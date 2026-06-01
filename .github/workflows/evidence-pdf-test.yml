@@ -1,0 +1,234 @@
+name: "TEST: Audit-Grade Evidence PDF (standalone)"
+
+# Standalone, manually-triggered test harness for the Phase-6 evidence-PDF
+# chain. It synthesizes a realistic FULL-PIPELINE evidence set (SAST/CodeQL,
+# IaC/Checkov, SCA/Trivy fs+image, DAST/ZAP, SBOM, signing log, SLSA
+# provenance, coverage, pipeline metadata) and runs the SAME scripts the real
+# Phase-6 job runs — fail-closed — so we can prove the PDF generation works on
+# a real runner WITHOUT the full build/deploy/Azure pipeline.
+#
+# Trigger:  Actions tab -> this workflow -> "Run workflow"  (workflow_dispatch)
+# Output:   the "evidence-audit-pdf" artifact (the sealed PDF/A-3 + manifest +
+#           OSCAL + veraPDF report + cosign bundles + RFC-3161 tokens).
+
+on:
+  workflow_dispatch:
+    inputs:
+      fail_closed:
+        description: "Fail-closed (require weasyprint/veraPDF/cosign). Uncheck to allow degrade."
+        type: boolean
+        default: true
+  # TEMPORARY: auto-run on pushes to this test branch so we can prove the chain
+  # in CI before the workflow exists on the default branch (workflow_dispatch via
+  # API requires the file to be on the default branch first). Remove this `push`
+  # trigger before merging — the production path is the Phase-6 reusable workflow.
+  push:
+    branches:
+      - feat/evidence-pdf
+
+permissions:
+  contents: read
+  id-token: write   # keyless cosign sign-blob over the manifest + PDF hash
+
+jobs:
+  test-evidence-pdf:
+    name: "Synthesize evidence + build sealed PDF"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Synthesize full-pipeline evidence
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/codeql
+          # SCA — Trivy filesystem + image
+          cat > evidence/trivy-sca-results.json <<'J'
+          {"SchemaVersion":2,"ArtifactName":"package-lock.json","Results":[{"Target":"package-lock.json","Class":"lang-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2024-1234","PkgName":"lodash","InstalledVersion":"4.17.20","FixedVersion":"4.17.21","Severity":"HIGH","Title":"Prototype pollution in lodash"}]}]}
+          J
+          cat > evidence/trivy-image-results.json <<'J'
+          {"SchemaVersion":2,"ArtifactName":"app:staging","Results":[{"Target":"app:staging (debian 12)","Class":"os-pkgs","Vulnerabilities":[{"VulnerabilityID":"CVE-2024-9999","PkgName":"openssl","InstalledVersion":"3.0.11","Severity":"CRITICAL","Title":"OpenSSL buffer overflow"}]}]}
+          J
+          # SAST — CodeQL SARIF
+          cat > evidence/codeql/javascript.sarif <<'J'
+          {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"CodeQL","version":"2.18.0","rules":[{"id":"js/xss","name":"ReflectedXss"}]}},"results":[{"ruleId":"js/xss","level":"warning","message":{"text":"Potential reflected XSS from untrusted input"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/routes/items.ts"},"region":{"startLine":42}}}]}]}]}
+          J
+          # IaC — Checkov SARIF
+          cat > evidence/checkov-results.sarif <<'J'
+          {"version":"2.1.0","runs":[{"tool":{"driver":{"name":"Checkov","version":"3.2.0"}},"results":[{"ruleId":"CKV_AZURE_44","level":"error","message":{"text":"Ensure Storage Account uses latest TLS"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"infra/modules/storage/main.tf"},"region":{"startLine":10}}}]}]}]}
+          J
+          # SBOM — CycloneDX
+          cat > evidence/sbom.cyclonedx.json <<'J'
+          {"bomFormat":"CycloneDX","specVersion":"1.6","version":1,"components":[{"type":"library","name":"express","version":"4.19.2"},{"type":"library","name":"helmet","version":"7.1.0"},{"type":"library","name":"pino","version":"9.0.0"}]}
+          J
+          # DAST — OWASP ZAP
+          cat > evidence/zap-report.json <<'J'
+          {"@version":"2.15.0","site":[{"@name":"https://staging.example","alerts":[{"alertRef":"10038","name":"Content Security Policy (CSP) Header Not Set","riskcode":"2","riskdesc":"Medium","instances":[{"uri":"https://staging.example/"}]},{"alertRef":"10096","name":"Timestamp Disclosure","riskcode":"1","riskdesc":"Low","instances":[]}]}]}
+          J
+          # Signing + SLSA provenance
+          cat > evidence/cosign-verification.log <<'J'
+          Verification for app@sha256:deadbeefcafe -- The following checks were performed on each of these signatures:
+          - The cosign claims were validated
+          - Existence of the claims in the transparency log was verified offline
+          - The code-signing certificate was verified using trusted certificate authority certificates
+          Certificate subject: https://github.com/CyberForge-Agency/DevSecOps-Pipeline/.github/workflows/sign-and-attest.yml@refs/heads/main
+          Certificate issuer URL: https://token.actions.githubusercontent.com
+          J
+          cat > evidence/provenance.intoto.jsonl <<'J'
+          {"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"app","digest":{"sha256":"deadbeefcafe"}}],"predicate":{"buildDefinition":{"buildType":"https://slsa.dev/container-based-build/v0.1"},"runDetails":{"builder":{"id":"https://github.com/CyberForge-Agency/DevSecOps-Pipeline/.github/workflows/build-and-scan.yml"}}}}
+          J
+          # Coverage
+          cat > evidence/coverage-summary.json <<'J'
+          {"total":{"lines":{"total":420,"covered":368,"pct":87.6},"branches":{"pct":82.1},"functions":{"pct":90.4},"statements":{"pct":87.9}}}
+          J
+          # Pipeline metadata + DPA + data-flow
+          cat > evidence/pipeline-run.json <<'J'
+          {"run_id":"TEST","run_number":"1","repo":"CyberForge-Agency/DevSecOps-Pipeline","sha_short":"testsha","environment":"staging","timestamp":"synthetic","run_url":"https://github.com/CyberForge-Agency/DevSecOps-Pipeline/actions","gates":{"security_gate":"pass","build_scan":"pass","sign_attest":"pass","deploy":"pass","dast":"pass"}}
+          J
+          cat > evidence/dpa-compliance-check.json <<'J'
+          {"processors":[{"name":"Microsoft Azure","dpa":"signed","scc":"yes","location":"EU West"}]}
+          J
+          cat > evidence/data-flow-diagram.json <<'J'
+          {"nodes":[{"id":"user"},{"id":"app"},{"id":"db"}],"flows":[{"from":"user","to":"app","data":"email","pii":true},{"from":"app","to":"db","data":"item","pii":false}]}
+          J
+          # Compliance matrix — produced by the project's real generator
+          bash scripts/generate-compliance-matrix.sh evidence > evidence/compliance-matrix.json
+          # A consolidated security report (mirrors what Phase 6 builds)
+          python3 - <<'PY'
+          import json, glob, os, datetime
+          reports = {}
+          for f in glob.glob('evidence/*.json') + glob.glob('evidence/**/*.sarif', recursive=True):
+              try:
+                  reports[os.path.basename(f)] = json.load(open(f))
+              except Exception:
+                  pass
+          json.dump({'consolidated_at': 'synthetic', 'reports': reports},
+                    open('evidence/security-report.json','w'), indent=2)
+          PY
+          echo "Synthesized evidence files:"
+          ls -R evidence
+
+      - name: Install WeasyPrint system libraries + tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangocairo-1.0-0 libcairo2 \
+            libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info \
+            fonts-dejavu-core fonts-liberation2 \
+            qpdf jq poppler-utils ghostscript
+
+      - name: Install Python PDF toolchain
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-pdf.txt
+
+      - name: Install veraPDF
+        run: |
+          set -euo pipefail
+          VERAPDF_VER="1.26.2"
+          VERAPDF_MINOR="1.26"   # release dir = MINOR version; filename = patch version
+          ZIP="verapdf-greenfield-${VERAPDF_VER}-installer.zip"
+          curl -fsSL -o "/tmp/${ZIP}" "https://software.verapdf.org/releases/${VERAPDF_MINOR}/${ZIP}"
+          unzip -q "/tmp/${ZIP}" -d /tmp/verapdf-installer
+          JAR="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -n1)"
+          cat > /tmp/verapdf-auto.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+              <installpath>/opt/verapdf</installpath>
+            </com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+              <pack index="0" name="veraPDF GUI" selected="true"/>
+              <pack index="1" name="veraPDF Batch files" selected="true"/>
+              <pack index="2" name="veraPDF Validation model" selected="true"/>
+              <pack index="3" name="veraPDF Documentation" selected="false"/>
+              <pack index="4" name="veraPDF Sample Files" selected="false"/>
+            </com.izforge.izpack.panels.packs.PacksPanel>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          java -jar "${JAR}" /tmp/verapdf-auto.xml
+          echo "/opt/verapdf" >> "${GITHUB_PATH}"
+
+      - name: Cosign install
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Build sealed audit PDF (same chain as Phase 6)
+        env:
+          EVIDENCE_ALLOW_DEGRADE: ${{ inputs.fail_closed && '' || '1' }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_DIGEST: "sha256:deadbeefcafe"
+          REPORT_ID: "cyberforge-evidence-TEST"
+          PERIOD_START: "synthetic-window-start"
+          PERIOD_END: "synthetic-window-end"
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pdf-test.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+          TSA_URL: https://freetsa.org/tsr
+        run: |
+          set -euo pipefail
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; export GENERATED_AT
+          # Pass 1: provisional manifest so OSCAL + the audit document can link
+          # each control to its evidence artifact's SHA-256.
+          python3 scripts/generate-evidence-manifest.py evidence --out evidence/manifest.json --legacy-out evidence/manifest.sha256
+          python3 scripts/generate-oscal.py evidence evidence/compliance-matrix.json --manifest evidence/manifest.json --out evidence/oscal-assessment-results.json
+          bash scripts/generate-html-report.sh evidence evidence/evidence-report.html
+          python3 scripts/build-audit-document.py --evidence-dir evidence --manifest evidence/manifest.json --report-html evidence/evidence-report.html --compliance-matrix evidence/compliance-matrix.json --out evidence/audit-document.html
+          python3 scripts/render-evidence-pdf.py --html evidence/audit-document.html --evidence-dir evidence --out evidence/evidence-report.pdf \
+            --attach evidence/manifest.json --attach evidence/oscal-assessment-results.json --attach evidence/sbom.cyclonedx.json --attach evidence/provenance.intoto.jsonl
+          # Pass 2: FINAL manifest — now includes the rendered PDF, OSCAL and
+          # audit document. Sealing outputs (*.bundle, *.tsr, merkle-root.txt,
+          # pdf.sha256, verapdf-report.json) are excluded from the hashed set,
+          # so this manifest is stable across the seal step and is NOT
+          # regenerated afterward (regenerating after signing was what broke the
+          # cosign signature previously).
+          python3 scripts/generate-evidence-manifest.py evidence --out evidence/manifest.json --legacy-out evidence/manifest.sha256
+          bash scripts/seal-evidence.sh evidence evidence/evidence-report.pdf evidence/manifest.json
+          bash scripts/verify-evidence-pack.sh evidence
+
+      - name: Show PDF facts
+        if: always()
+        run: |
+          echo "## Evidence PDF test result" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f evidence/evidence-report.pdf ]; then
+            BYTES=$(wc -c < evidence/evidence-report.pdf)
+            PAGES=$(pdfinfo evidence/evidence-report.pdf 2>/dev/null | awk '/Pages/{print $2}')
+            PDFA=$(strings evidence/evidence-report.pdf | grep -c pdfaid || true)
+            EMB=$(strings evidence/evidence-report.pdf | grep -c EmbeddedFile || true)
+            {
+              echo "| Property | Value |"
+              echo "|---|---|"
+              echo "| PDF produced | yes |"
+              echo "| Bytes | ${BYTES} |"
+              echo "| Pages | ${PAGES:-?} |"
+              echo "| PDF/A XMP markers | ${PDFA} |"
+              echo "| Embedded evidence files | ${EMB} |"
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "PDF NOT produced (see logs)." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload sealed audit PDF + artifacts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evidence-audit-pdf
+          path: |
+            evidence/evidence-report.pdf
+            evidence/audit-document.html
+            evidence/manifest.json
+            evidence/oscal-assessment-results.json
+            evidence/verapdf-report.json
+            evidence/*.bundle
+            evidence/*.tsr
+          retention-days: 30
+          if-no-files-found: warn

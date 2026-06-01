@@ -1,0 +1,26 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":pinDependencies"
+  ],
+  "labels": ["dependencies", "automated"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "automerge": false,
+      "labels": ["ci", "supply-chain"]
+    },
+    {
+      "matchManagers": ["npm"],
+      "stabilityDays": 3,
+      "automerge": false
+    }
+  ]
+}

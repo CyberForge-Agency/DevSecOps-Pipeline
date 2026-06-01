@@ -1,0 +1,17 @@
+# Each ignored CVE MUST have a VEX justification comment above it.
+# Format: # VEX: <status> - <justification>
+# Allowed statuses: not_affected, false_positive, will_not_fix
+#
+# Example:
+# VEX: not_affected - This component is not reachable in our configuration
+# CVE-2024-XXXXX
+
+# No active suppressions.
+#
+# History (2026-06-01): the prior waivers (CVE-2026-0861 glibc, CVE-2026-28390
+# openssl) covered unpatched OS CVEs in the old gcr.io/distroless/nodejs20-debian12
+# base. The runtime base was switched to cgr.dev/chainguard/node (Wolfi-based),
+# which ships fixed packages and scans 0 HIGH/CRITICAL, so those waivers no
+# longer apply and were removed rather than left as dead entries. The four
+# OpenSSL libssl3 CVEs that were blocking (CVE-2026-31789, -28387, -28388,
+# -28389) are RESOLVED by the base-image change, not suppressed.

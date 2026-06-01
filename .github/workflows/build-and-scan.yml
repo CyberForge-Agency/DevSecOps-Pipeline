@@ -1,0 +1,665 @@
+name: "Phase 2: Build & Scan"
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+      push_image:
+        description: "Push image to ACR (false for PR checks)"
+        required: false
+        type: string
+        default: "false"
+    outputs:
+      image_uri:
+        description: "Full image URI with SHA tag"
+        value: ${{ jobs.docker-build.outputs.image_uri }}
+      image_digest:
+        description: "Image digest (sha256)"
+        value: ${{ jobs.docker-build.outputs.image_digest }}
+
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+  id-token: write
+
+env:
+  ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
+  IMAGE_NAME: cyberforge-demo
+
+jobs:
+  dependency-scan:
+    name: "Dependency Scan (Trivy SCA)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update && sudo apt-get install -y trivy
+
+      - name: Run Trivy filesystem scan
+        run: |
+          # pipefail is REQUIRED: without it the pipe's exit status is tee's
+          # (always 0), so Trivy's --exit-code 1 on HIGH/CRITICAL findings would
+          # be swallowed and the gate would silently pass. GitHub's default
+          # shell (bash -e) does NOT enable pipefail.
+          set -o pipefail
+          trivy fs app/ \
+            --format json \
+            --output trivy-sca-results.json \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            --ignorefile app/.trivyignore \
+            2>&1 | tee /tmp/trivy-sca-console.txt
+
+      - name: Generate Trivy SCA summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+
+          trivy_version = subprocess.run(["trivy", "--version"], capture_output=True, text=True).stdout.strip()
+
+          summary = {
+              "tool": "Trivy",
+              "tool_version": trivy_version,
+              "scan_type": "filesystem (SCA)",
+              "target": "app/",
+              "severity_filter": "CRITICAL,HIGH",
+              "ignorefile": "app/.trivyignore",
+              "timestamp": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip(),
+          }
+
+          try:
+              with open("trivy-sca-results.json") as f:
+                  data = json.load(f)
+              results = data.get("Results", [])
+              total_deps = 0
+              total_vulns = 0
+              severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+              for r in results:
+                  total_deps += len(r.get("Packages", []))
+                  for v in r.get("Vulnerabilities", []):
+                      sev = v.get("Severity", "").upper()
+                      total_vulns += 1
+                      if sev in severity_counts:
+                          severity_counts[sev] += 1
+              summary["total_dependencies_scanned"] = total_deps
+              summary["total_findings"] = total_vulns
+              summary["severity_breakdown"] = severity_counts
+          except Exception as e:
+              summary["parse_error"] = str(e)
+
+          with open("trivy-sca-summary.json", "w") as f:
+              json.dump(summary, f, indent=2)
+          PY
+
+      - name: Upload Trivy SCA results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: trivy-sca-results
+          path: |
+            trivy-sca-results.json
+            trivy-sca-summary.json
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Dependency Scan (Trivy SCA)
+          EOF
+          if [ -f trivy-sca-results.json ]; then
+            python3 - <<'PY'
+          import json, os
+          try:
+              with open("trivy-sca-results.json") as f:
+                  data = json.load(f)
+              results = data.get("Results", [])
+              high = 0
+              critical = 0
+              medium = 0
+              low = 0
+              for r in results:
+                  for v in r.get("Vulnerabilities", []):
+                      sev = v.get("Severity", "").upper()
+                      if sev == "CRITICAL":
+                          critical += 1
+                      elif sev == "HIGH":
+                          high += 1
+                      elif sev == "MEDIUM":
+                          medium += 1
+                      elif sev == "LOW":
+                          low += 1
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write("\n| Severity | Count |\n|----------|-------|\n")
+                  fh.write(f"| CRITICAL | {critical} |\n")
+                  fh.write(f"| HIGH | {high} |\n")
+                  fh.write(f"| MEDIUM | {medium} |\n")
+                  fh.write(f"| LOW | {low} |\n\n")
+                  if critical == 0 and high == 0:
+                      fh.write(":white_check_mark: **0 HIGH/CRITICAL vulnerabilities found**\n")
+                  else:
+                      fh.write(f":x: **{critical + high} HIGH/CRITICAL vulnerabilities found**\n")
+          except Exception as e:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write(f"\nTrivy scan completed. Results uploaded as artifact.\n")
+          PY
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Trivy scan completed. Results uploaded as artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  codeql:
+    name: "SAST (CodeQL)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies (for CodeQL build context)
+        run: cd app && npm ci
+
+      - name: Build app (for CodeQL)
+        run: cd app && npm run build
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          category: /language:javascript-typescript
+          output: codeql-results
+          upload: false
+
+      - name: Upload CodeQL SARIF to Code Scanning
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: codeql-results/javascript.sarif
+          category: /language:javascript-typescript
+
+      - name: Generate CodeQL analysis summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, os, subprocess
+
+          summary = {
+              "tool": "CodeQL",
+              "scan_type": "SAST",
+              "language": "javascript-typescript",
+              "query_suite": "security-extended",
+              "timestamp": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip(),
+          }
+
+          try:
+              with open("codeql-results/javascript.sarif") as f:
+                  sarif = json.load(f)
+              total_findings = 0
+              rules_evaluated = 0
+              for run in sarif.get("runs", []):
+                  total_findings += len(run.get("results", []))
+                  rules_evaluated += len(run.get("tool", {}).get("driver", {}).get("rules", []))
+              summary["total_findings"] = total_findings
+              summary["rules_evaluated"] = rules_evaluated
+              # List finding details
+              findings_detail = []
+              for run in sarif.get("runs", []):
+                  for result in run.get("results", []):
+                      findings_detail.append({
+                          "rule_id": result.get("ruleId", "unknown"),
+                          "level": result.get("level", "note"),
+                          "message": result.get("message", {}).get("text", "")[:200],
+                      })
+              summary["findings_detail"] = findings_detail[:50]  # cap at 50
+          except Exception as e:
+              summary["parse_error"] = str(e)
+
+          with open("codeql-results/codeql-summary.json", "w") as f:
+              json.dump(summary, f, indent=2)
+          PY
+
+      - name: Upload CodeQL SARIF as artifact
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: codeql-results
+          path: codeql-results/
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## SAST (CodeQL)
+
+          | Detail | Value |
+          |--------|-------|
+          | Language | JavaScript / TypeScript |
+          | Query suite | security-extended |
+          EOF
+          if [ -f codeql-results/javascript.sarif ]; then
+            python3 - <<'PY'
+          import json, os
+          try:
+              with open("codeql-results/javascript.sarif") as f:
+                  sarif = json.load(f)
+              total_findings = 0
+              for run in sarif.get("runs", []):
+                  total_findings += len(run.get("results", []))
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write(f"| Findings | {total_findings} |\n")
+                  fh.write(f"| SARIF upload | :white_check_mark: Uploaded |\n\n")
+                  if total_findings == 0:
+                      fh.write(":white_check_mark: **CodeQL analysis complete, no findings**\n")
+                  else:
+                      fh.write(f":warning: **CodeQL analysis complete, {total_findings} finding(s) -- SARIF uploaded**\n")
+          except Exception:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write("| SARIF upload | :white_check_mark: Uploaded |\n\n")
+                  fh.write(":white_check_mark: **CodeQL analysis complete, SARIF uploaded**\n")
+          PY
+          else
+            echo "| SARIF upload | :white_check_mark: Uploaded |" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **CodeQL analysis complete, SARIF uploaded**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  unit-tests:
+    name: "Unit Tests + Coverage"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        run: cd app && npm ci
+
+      - name: Run tests with coverage
+        env:
+          JEST_JUNIT_OUTPUT_DIR: ./test-results
+        run: cd app && npm run test:ci
+
+      - name: Check coverage threshold (>=80%)
+        run: |
+          COVERAGE=$(cd app && cat coverage/coverage-summary.json | \
+            python3 -c "import sys,json; d=json.load(sys.stdin)['total']; print(min(d['lines']['pct'],d['branches']['pct'],d['functions']['pct'],d['statements']['pct']))")
+          echo "Minimum coverage: ${COVERAGE}%"
+          python3 - "$COVERAGE" <<'PY'
+          import sys
+          cov = float(sys.argv[1])
+          if cov < 80:
+              print(f"::error::Test coverage {cov}% is below the 80% threshold")
+              raise SystemExit(1)
+          PY
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-report
+          path: app/coverage/
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Unit Tests + Coverage
+          EOF
+          python3 - <<'PY'
+          import json, os, glob
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+
+          # Parse JUnit XML for test counts
+          test_count = 0
+          test_failures = 0
+          test_errors = 0
+          try:
+              import xml.etree.ElementTree as ET
+              for junit_file in glob.glob("app/test-results/*.xml") + glob.glob("app/junit.xml"):
+                  tree = ET.parse(junit_file)
+                  root = tree.getroot()
+                  for ts in root.iter("testsuite"):
+                      test_count += int(ts.get("tests", 0))
+                      test_failures += int(ts.get("failures", 0))
+                      test_errors += int(ts.get("errors", 0))
+          except Exception:
+              pass
+
+          # Parse coverage
+          lines_pct = branches_pct = functions_pct = statements_pct = "N/A"
+          try:
+              with open("app/coverage/coverage-summary.json") as f:
+                  cov = json.load(f)["total"]
+              lines_pct = cov["lines"]["pct"]
+              branches_pct = cov["branches"]["pct"]
+              functions_pct = cov["functions"]["pct"]
+              statements_pct = cov["statements"]["pct"]
+              min_cov = min(lines_pct, branches_pct, functions_pct, statements_pct)
+          except Exception:
+              min_cov = None
+
+          with open(summary, "a") as fh:
+              fh.write("\n| Metric | Value |\n|--------|-------|\n")
+              if test_count > 0:
+                  passed = test_count - test_failures - test_errors
+                  indicator = ":white_check_mark:" if (test_failures + test_errors) == 0 else ":x:"
+                  fh.write(f"| Tests run | {test_count} |\n")
+                  fh.write(f"| Passed | {passed} {indicator} |\n")
+                  fh.write(f"| Failed | {test_failures} |\n")
+                  fh.write(f"| Errors | {test_errors} |\n")
+              fh.write(f"| Line coverage | {lines_pct}% |\n")
+              fh.write(f"| Branch coverage | {branches_pct}% |\n")
+              fh.write(f"| Function coverage | {functions_pct}% |\n")
+              fh.write(f"| Statement coverage | {statements_pct}% |\n")
+              if min_cov is not None:
+                  indicator = ":white_check_mark:" if min_cov >= 80 else ":x:"
+                  fh.write(f"\n{indicator} **Minimum coverage: {min_cov}%** (threshold: 80%)\n")
+          PY
+
+  docker-build:
+    name: "Docker Build + Image Scan + SBOM"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [dependency-scan, codeql, unit-tests]
+    outputs:
+      image_uri: ${{ steps.meta.outputs.image_uri }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Set image metadata
+        id: meta
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          PUSH_IMAGE: ${{ inputs.push_image }}
+        run: |
+          SHORT_SHA=$(echo "${COMMIT_SHA}" | cut -c1-7)
+          if [ "${PUSH_IMAGE}" = "true" ]; then
+            IMAGE_URI="${{ env.ACR_REGISTRY }}/${{ env.IMAGE_NAME }}:${SHORT_SHA}"
+          else
+            # PR runs use a local tag so the build/scan jobs do not depend on Azure variables.
+            IMAGE_URI="${{ env.IMAGE_NAME }}:${SHORT_SHA}"
+          fi
+          echo "image_uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4.0.0
+
+      - name: Azure Login (OIDC)
+        if: inputs.push_image == 'true'
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        if: inputs.push_image == 'true'
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Build Docker image
+        id: build
+        uses: docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f # v7.1.0
+        with:
+          context: app/
+          push: ${{ inputs.push_image == 'true' }}
+          tags: ${{ steps.meta.outputs.image_uri }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          load: ${{ inputs.push_image != 'true' }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            GIT_REF=${{ github.ref }}
+            BUILD_TIME=${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+            RUN_ID=${{ github.run_id }}
+            RUN_NUMBER=${{ github.run_number }}
+            REPOSITORY=${{ github.repository }}
+            WORKFLOW_REF=${{ github.workflow_ref }}
+
+      - name: Capture Docker build metadata
+        if: always()
+        run: |
+          IMAGE_URI="${{ steps.meta.outputs.image_uri }}"
+          python3 - <<PY
+          import json, subprocess, os
+
+          image_uri = os.environ.get("IMAGE_URI", "$IMAGE_URI")
+          metadata = {
+              "timestamp": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip(),
+              "image_uri": image_uri,
+              "image_digest": "${{ steps.build.outputs.digest }}",
+              "pushed": ${{ inputs.push_image == 'true' && 'True' || 'False' }},
+              "build_context": "app/",
+              "dockerfile": "app/Dockerfile",
+              "cache_from": "type=gha",
+              "cache_to": "type=gha,mode=max",
+          }
+
+          # Try to get image inspect data if loaded locally
+          try:
+              inspect_raw = subprocess.run(
+                  ["docker", "image", "inspect", image_uri],
+                  capture_output=True, text=True
+              )
+              if inspect_raw.returncode == 0:
+                  inspect_data = json.loads(inspect_raw.stdout)
+                  if inspect_data:
+                      img = inspect_data[0]
+                      metadata["size_bytes"] = img.get("Size", 0)
+                      metadata["size_mb"] = round(img.get("Size", 0) / 1048576, 2)
+                      metadata["architecture"] = img.get("Architecture", "unknown")
+                      metadata["os"] = img.get("Os", "unknown")
+                      metadata["created"] = img.get("Created", "unknown")
+                      # Layer count
+                      layers = img.get("RootFS", {}).get("Layers", [])
+                      metadata["layer_count"] = len(layers)
+                      # Base image from config labels
+                      labels = img.get("Config", {}).get("Labels", {})
+                      if labels:
+                          metadata["labels"] = labels
+          except Exception as e:
+              metadata["inspect_error"] = str(e)
+
+          with open("docker-build-metadata.json", "w") as f:
+              json.dump(metadata, f, indent=2)
+          PY
+        env:
+          IMAGE_URI: ${{ steps.meta.outputs.image_uri }}
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update && sudo apt-get install -y trivy
+
+      - name: Trivy image scan
+        run: |
+          # pipefail is REQUIRED: without it the pipe's exit status is tee's
+          # (always 0), so Trivy's --exit-code 1 on HIGH/CRITICAL findings would
+          # be swallowed and the gate would silently pass. GitHub's default
+          # shell (bash -e) does NOT enable pipefail.
+          set -o pipefail
+          trivy image "${{ steps.meta.outputs.image_uri }}" \
+            --format json \
+            --output trivy-image-results.json \
+            --severity CRITICAL,HIGH \
+            --exit-code 1 \
+            --ignorefile app/.trivyignore \
+            2>&1 | tee /tmp/trivy-image-console.txt
+
+      - name: Generate Trivy image scan metadata
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, subprocess
+
+          trivy_version = subprocess.run(["trivy", "--version"], capture_output=True, text=True).stdout.strip()
+
+          metadata = {
+              "tool": "Trivy",
+              "tool_version": trivy_version,
+              "scan_type": "container image",
+              "image_scanned": "${{ steps.meta.outputs.image_uri }}",
+              "image_digest": "${{ steps.build.outputs.digest }}",
+              "severity_filter": "CRITICAL,HIGH",
+              "ignorefile": "app/.trivyignore",
+              "timestamp": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip(),
+          }
+
+          try:
+              with open("trivy-image-results.json") as f:
+                  data = json.load(f)
+              total_vulns = 0
+              severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+              for r in data.get("Results", []):
+                  for v in r.get("Vulnerabilities", []):
+                      sev = v.get("Severity", "").upper()
+                      total_vulns += 1
+                      if sev in severity_counts:
+                          severity_counts[sev] += 1
+              metadata["total_findings"] = total_vulns
+              metadata["severity_breakdown"] = severity_counts
+          except Exception as e:
+              metadata["parse_error"] = str(e)
+
+          with open("trivy-image-scan-metadata.json", "w") as f:
+              json.dump(metadata, f, indent=2)
+          PY
+
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+        with:
+          image: ${{ steps.meta.outputs.image_uri }}
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+
+      - name: Upload image scan results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image-scan-results
+          path: |
+            trivy-image-results.json
+            trivy-image-scan-metadata.json
+            sbom.cyclonedx.json
+
+      - name: Upload Docker build metadata
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: docker-build-metadata
+          path: docker-build-metadata.json
+
+      - name: Job Summary
+        if: always()
+        run: |
+          IMAGE_URI="${{ steps.meta.outputs.image_uri }}"
+          IMAGE_DIGEST="${{ steps.build.outputs.digest }}"
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Docker Build + Image Scan + SBOM
+
+          ### Image Details
+          | Detail | Value |
+          |--------|-------|
+          | Image URI | \`${IMAGE_URI}\` |
+          | Digest | \`${IMAGE_DIGEST:-pending}\` |
+          EOF
+          # Image size (if available locally)
+          SIZE=$(docker image inspect "$IMAGE_URI" --format='{{.Size}}' 2>/dev/null || echo "")
+          if [ -n "$SIZE" ]; then
+            SIZE_MB=$(echo "scale=1; $SIZE / 1048576" | bc 2>/dev/null || echo "N/A")
+            echo "| Size | ${SIZE_MB} MB |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Trivy image scan results
+          python3 - <<'PY'
+          import json, os
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          # Trivy image scan
+          try:
+              with open("trivy-image-results.json") as f:
+                  data = json.load(f)
+              high = 0
+              critical = 0
+              for r in data.get("Results", []):
+                  for v in r.get("Vulnerabilities", []):
+                      sev = v.get("Severity", "").upper()
+                      if sev == "CRITICAL":
+                          critical += 1
+                      elif sev == "HIGH":
+                          high += 1
+              with open(summary, "a") as fh:
+                  fh.write("### Trivy Image Scan\n")
+                  fh.write(f"| Severity | Count |\n|----------|-------|\n")
+                  fh.write(f"| CRITICAL | {critical} |\n")
+                  fh.write(f"| HIGH | {high} |\n\n")
+                  if critical == 0 and high == 0:
+                      fh.write(":white_check_mark: **No HIGH/CRITICAL image vulnerabilities**\n\n")
+                  else:
+                      fh.write(f":x: **{critical + high} HIGH/CRITICAL image vulnerabilities found**\n\n")
+          except Exception:
+              with open(summary, "a") as fh:
+                  fh.write("### Trivy Image Scan\nResults uploaded as artifact.\n\n")
+
+          # SBOM component count
+          try:
+              with open("sbom.cyclonedx.json") as f:
+                  sbom = json.load(f)
+              components = len(sbom.get("components", []))
+              with open(summary, "a") as fh:
+                  fh.write(f"### SBOM (CycloneDX)\n")
+                  fh.write(f"| Detail | Value |\n|--------|-------|\n")
+                  fh.write(f"| Components | {components} |\n")
+                  fh.write(f"| Format | CycloneDX JSON |\n\n")
+          except Exception:
+              with open(summary, "a") as fh:
+                  fh.write("### SBOM\nSBOM generated and uploaded as artifact.\n\n")
+          PY

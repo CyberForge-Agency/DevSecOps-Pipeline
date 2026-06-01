@@ -1,0 +1,190 @@
+name: "ICT Incident Report (DORA Art. 19)"
+description: "Report and track a major ICT-related incident per DORA Article 19 requirements"
+title: "[ICT INCIDENT] "
+labels:
+  - "incident"
+  - "security"
+  - "dora-reporting"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## ICT Incident Report
+
+        This template captures the information required by DORA Article 19 for major ICT-related incident notifications.
+        Complete all required fields. Update this issue as the incident progresses through Initial -> Intermediate -> Final phases.
+
+        Refer to the [Incident Response Runbook](docs/runbooks/incident-response.md) for the full process.
+
+  - type: dropdown
+    id: report-phase
+    attributes:
+      label: "Report Phase"
+      description: "Current phase of this incident report"
+      options:
+        - "Initial Notification (within 4 hours)"
+        - "Intermediate Report (within 72 hours)"
+        - "Final Report (within 1 month)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Severity"
+      description: "Incident severity classification"
+      options:
+        - "SEV-1 (Critical)"
+        - "SEV-2 (High)"
+        - "SEV-3 (Medium)"
+        - "SEV-4 (Low)"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: incident-type
+    attributes:
+      label: "Incident Type"
+      description: "Primary classification of the incident (DORA Art. 18)"
+      options:
+        - "Data breach / Confidentiality compromise"
+        - "Service disruption / Availability impact"
+        - "Cyber attack (malware, ransomware, DDoS, etc.)"
+        - "Supply chain compromise"
+        - "Unauthorized access"
+        - "Data integrity compromise"
+        - "Infrastructure failure"
+        - "Other"
+    validations:
+      required: true
+
+  - type: input
+    id: detection-time
+    attributes:
+      label: "Detection Time (UTC)"
+      description: "When was this incident first detected? Format: YYYY-MM-DD HH:MM UTC"
+      placeholder: "2026-04-13 14:30 UTC"
+    validations:
+      required: true
+
+  - type: input
+    id: classification-time
+    attributes:
+      label: "Classification Time (UTC)"
+      description: "When was this incident classified as major? Format: YYYY-MM-DD HH:MM UTC"
+      placeholder: "2026-04-13 15:00 UTC"
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-services
+    attributes:
+      label: "Affected Services"
+      description: "Which CyberForge services/components are impacted?"
+      placeholder: |
+        - e.g., CI/CD pipeline execution
+        - e.g., Evidence pack generation
+        - e.g., Container deployment
+        - e.g., ACR image registry
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected-clients
+    attributes:
+      label: "Affected Clients"
+      description: "Number and type of affected clients. Include whether any clients are in critical sectors (banking, insurance, market infrastructure)."
+      placeholder: |
+        - Number of affected clients: X
+        - Client sectors: e.g., banking, insurance
+        - Cross-border impact: Yes/No (list affected EU member states)
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact-assessment
+    attributes:
+      label: "Impact Assessment"
+      description: "Describe the business impact, including duration, data affected, and economic impact if known."
+      placeholder: |
+        - Duration of impact: X hours
+        - Data types affected: e.g., pipeline logs, evidence packs, client configurations
+        - Estimated economic impact: EUR X
+        - Reputational impact: e.g., none, media coverage, regulatory inquiry
+    validations:
+      required: true
+
+  - type: dropdown
+    id: current-status
+    attributes:
+      label: "Current Status"
+      description: "Current status of the incident"
+      options:
+        - "Detected -- Triage in progress"
+        - "Confirmed -- Containment in progress"
+        - "Contained -- Remediation in progress"
+        - "Remediated -- Monitoring for recurrence"
+        - "Resolved -- Post-incident review pending"
+        - "Closed -- Final report submitted"
+    validations:
+      required: true
+
+  - type: textarea
+    id: root-cause
+    attributes:
+      label: "Root Cause (Preliminary or Final)"
+      description: "Best current understanding of the root cause. Update as investigation progresses."
+      placeholder: |
+        Initial: Unknown, investigation in progress
+        Intermediate: Preliminary root cause analysis
+        Final: Complete root cause with 5 Whys analysis
+    validations:
+      required: false
+
+  - type: textarea
+    id: actions-taken
+    attributes:
+      label: "Actions Taken"
+      description: "Chronological list of containment and remediation actions taken."
+      placeholder: |
+        - 2026-04-13 14:35 UTC: Alert received, on-call engineer paged
+        - 2026-04-13 14:45 UTC: Initial triage completed, classified as SEV-1
+        - 2026-04-13 15:00 UTC: Containment action -- disabled affected service
+    validations:
+      required: true
+
+  - type: textarea
+    id: preventive-measures
+    attributes:
+      label: "Preventive Measures (Final Report)"
+      description: "For the final report: describe specific changes implemented to prevent recurrence."
+      placeholder: |
+        - e.g., Added monitoring alert for X
+        - e.g., Implemented additional access control for Y
+        - e.g., Updated security gate to detect Z
+    validations:
+      required: false
+
+  - type: input
+    id: incident-lead
+    attributes:
+      label: "Incident Lead"
+      description: "Name and contact of the person leading the incident response"
+      placeholder: "e.g., Jan Kowalski (@jkowalski)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: regulatory-notifications
+    attributes:
+      label: "Regulatory Notifications Sent"
+      description: "Track which regulatory bodies have been notified and when."
+      placeholder: |
+        - [ ] KNF (DORA) -- Initial notification sent: YYYY-MM-DD HH:MM UTC
+        - [ ] KNF (DORA) -- Intermediate report sent: YYYY-MM-DD HH:MM UTC
+        - [ ] KNF (DORA) -- Final report sent: YYYY-MM-DD HH:MM UTC
+        - [ ] CSIRT NASK (NIS2) -- Early warning sent: YYYY-MM-DD HH:MM UTC
+        - [ ] UODO (GDPR) -- Breach notification sent: YYYY-MM-DD HH:MM UTC
+        - [ ] Affected clients notified: YYYY-MM-DD HH:MM UTC
+    validations:
+      required: false

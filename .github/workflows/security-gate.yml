@@ -1,0 +1,384 @@
+name: "Phase 1: Security Gate"
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref to checkout"
+        required: false
+        type: string
+        default: ""
+      is_pull_request:
+        description: "Whether the caller event is a pull request"
+        required: false
+        type: string
+        default: "false"
+      pr_base_sha:
+        description: "Base commit SHA for PR diff scanning"
+        required: false
+        type: string
+        default: ""
+      pr_number:
+        description: "Pull request number (for signature verification API call)"
+        required: false
+        type: string
+        default: "0"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  secret-detection:
+    name: "Secret Detection (TruffleHog)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: TruffleHog Scan
+        id: trufflehog
+        uses: trufflesecurity/trufflehog@1aa1871f9ae24a8c8a3a48a9345514acf42beb39 # v3.82.13
+        with:
+          extra_args: --only-verified --results=verified
+          base: ${{ inputs.is_pull_request == 'true' && inputs.pr_base_sha || '' }}
+          head: ${{ inputs.ref || 'HEAD' }}
+
+      - name: Capture TruffleHog output
+        if: always()
+        run: |
+          mkdir -p /tmp/security-gate-logs
+          {
+            echo "=== TruffleHog Secret Detection ==="
+            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Configuration: --only-verified --results=verified"
+            echo "Base: ${{ inputs.is_pull_request == 'true' && inputs.pr_base_sha || 'full-repo' }}"
+            echo "Head: ${{ inputs.ref || 'HEAD' }}"
+            echo "Outcome: ${{ steps.trufflehog.outcome }}"
+            echo ""
+          } > /tmp/security-gate-logs/trufflehog-output.txt
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Secret Detection (TruffleHog)
+
+          | Check | Result |
+          |-------|--------|
+          | Scan type | Verified secrets only |
+          EOF
+          if [ "${{ steps.trufflehog.outcome }}" = "success" ]; then
+            echo "| Status | :white_check_mark: **No verified secrets found** |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Status | :x: **Verified secrets detected** |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload TruffleHog logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-gate-trufflehog-log
+          path: /tmp/security-gate-logs/trufflehog-output.txt
+
+  iac-security:
+    name: "IaC Security (Checkov)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Install Checkov
+        run: pip3 install checkov
+
+      - name: Run Checkov
+        run: |
+          # pipefail REQUIRED: tee would otherwise mask Checkov's non-zero exit
+          # on policy failures, silently passing the IaC security gate.
+          set -o pipefail
+          CHECKOV_SKIP_CHECKS="CKV_AZURE_163,CKV_AZURE_237,CKV_AZURE_165,CKV_AZURE_139,CKV_AZURE_166,CKV_AZURE_164,CKV_AZURE_167,CKV_AZURE_233,CKV_AZURE_189,CKV_AZURE_109,CKV2_AZURE_32,CKV_AZURE_59,CKV_AZURE_33,CKV2_AZURE_40,CKV2_AZURE_41,CKV2_AZURE_1,CKV2_AZURE_33,CKV2_AZURE_21,CKV_AZURE_206"
+          checkov -d infra/ \
+            --framework terraform \
+            --skip-check "$CHECKOV_SKIP_CHECKS" \
+            --output cli --output sarif \
+            --output-file-path console,checkov-results.sarif \
+            2>&1 | tee /tmp/checkov-console-output.txt
+
+      - name: Capture Checkov configuration proof
+        if: always()
+        run: |
+          mkdir -p /tmp/security-gate-logs
+          {
+            echo "=== Checkov IaC Security Scan ==="
+            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Checkov version: $(checkov --version 2>/dev/null || echo 'unknown')"
+            echo "Target directory: infra/"
+            echo "Framework: terraform"
+            echo "Skipped checks: CKV_AZURE_163,CKV_AZURE_237,CKV_AZURE_165,CKV_AZURE_139,CKV_AZURE_166,CKV_AZURE_164,CKV_AZURE_167,CKV_AZURE_233,CKV_AZURE_189,CKV_AZURE_109,CKV2_AZURE_32,CKV_AZURE_59,CKV_AZURE_33,CKV2_AZURE_40,CKV2_AZURE_41,CKV2_AZURE_1,CKV2_AZURE_33,CKV2_AZURE_21,CKV_AZURE_206"
+            echo "Output formats: cli, sarif"
+            echo ""
+            echo "--- Console Output ---"
+            cat /tmp/checkov-console-output.txt 2>/dev/null || echo "(no output captured)"
+            echo ""
+          } > /tmp/security-gate-logs/checkov-output.txt
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: checkov-results
+          path: checkov-results.sarif
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## IaC Security (Checkov)
+          EOF
+          if [ -f checkov-results.sarif ]; then
+            python3 - <<'PY'
+          import json, os
+          try:
+              with open("checkov-results.sarif") as f:
+                  sarif = json.load(f)
+              runs = sarif.get("runs", [])
+              passed = 0
+              failed = 0
+              skipped = 0
+              for run in runs:
+                  for result in run.get("results", []):
+                      level = result.get("level", "note")
+                      if level in ("error", "warning"):
+                          failed += 1
+                      else:
+                          passed += 1
+                  rules = run.get("tool", {}).get("driver", {}).get("rules", [])
+                  passed = max(passed, len(rules) - failed)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write(f"\n| Metric | Count |\n|--------|-------|\n")
+                  fh.write(f"| Checks analyzed | {passed + failed} |\n")
+                  fh.write(f"| Findings | {failed} |\n")
+                  fh.write(f"| Status | {'pass' if failed == 0 else 'findings detected'} |\n")
+          except Exception as e:
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+                  fh.write(f"\nCheckov scan completed. SARIF uploaded as artifact.\n")
+          PY
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Checkov scan completed. Results uploaded as artifact." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload Checkov logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-gate-checkov-log
+          path: /tmp/security-gate-logs/checkov-output.txt
+
+  linting:
+    name: "Code Linting (MegaLinter)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+
+      - name: MegaLinter
+        id: megalinter
+        uses: oxsecurity/megalinter/flavors/javascript@f90c800040e4f84800700b27b2394d3eecc1fdad # v8.4.0
+        env:
+          VALIDATE_ALL_CODEBASE: false
+          ENABLE_LINTERS: >-
+            JAVASCRIPT_ES,
+            TYPESCRIPT_ES,
+            DOCKERFILE_HADOLINT,
+            MARKDOWN_MARKDOWNLINT,
+            YAML_YAMLLINT,
+            JSON_JSONLINT
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_COMMENT_REPORTER: false
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Code Linting (MegaLinter)
+
+          **Enabled linters:** JavaScript/ES, TypeScript/ES, Dockerfile/Hadolint, Markdown, YAML, JSON
+          EOF
+          if [ "${{ steps.megalinter.outcome }}" = "success" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **All linters passed**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **Linting issues detected** -- review MegaLinter output above" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  commit-signing:
+    name: "Commit Signature Verification"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: inputs.is_pull_request == 'true'
+    steps:
+      - name: Verify commit signatures via GitHub API
+        id: verify-sigs
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const pullNumber = Number("${{ inputs.pr_number }}");
+            if (!Number.isInteger(pullNumber) || pullNumber <= 0) {
+              core.setFailed("PR number input is required for commit signature verification.");
+              return;
+            }
+
+            const commits = await github.paginate(
+              github.rest.pulls.listCommits,
+              {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pullNumber,
+              }
+            );
+
+            let unsigned = 0;
+            for (const c of commits) {
+              const verified = c.commit.verification?.verified || false;
+              const reason = c.commit.verification?.reason || 'unknown';
+              if (!verified) {
+                core.warning(`Unsigned commit: ${c.sha} (reason: ${reason})`);
+                unsigned++;
+              }
+            }
+
+            core.setOutput('total', commits.length);
+            core.setOutput('unsigned', unsigned);
+
+            if (unsigned > 0) {
+              core.setFailed(`Found ${unsigned} unsigned commit(s). All commits must be signed.`);
+            } else {
+              core.info(`All ${commits.length} commits are signed and verified.`);
+            }
+
+      - name: Job Summary
+        if: always()
+        run: |
+          TOTAL="${{ steps.verify-sigs.outputs.total }}"
+          UNSIGNED="${{ steps.verify-sigs.outputs.unsigned }}"
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Commit Signature Verification
+
+          | Metric | Count |
+          |--------|-------|
+          | Total commits | ${TOTAL:-N/A} |
+          | Unsigned commits | ${UNSIGNED:-0} |
+          EOF
+          if [ "${UNSIGNED:-0}" = "0" ] && [ -n "$TOTAL" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **All ${TOTAL} commits are signed and verified**" >> "$GITHUB_STEP_SUMMARY"
+          elif [ -n "$UNSIGNED" ] && [ "$UNSIGNED" != "0" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **${UNSIGNED} unsigned commit(s) detected**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  pii-scanner:
+    name: "PII Scanner"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+
+      - name: Scan for hardcoded PII
+        run: |
+          # pipefail REQUIRED: the whole block is piped to tee, which would
+          # otherwise mask the `exit 1` on PII detection and pass the gate.
+          set -o pipefail
+          {
+            echo "Scanning for hardcoded PII patterns..."
+            FOUND=0
+
+            if grep -rn --include="*.ts" --include="*.js" --include="*.json" \
+              -E '\b[0-9]{2}([02468]1|[13579][012])(0[1-9]|[12][0-9]|3[01])[0-9]{5}\b' \
+              app/src/ app/tests/ || false; then
+              echo "::error::Potential PESEL numbers found in source code"
+              FOUND=1
+            fi
+
+            if grep -rn --include="*.ts" --include="*.js" --include="*.json" \
+              -E '\+48\s?[0-9]{3}\s?[0-9]{3}\s?[0-9]{3}' \
+              app/src/ app/tests/ || false; then
+              echo "::error::Potential Polish phone numbers found in source code"
+              FOUND=1
+            fi
+
+            if grep -rn --include="*.ts" --include="*.js" \
+              -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' \
+              app/src/ | grep -v "// " | grep -v "noreply" || false; then
+              echo "::warning::Potential email addresses found in source code"
+            fi
+
+            if [ "$FOUND" -eq 1 ]; then
+              echo "PII_FOUND=true" >> "$GITHUB_ENV"
+              echo "::error::PII detected in source code. Remove before merging."
+              exit 1
+            fi
+            echo "PII_FOUND=false" >> "$GITHUB_ENV"
+            echo "No PII patterns detected."
+          } 2>&1 | tee /tmp/pii-scanner-output.txt
+
+      - name: Capture PII scanner output
+        if: always()
+        run: |
+          mkdir -p /tmp/security-gate-logs
+          {
+            echo "=== PII Scanner ==="
+            echo "Timestamp: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Scanned directories: app/src/, app/tests/"
+            echo "File types: *.ts, *.js, *.json"
+            echo "Patterns checked: PESEL numbers, Polish phone numbers (+48), email addresses"
+            echo ""
+            echo "--- Console Output ---"
+            cat /tmp/pii-scanner-output.txt 2>/dev/null || echo "(no output captured)"
+            echo ""
+          } > /tmp/security-gate-logs/pii-scanner-output.txt
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## PII Scanner
+
+          | Pattern | Scanned |
+          |---------|---------|
+          | PESEL numbers | :white_check_mark: |
+          | Polish phone numbers (+48) | :white_check_mark: |
+          | Email addresses | :white_check_mark: |
+          EOF
+          if [ "${PII_FOUND:-false}" = "true" ]; then
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":x: **PII patterns detected in source code**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":white_check_mark: **No PII patterns detected**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload PII scanner logs
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: security-gate-pii-log
+          path: /tmp/security-gate-logs/pii-scanner-output.txt

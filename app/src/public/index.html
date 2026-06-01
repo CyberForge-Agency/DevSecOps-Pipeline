@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberForge — DevSecOps Pipeline Case Study</title>
+<meta name="description" content="Interactive technical case study of a compliance-enabling CI/CD pipeline with automated audit evidence for DORA, NIS2, ISO 27001, SOC 2, GDPR.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Syne:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#07111D;--navy:#0D2147;--blue:#1A54D9;--blue2:#2E75F0;--blue3:#5B9AF5;--white:#fff;--mist:#F3F7FD;--fog:#E8F0FB;--txt:#334155;--mid:#64748B;--dim:#94A3B8;--border:#CBD5E8;--blt:#E2EAF5;--red:#DC2626;--green:#059669;--amber:#D97706;--purple:#7C3AED;--serif:'Playfair Display',Georgia,serif;--sans:'Syne',sans-serif;--mono:'IBM Plex Mono',monospace}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--txt);background:var(--white);-webkit-font-smoothing:antialiased;line-height:1.7}
+.wrap{max-width:1100px;margin:0 auto;padding:0 36px}
+.eyebrow{font-family:var(--mono);font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);display:block;margin-bottom:10px}
+h1{font-family:var(--serif);font-size:clamp(2rem,4vw,3rem);line-height:1.15;color:var(--navy);font-weight:900;margin-bottom:14px}
+h1 em{font-style:italic;color:var(--blue)}
+h2{font-family:var(--serif);font-size:1.6rem;color:var(--navy);font-weight:700;margin-bottom:18px;line-height:1.2}
+h3{font-family:var(--sans);font-size:1.05rem;font-weight:700;color:var(--navy);margin-bottom:10px;margin-top:18px}
+h4{font-family:var(--mono);font-size:.78rem;font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:16px;letter-spacing:.04em;text-transform:uppercase}
+p,li{font-size:.92rem;color:var(--txt);line-height:1.75;margin-bottom:10px}
+.lead{font-size:1.02rem;color:var(--mid);line-height:1.85}
+a{color:var(--blue);text-decoration:none;transition:color .15s}
+a:hover{color:var(--navy);text-decoration:underline}
+ul{margin-left:20px;margin-bottom:14px}
+li{margin-bottom:4px}
+code{font-family:var(--mono);font-size:.85em;background:var(--fog);padding:2px 6px;border-radius:3px;color:var(--navy)}
+strong{color:var(--navy);font-weight:600}
+button{font-family:inherit;cursor:pointer;border:none;background:none}
+[hidden]{display:none!important}
+.hidden-lang{display:none}
+
+/* Loading state */
+.loading{opacity:0;animation:fadeIn .6s ease forwards}
+@keyframes fadeIn{to{opacity:1}}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.in-view{animation:slideUp .6s ease forwards}
+
+/* Nav */
+nav{height:60px;background:rgba(255,255,255,.96);backdrop-filter:blur(16px);border-bottom:1px solid var(--blt);display:flex;align-items:center;position:sticky;top:0;z-index:100}
+.nav-inner{max-width:1100px;margin:0 auto;padding:0 36px;width:100%;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.logo{display:flex;align-items:stretch;gap:8px;text-decoration:none}
+.logo-bar{width:3px;background:var(--blue);border-radius:2px}
+.logo-cyber,.logo-forge{font-family:var(--mono);font-weight:500;font-size:13px;letter-spacing:.08em;line-height:1.1}
+.logo-cyber{color:var(--navy)}.logo-forge{color:var(--blue)}
+.nav-right{display:flex;align-items:center;gap:18px}
+.nav-links{display:flex;gap:18px}
+.nav-links a{font-family:var(--mono);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mid)}
+.nav-links a:hover{color:var(--navy);text-decoration:none}
+.lang-switch{display:flex;border:1px solid var(--border);border-radius:4px;overflow:hidden}
+.lang-btn{font-family:var(--mono);font-size:.65rem;letter-spacing:.06em;color:var(--mid);padding:6px 10px;background:var(--white);border-right:1px solid var(--border);transition:all .15s}
+.lang-btn:last-child{border-right:none}
+.lang-btn.active{background:var(--navy);color:var(--white)}
+.lang-btn:hover:not(.active){background:var(--mist);color:var(--navy)}
+.status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:middle;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* Hero */
+.hero{padding:80px 0 56px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,var(--mist) 0%,var(--white) 100%);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;right:-20%;width:600px;height:600px;background:radial-gradient(circle,rgba(26,84,217,.08) 0%,transparent 60%);pointer-events:none}
+.hero-inner{position:relative;z-index:2}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;text-transform:uppercase;background:#ECFDF5;color:var(--green);padding:6px 14px;border-radius:20px;margin-bottom:18px;border:1px solid #A7F3D0;cursor:pointer;transition:transform .2s}
+.hero-badge:hover{transform:scale(1.03)}
+.hero p.lead{margin:18px 0 28px;max-width:720px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-top:32px}
+.stat{border:1px solid var(--border);border-left:3px solid var(--blue);background:var(--white);padding:18px;border-radius:6px;cursor:pointer;transition:all .25s;position:relative;overflow:hidden}
+.stat:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(13,33,71,.08);border-left-width:6px}
+.stat-num{font-family:var(--serif);font-size:2.2rem;font-weight:900;color:var(--navy);line-height:1}
+.stat-lbl{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--mid);margin-top:6px}
+.stat-tip{position:absolute;top:6px;right:8px;font-family:var(--mono);font-size:.55rem;color:var(--dim);opacity:0;transition:opacity .2s}
+.stat:hover .stat-tip{opacity:1}
+
+/* TOC — compact horizontal chip strip */
+.toc{padding:10px 0;background:var(--ink);color:var(--blue3);position:sticky;top:60px;z-index:90;border-bottom:1px solid var(--navy)}
+.toc-list{display:flex;flex-wrap:nowrap;gap:4px;overflow-x:auto;list-style:none;margin:0;padding:0;scrollbar-width:thin;scrollbar-color:var(--navy) transparent}
+.toc-list::-webkit-scrollbar{height:3px}
+.toc-list::-webkit-scrollbar-thumb{background:var(--navy);border-radius:2px}
+.toc-list li{margin:0;flex:0 0 auto}
+.toc-list a{color:var(--blue3);font-family:var(--mono);font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;display:inline-block;padding:6px 12px;border-radius:3px;white-space:nowrap;transition:all .15s}
+.toc-list a:hover,.toc-list a.active{color:var(--white);background:var(--blue);text-decoration:none}
+
+/* Sections */
+.section{padding:64px 0;border-bottom:1px solid var(--border);position:relative}
+.section:nth-child(even){background:var(--mist)}
+.section-num{font-family:var(--mono);font-size:.7rem;letter-spacing:.16em;color:var(--dim);text-transform:uppercase;display:block;margin-bottom:6px}
+
+/* Interactive Pipeline SVG */
+.pipeline-viz{margin:30px 0;background:var(--white);border:1px solid var(--border);border-radius:12px;padding:24px;overflow:hidden}
+.pipeline-svg{width:100%;height:auto;display:block;cursor:default}
+.phase-node{cursor:pointer;transition:filter .2s}
+.phase-node:hover{filter:brightness(1.1)}
+.phase-node.active circle{stroke:var(--blue);stroke-width:3;filter:drop-shadow(0 0 8px rgba(26,84,217,.4))}
+.phase-info-panel{margin-top:16px;background:var(--mist);border-radius:8px;padding:16px;min-height:80px;border-left:3px solid var(--blue);transition:all .3s}
+.phase-info-title{font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.phase-info-desc{font-size:.88rem;color:var(--txt);line-height:1.7}
+.phase-info-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.phase-tool-tag{font-family:var(--mono);font-size:.62rem;background:var(--white);padding:4px 10px;border-radius:3px;border:1px solid var(--border);color:var(--navy)}
+
+/* Tool cards (clickable, expandable) */
+.tool-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;margin:20px 0}
+.tool-card{border:1px solid var(--border);border-radius:8px;padding:20px;background:var(--white);cursor:pointer;transition:all .25s;position:relative}
+.tool-card:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(13,33,71,.08)}
+.tool-card h3{margin-top:0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tool-card .toggle-icon{font-family:var(--mono);color:var(--dim);transition:transform .25s;font-size:.9rem}
+.tool-card.expanded .toggle-icon{transform:rotate(45deg);color:var(--blue)}
+.tool-card p{font-size:.85rem;margin-bottom:8px}
+.tool-card .details{max-height:0;overflow:hidden;transition:max-height .35s ease;border-top:0 solid var(--border);margin-top:0;padding-top:0}
+.tool-card.expanded .details{max-height:500px;border-top:1px solid var(--border);margin-top:14px;padding-top:14px}
+.tool-card .details p{font-size:.82rem;color:var(--mid)}
+.tool-card .details code{font-size:.78rem}
+.tool-tag{display:inline-block;font-family:var(--mono);font-size:.55rem;padding:3px 9px;border-radius:3px;letter-spacing:.06em;font-weight:600}
+.tag-sast{background:#EFF6FF;color:#1D4ED8}.tag-sca{background:#FEF3C7;color:#92400E}
+.tag-sign{background:#F0FDF4;color:#166534}.tag-dast{background:#FEF2F2;color:#991B1B}
+.tag-iac{background:#F5F3FF;color:#5B21B6}.tag-lint{background:#F0F9FF;color:#0369A1}
+.tag-pii{background:#FCE7F3;color:#9F1239}.tag-deploy{background:#ECFEFF;color:#155E75}
+.tag-evidence{background:#FFF7ED;color:#9A3412}.tag-id{background:#F1F5F9;color:#334155}
+
+/* Compliance: framework grid + interactive matrix */
+.framework-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin:20px 0}
+.fw-card{border:1px solid var(--border);border-radius:8px;padding:16px;text-align:center;background:var(--white);cursor:pointer;transition:all .25s;position:relative}
+.fw-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(13,33,71,.06)}
+.fw-card.active{border-color:var(--blue);border-width:2px;background:var(--fog);padding:15px}
+.fw-name{font-family:var(--mono);font-size:.75rem;font-weight:600;letter-spacing:.06em;color:var(--navy)}
+.fw-coverage{font-family:var(--mono);font-size:1.5rem;font-weight:700;color:var(--green);margin:6px 0}
+.fw-label{font-family:var(--mono);font-size:.55rem;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.fw-tab-content{display:none;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:20px;margin-top:16px;animation:fadeIn .3s}
+.fw-tab-content.active{display:block}
+
+/* Donut chart */
+.chart-row{display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center;margin:20px 0;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:20px}
+.donut{width:160px;height:160px}
+.donut-track{stroke:var(--fog);stroke-width:18;fill:none}
+.donut-fill{stroke:var(--green);stroke-width:18;fill:none;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset 1.2s ease}
+.donut-text{font-family:var(--mono);font-weight:600;fill:var(--navy)}
+.chart-legend ul{list-style:none;margin:0;padding:0}
+.chart-legend li{display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:6px}
+.chart-legend .dot{width:10px;height:10px;border-radius:50%;display:inline-block}
+
+/* Tables */
+table{width:100%;border-collapse:collapse;font-size:.84rem;margin:14px 0;background:var(--white);border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+th{font-family:var(--mono);font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);text-align:left;padding:11px 14px;background:var(--navy)}
+td{padding:11px 14px;border-bottom:1px solid var(--blt);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr.filter-hidden{display:none}
+.badge-pass{background:#ECFDF5;color:var(--green);padding:3px 8px;border-radius:3px;font-family:var(--mono);font-size:.6rem;font-weight:600;display:inline-block}
+.badge-warn{background:#FFFBEB;color:var(--amber);padding:3px 8px;border-radius:3px;font-family:var(--mono);font-size:.6rem;font-weight:600;display:inline-block}
+.badge-info{background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:3px;font-family:var(--mono);font-size:.6rem;font-weight:600;display:inline-block}
+
+/* Search input */
+.search-bar{display:flex;gap:10px;margin:14px 0;flex-wrap:wrap}
+.search-input{flex:1;min-width:240px;font-family:var(--mono);font-size:.82rem;padding:10px 14px;border:1px solid var(--border);border-radius:6px;color:var(--navy);background:var(--white);transition:border-color .15s}
+.search-input:focus{outline:none;border-color:var(--blue)}
+.filter-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{font-family:var(--mono);font-size:.65rem;padding:6px 12px;border:1px solid var(--border);border-radius:20px;background:var(--white);color:var(--mid);cursor:pointer;transition:all .15s}
+.chip:hover{color:var(--navy)}
+.chip.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+
+/* Live Demo */
+.demo-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:20px 0}
+@media(max-width:700px){.demo-grid{grid-template-columns:1fr}}
+.demo-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px}
+.demo-card h3{margin-top:0;font-family:var(--mono);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.demo-output{font-family:var(--mono);font-size:.74rem;background:var(--ink);color:var(--blue3);padding:14px;border-radius:6px;min-height:140px;max-height:280px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.btn{font-family:var(--mono);font-size:.7rem;letter-spacing:.04em;padding:8px 14px;border-radius:4px;cursor:pointer;transition:all .15s;text-transform:uppercase;background:var(--navy);color:var(--white);border:1px solid var(--navy);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--blue);border-color:var(--blue)}
+.btn-secondary{background:var(--white);color:var(--navy);border-color:var(--border)}
+.btn-secondary:hover{background:var(--fog);border-color:var(--blue);color:var(--blue)}
+.input-row{display:flex;gap:8px;margin-bottom:10px}
+.input-row input{flex:1;font-family:var(--mono);font-size:.78rem;padding:8px 12px;border:1px solid var(--border);border-radius:4px;color:var(--navy)}
+.input-row input:focus{outline:none;border-color:var(--blue)}
+
+/* Code block */
+.codeblock{font-family:var(--mono);font-size:.74rem;background:var(--ink);color:var(--blue3);padding:20px;border-radius:8px;overflow-x:auto;line-height:1.8;white-space:pre;margin:18px 0;border:1px solid #1e293b;position:relative}
+.code-copy{position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:.6rem;background:var(--navy);color:var(--white);padding:5px 10px;border-radius:3px;cursor:pointer;opacity:.6;transition:opacity .15s}
+.code-copy:hover{opacity:1}
+.code-copy.copied{background:var(--green)}
+.callout{border-left:3px solid var(--blue);background:var(--fog);padding:14px 18px;border-radius:0 6px 6px 0;margin:16px 0}
+.callout strong{color:var(--navy)}
+.callout-warn{border-left-color:var(--amber);background:#FFFBEB}
+.callout-warn strong{color:var(--amber)}
+
+/* Footer */
+.footer{padding:48px 0 28px;text-align:center;background:var(--ink);color:var(--dim)}
+.footer p{font-family:var(--mono);font-size:.72rem;color:var(--dim);letter-spacing:.04em;margin-bottom:8px}
+.footer a{color:var(--blue3)}
+.footer-tag{font-family:var(--serif);color:var(--white);font-size:1rem;font-style:italic;margin-bottom:14px;display:block}
+
+/* Live System Status grid */
+.live-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:18px 0}
+.live-card{border:1px solid var(--border);border-radius:8px;padding:18px;background:var(--white)}
+.live-card h3{margin-top:0;display:flex;align-items:center;gap:8px;font-size:.95rem}
+.live-value{font-family:var(--mono);font-size:.78rem;color:var(--navy);word-break:break-all}
+
+/* Timeline component (DORA Art.19) */
+.timeline{position:relative;padding-left:30px;margin:20px 0}
+.timeline::before{content:'';position:absolute;left:9px;top:0;bottom:0;width:2px;background:var(--blue)}
+.timeline-item{position:relative;margin-bottom:18px;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px 16px}
+.timeline-item::before{content:'';position:absolute;left:-26px;top:18px;width:14px;height:14px;border-radius:50%;background:var(--blue);border:3px solid var(--white);box-shadow:0 0 0 2px var(--blue)}
+.timeline-time{font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--blue);letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px}
+.timeline-title{font-family:var(--sans);font-weight:600;color:var(--navy);font-size:.92rem;margin-bottom:4px}
+.timeline-desc{font-size:.82rem;color:var(--mid);margin:0}
+
+/* OIDC Flow Diagram */
+.flow-diagram{margin:24px 0;background:var(--white);border:1px solid var(--border);border-radius:10px;padding:24px;overflow-x:auto}
+.flow-svg{display:block;margin:0 auto}
+.flow-node-text{font-family:var(--mono);font-size:11px;fill:var(--navy);font-weight:500}
+.flow-arrow-text{font-family:var(--mono);font-size:9px;fill:var(--mid)}
+
+/* Bar chart */
+.bar-chart{margin:14px 0}
+.bar-row{display:grid;grid-template-columns:120px 1fr 60px;gap:10px;align-items:center;margin-bottom:8px}
+.bar-label{font-family:var(--mono);font-size:.72rem;color:var(--navy);text-align:right}
+.bar-track{background:var(--fog);height:14px;border-radius:7px;overflow:hidden;position:relative}
+.bar-fill{height:100%;background:linear-gradient(90deg,var(--blue) 0%,var(--blue2) 100%);border-radius:7px;transition:width 1.2s ease;width:0%}
+.bar-value{font-family:var(--mono);font-size:.7rem;color:var(--mid);text-align:left}
+
+/* Tablet */
+@media(max-width:900px){
+  .wrap{padding:0 24px}
+  .nav-inner{padding:0 24px}
+  .nav-links{gap:12px}
+  .nav-links a{font-size:.6rem}
+  .hero{padding:60px 0 44px}
+  .section{padding:48px 0}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .tool-grid{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
+  .framework-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .live-grid{grid-template-columns:1fr}
+  .demo-grid{grid-template-columns:1fr}
+  .bar-row{grid-template-columns:90px 1fr 50px}
+}
+
+/* Mobile */
+@media(max-width:600px){
+  .wrap{padding:0 18px}
+  .nav-inner{padding:0 18px;gap:10px}
+  .hero{padding:40px 0 30px}
+  .section{padding:32px 0}
+  h1{font-size:1.7rem}
+  h2{font-size:1.25rem}
+  .lead{font-size:.92rem}
+  p,li{font-size:.86rem}
+  .nav-links{display:none}
+  .toc{padding:8px 0}
+  .toc-list a{font-size:.6rem;padding:5px 9px}
+  .stat-grid{grid-template-columns:1fr 1fr;gap:10px}
+  .stat{padding:14px}
+  .stat-num{font-size:1.7rem}
+  .tool-grid{grid-template-columns:1fr}
+  .framework-grid{grid-template-columns:repeat(2,1fr)}
+  .chart-row{grid-template-columns:1fr;text-align:center;padding:14px}
+  .donut{margin:0 auto;width:130px;height:130px}
+  .codeblock{font-size:.66rem;padding:14px}
+  .pipeline-viz{padding:14px}
+  .timeline{padding-left:22px}
+  .timeline-item{padding:12px 14px}
+  .input-row{flex-direction:column}
+  .bar-row{grid-template-columns:80px 1fr 44px;gap:6px}
+  .bar-label{font-size:.62rem}
+  table{font-size:.74rem}
+  th,td{padding:8px 10px}
+}
+
+/* Very small phones */
+@media(max-width:380px){
+  .stat-grid{grid-template-columns:1fr}
+  .framework-grid{grid-template-columns:1fr}
+  h1{font-size:1.5rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+<div class="nav-inner">
+  <a href="https://cyberforge.agency" class="logo">
+    <div class="logo-bar" style="height:24px"></div>
+    <div><div class="logo-cyber">CYBER</div><div class="logo-forge">FORGE</div></div>
+  </a>
+  <div class="nav-right">
+    <div class="nav-links">
+      <a href="#problem"><span data-en="Problem" data-pl="Problem">Problem</span></a>
+      <a href="#architecture"><span data-en="Architecture" data-pl="Architektura">Architecture</span></a>
+      <a href="#phases"><span data-en="Phases" data-pl="Fazy">Phases</span></a>
+      <a href="#compliance"><span data-en="Compliance" data-pl="Zgodność">Compliance</span></a>
+      <a href="#live"><span data-en="Demo" data-pl="Demo">Demo</span></a>
+    </div>
+    <div class="lang-switch">
+      <button class="lang-btn active" data-lang="en">EN</button>
+      <button class="lang-btn" data-lang="pl">PL</button>
+    </div>
+  </div>
+</div>
+</nav>
+
+<!-- ═════════════════ HERO ═════════════════ -->
+<div class="hero">
+<div class="wrap hero-inner">
+  <div class="hero-badge">
+    <span class="status-dot"></span>
+    <span data-en="Live on Azure · Cosign-signed · WORM-archived" data-pl="Live na Azure · Podpisane przez Cosign · Archiwizacja WORM">Live on Azure · Cosign-signed · WORM-archived</span>
+  </div>
+  <h1 data-en-html="DevSecOps Pipeline: <em>A Live Case Study</em>" data-pl-html="Pipeline DevSecOps: <em>Studium przypadku na żywo</em>">DevSecOps Pipeline: <em>A Live Case Study</em></h1>
+  <p class="lead" data-en="This application was built, scanned, signed, deployed, and tested by a 6-phase compliance-enabling CI/CD pipeline. Every commit triggers automated security checks across ten tools. Every release produces tamper-evident audit evidence mapped to DORA, NIS2, ISO 27001, SOC 2, and GDPR." data-pl="Ta aplikacja została zbudowana, przeskanowana, podpisana, wdrożona i przetestowana przez 6-fazowy pipeline CI/CD wspierający zgodność. Każdy commit uruchamia automatyczne kontrole bezpieczeństwa w dziesięciu narzędziach. Każde wydanie generuje niemodyfikowalne dowody audytowe zmapowane do DORA, NIS2, ISO 27001, SOC 2 i RODO.">This application was built, scanned, signed, deployed, and tested by a 6-phase compliance-enabling CI/CD pipeline. Every commit triggers automated security checks across ten tools. Every release produces tamper-evident audit evidence mapped to DORA, NIS2, ISO 27001, SOC 2, and GDPR.</p>
+  <p class="lead" data-en="What you see below is not theory. It is the production pipeline that delivered this very webpage — documented in detail, end to end. Click anything to explore." data-pl="To, co widzisz poniżej, to nie teoria. To produkcyjny pipeline, który dostarczył tę stronę — udokumentowany szczegółowo, od początku do końca. Kliknij cokolwiek, aby zgłębić temat.">What you see below is not theory. It is the production pipeline that delivered this very webpage — documented in detail, end to end. Click anything to explore.</p>
+  <div class="stat-grid">
+    <div class="stat" data-target="6"><div class="stat-tip" data-en="click to scroll" data-pl="kliknij aby przewinąć">→ phases</div><div class="stat-num" data-count="6">0</div><div class="stat-lbl" data-en="Pipeline Phases" data-pl="Fazy Pipeline">Pipeline Phases</div></div>
+    <div class="stat" data-target="10"><div class="stat-tip">→ tools</div><div class="stat-num" data-count="10">0</div><div class="stat-lbl" data-en="Security Tools" data-pl="Narzędzia">Security Tools</div></div>
+    <div class="stat" data-target="5"><div class="stat-tip">→ frameworks</div><div class="stat-num" data-count="5">0</div><div class="stat-lbl" data-en="Frameworks" data-pl="Standardy">Frameworks</div></div>
+    <div class="stat" data-target="11"><div class="stat-tip">→ evidence</div><div class="stat-num" data-count="11">0</div><div class="stat-lbl" data-en="Evidence Artifacts" data-pl="Artefakty">Evidence Artifacts</div></div>
+    <div class="stat" data-target="0"><div class="stat-num" data-count="0">0</div><div class="stat-lbl" data-en="Static Secrets" data-pl="Statyczne sekrety">Static Secrets</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ TOC ═════════════════ -->
+<div class="toc">
+<div class="wrap">
+  <ul class="toc-list">
+    <li><a href="#summary" data-en="Summary" data-pl="Podsumowanie">Summary</a></li>
+    <li><a href="#architecture" data-en="Architecture" data-pl="Architektura">Architecture</a></li>
+    <li><a href="#oidc" data-en="OIDC" data-pl="OIDC">OIDC</a></li>
+    <li><a href="#compliance" data-en="Compliance" data-pl="Zgodność">Compliance</a></li>
+    <li><a href="#live" data-en="Live Demo" data-pl="Demo">Live Demo</a></li>
+    <li><a href="#verify" data-en="Verify" data-pl="Zweryfikuj">Verify</a></li>
+  </ul>
+</div>
+</div>
+
+<!-- ═════════════════ EXECUTIVE SUMMARY ═════════════════ -->
+<div class="section" id="summary">
+<div class="wrap">
+  <span class="section-num" data-en="01 — Executive Summary" data-pl="01 — Podsumowanie wykonawcze">01 — Executive Summary</span>
+  <h2 data-en="What This Pipeline Is, And Why It Exists" data-pl="Czym jest ten pipeline i dlaczego istnieje">What This Pipeline Is, And Why It Exists</h2>
+  <p class="lead" data-en="CyberForge built this pipeline as a working reference implementation of a compliance-enabling secure software supply chain. It addresses the technical CI/CD requirements of DORA (effective January 17, 2025), NIS2 (transposed across EU member states 2024-2026), ISO/IEC 27001:2022, SOC 2 Trust Services Criteria, and the GDPR articles relevant to software delivery." data-pl="CyberForge zbudował ten pipeline jako działającą implementację referencyjną bezpiecznego łańcucha dostaw oprogramowania wspierającego zgodność. Adresuje techniczne wymagania CI/CD wynikające z DORA (obowiązuje od 17 stycznia 2025), NIS2 (transponowanej w państwach UE w latach 2024-2026), ISO/IEC 27001:2022, kryteriów SOC 2 oraz artykułów RODO związanych z dostarczaniem oprogramowania.">CyberForge built this pipeline as a working reference implementation of a compliance-enabling secure software supply chain.</p>
+  <p data-en="The pipeline takes a Node.js application — this one — and runs it through six sequential phases. Each phase produces machine-readable evidence. The final phase consolidates that evidence into a tamper-evident archive stored in Azure Blob storage with 5-year time-based immutability." data-pl="Pipeline pobiera aplikację Node.js — tę właśnie — i przepuszcza ją przez sześć kolejnych faz. Każda faza generuje dowody w formacie czytelnym maszynowo. Końcowa faza konsoliduje je w archiwum odporne na manipulacje, przechowywane w Azure Blob Storage z 5-letnią niezmienialnością czasową.">The pipeline takes a Node.js application and runs it through six sequential phases. Each phase produces machine-readable evidence.</p>
+  <p data-en="The pipeline is designed for three audiences:" data-pl="Pipeline jest zaprojektowany dla trzech grup odbiorców:">The pipeline is designed for three audiences:</p>
+  <ul>
+    <li><strong data-en="Engineering teams" data-pl="Zespoły inżynierskie">Engineering teams</strong> <span data-en="shipping software who need security checks that don't slow them down. Pull requests run Phases 1–2 in under 5 minutes for fast feedback." data-pl="dostarczające oprogramowanie, które potrzebują kontroli bezpieczeństwa nie spowalniających pracy. Pull requesty uruchamiają Fazy 1–2 w mniej niż 5 minut.">shipping software who need security checks that don't slow them down. Pull requests run Phases 1–2 in under 5 minutes for fast feedback.</span></li>
+    <li><strong data-en="Compliance officers" data-pl="Specjaliści ds. zgodności">Compliance officers</strong> <span data-en="who need defensible evidence to present to auditors. Every release produces 11 cryptographically-bound artifacts." data-pl="którzy potrzebują dowodów do prezentacji audytorom. Każde wydanie generuje 11 kryptograficznie powiązanych artefaktów.">who need defensible evidence to present to auditors. Every release produces 11 cryptographically-bound artifacts.</span></li>
+    <li><strong data-en="Sales teams" data-pl="Zespoły sprzedażowe">Sales teams</strong> <span data-en="closing enterprise deals where vendor security questionnaires are the gating step. The evidence pack answers most questions before they're asked." data-pl="zamykające umowy enterprise, gdzie kwestionariusze bezpieczeństwa są etapem blokującym. Evidence Pack odpowiada na większość pytań zanim zostaną zadane.">closing enterprise deals where vendor security questionnaires are the gating step. The evidence pack answers most questions before they're asked.</span></li>
+  </ul>
+  <p data-en="The implementation uses GitHub Actions (orchestration), Azure (deployment target), and ten open-source security tools. Total monthly cost on Azure: roughly $18–23 USD with scale-to-zero configured. Total static secrets in the pipeline: zero." data-pl="Implementacja wykorzystuje GitHub Actions (orkiestracja), Azure (cel wdrożenia) i dziesięć narzędzi bezpieczeństwa open-source. Całkowity miesięczny koszt na Azure: około $18–23 USD przy skalowaniu do zera. Liczba statycznych sekretów w pipeline: zero.">The implementation uses GitHub Actions, Azure, and ten open-source security tools. Total monthly cost: ~$18–23 USD. Total static secrets: zero.</p>
+</div>
+</div>
+
+<!-- ═════════════════ WHY THIS PAGE EXISTS ═════════════════ -->
+<div class="section" id="problem">
+<div class="wrap">
+  <span class="section-num" data-en="Why This Page" data-pl="Po co ta strona">Why This Page</span>
+  <h2 data-en="Proof, Not Promises" data-pl="Dowód, nie obietnice">Proof, Not Promises</h2>
+  <p class="lead" data-en="The case for hardened CI/CD — DORA, NIS2, supply-chain attacks, blocked enterprise deals — is made on cyberforge.agency. This page is the technical proof underneath that case: a real pipeline you can inspect, signatures you can verify, and evidence packs you can download." data-pl="Argumenty za utwardzonym CI/CD — DORA, NIS2, ataki na łańcuch dostaw, zablokowane kontrakty enterprise — znajdziesz na cyberforge.agency. Ta strona to dowód techniczny pod tym argumentem: prawdziwy pipeline, podpisy do weryfikacji, paczki dowodowe do pobrania.">The case for hardened CI/CD — DORA, NIS2, supply-chain attacks, blocked enterprise deals — is made on <a href="https://cyberforge.agency">cyberforge.agency</a>. This page is the technical proof underneath: a real pipeline you can inspect, signatures you can verify, evidence packs you can download.</p>
+
+  <div class="callout">
+    <strong data-en="The CyberForge thesis:" data-pl="Teza CyberForge:">The CyberForge thesis:</strong>
+    <span data-en="Compliance evidence should be a byproduct of how you ship software, not a separate annual exercise. Build the pipeline once, generate the evidence forever." data-pl="Dowody zgodności powinny być produktem ubocznym procesu dostarczania oprogramowania, a nie odrębnym corocznym ćwiczeniem. Zbuduj pipeline raz, generuj dowody na zawsze."> Compliance evidence should be a byproduct of how you ship software, not a separate annual exercise.</span>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ ARCHITECTURE WITH INTERACTIVE SVG ═════════════════ -->
+<div class="section" id="architecture">
+<div class="wrap">
+  <span class="section-num" data-en="03 — Architecture Overview" data-pl="03 — Przegląd architektury">03 — Architecture Overview</span>
+  <h2 data-en="Six Phases, One Trust Boundary" data-pl="Sześć faz, jedna granica zaufania">Six Phases, One Trust Boundary</h2>
+  <p data-en="The pipeline implements a zero-trust supply chain. Click any phase below to see what happens inside it." data-pl="Pipeline implementuje łańcuch dostaw zero-trust. Kliknij dowolną fazę poniżej, aby zobaczyć, co dzieje się w środku.">The pipeline implements a zero-trust supply chain. <strong>Click any phase below</strong> to see what happens inside it.</p>
+
+  <div class="pipeline-viz">
+    <svg class="pipeline-svg" viewBox="0 0 1000 220" xmlns="http://www.w3.org/2000/svg">
+      <!-- Trust gradient -->
+      <defs>
+        <linearGradient id="trustGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#1A54D9"/>
+          <stop offset="100%" stop-color="#059669"/>
+        </linearGradient>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#1A54D9"/>
+        </marker>
+      </defs>
+
+      <!-- Background line -->
+      <line x1="80" y1="100" x2="920" y2="100" stroke="url(#trustGrad)" stroke-width="3" opacity="0.3"/>
+
+      <!-- Phases -->
+      <g class="phase-node" data-phase="1" tabindex="0" role="button">
+        <circle cx="100" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="100" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">1</text>
+        <text x="100" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">Security Gate</text>
+        <text x="100" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~1m</text>
+      </g>
+
+      <line x1="135" y1="100" x2="200" y2="100" stroke="#1A54D9" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <g class="phase-node" data-phase="2" tabindex="0" role="button">
+        <circle cx="240" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="240" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">2</text>
+        <text x="240" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">Build &amp; Scan</text>
+        <text x="240" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~4m</text>
+      </g>
+
+      <line x1="275" y1="100" x2="340" y2="100" stroke="#1A54D9" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <g class="phase-node" data-phase="3" tabindex="0" role="button">
+        <circle cx="380" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="380" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">3</text>
+        <text x="380" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">Sign &amp; Attest</text>
+        <text x="380" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~45s</text>
+      </g>
+
+      <line x1="415" y1="100" x2="480" y2="100" stroke="#1A54D9" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <g class="phase-node" data-phase="4" tabindex="0" role="button">
+        <circle cx="520" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="520" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">4</text>
+        <text x="520" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">Deploy</text>
+        <text x="520" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~2m</text>
+      </g>
+
+      <line x1="555" y1="100" x2="620" y2="100" stroke="#1A54D9" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <g class="phase-node" data-phase="5" tabindex="0" role="button">
+        <circle cx="660" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="660" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">5</text>
+        <text x="660" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">DAST</text>
+        <text x="660" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~90s</text>
+      </g>
+
+      <line x1="695" y1="100" x2="760" y2="100" stroke="#1A54D9" stroke-width="2" marker-end="url(#arrow)"/>
+
+      <g class="phase-node" data-phase="6" tabindex="0" role="button">
+        <circle cx="800" cy="100" r="32" fill="#ECFDF5" stroke="#059669" stroke-width="2"/>
+        <text x="800" y="106" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="14" font-weight="600" fill="#059669">6</text>
+        <text x="800" y="160" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#0D2147" font-weight="600">Evidence</text>
+        <text x="800" y="178" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#94A3B8">~30s</text>
+      </g>
+
+      <!-- Output -->
+      <line x1="835" y1="100" x2="900" y2="100" stroke="#059669" stroke-width="2" marker-end="url(#arrow)"/>
+      <g>
+        <rect x="900" y="80" width="80" height="40" rx="6" fill="#0D2147"/>
+        <text x="940" y="98" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#fff" font-weight="600">WORM</text>
+        <text x="940" y="112" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#5B9AF5">5-yr archive</text>
+      </g>
+
+      <!-- Input -->
+      <g>
+        <rect x="20" y="80" width="60" height="40" rx="6" fill="#0D2147"/>
+        <text x="50" y="98" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#fff" font-weight="600">git push</text>
+        <text x="50" y="112" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#5B9AF5">main</text>
+      </g>
+
+      <!-- Trust label -->
+      <text x="500" y="35" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#94A3B8" letter-spacing="1.5">TRUST BOUNDARY: every artifact verified before next phase trusts it</text>
+    </svg>
+
+    <div class="phase-info-panel" id="phaseInfoPanel">
+      <div class="phase-info-title" data-en="Click any phase above" data-pl="Kliknij dowolną fazę powyżej">Click any phase above</div>
+      <div class="phase-info-desc" data-en="Hover or click a phase circle to see what happens inside it. Each phase produces machine-readable evidence consumed by Phase 6." data-pl="Najedź lub kliknij okrąg fazy, aby zobaczyć, co dzieje się w środku. Każda faza generuje dowody konsumowane przez Fazę 6.">Hover or click a phase circle to see what happens inside it. Each phase produces machine-readable evidence consumed by Phase 6.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ PHASES (combined) ═════════════════ -->
+<div class="section" id="phases">
+<div class="wrap">
+  <span class="section-num" data-en="04 — Pipeline Phases" data-pl="04 — Fazy Pipeline">04 — Pipeline Phases</span>
+  <h2 data-en="Inside Each Phase" data-pl="Wewnątrz każdej fazy">Inside Each Phase</h2>
+  <p data-en="Click any tool card to expand its full description, configuration, and gate behaviour." data-pl="Kliknij kartę dowolnego narzędzia, aby rozwinąć jego pełny opis, konfigurację i zachowanie bramki.">Click any tool card to expand its full description, configuration, and gate behaviour.</p>
+
+  <h3 data-en="Phase 1 — Security Gate" data-pl="Faza 1 — Brama bezpieczeństwa">Phase 1 — Security Gate</h3>
+  <div class="tool-grid" id="phase1-tools">
+    <!-- Tool cards populated here -->
+  </div>
+
+  <h3 data-en="Phase 2 — Build &amp; Scan" data-pl="Faza 2 — Build i skanowanie">Phase 2 — Build &amp; Scan</h3>
+  <div class="tool-grid" id="phase2-tools"></div>
+
+  <h3 data-en="Phase 3 — Sign &amp; Attest" data-pl="Faza 3 — Podpis i atestacja">Phase 3 — Sign &amp; Attest</h3>
+  <div class="tool-grid" id="phase3-tools"></div>
+
+  <h3 data-en="Phase 4 — Deploy" data-pl="Faza 4 — Wdrożenie">Phase 4 — Deploy</h3>
+  <div class="tool-grid" id="phase4-tools"></div>
+
+  <h3 data-en="Phase 5 — DAST" data-pl="Faza 5 — DAST">Phase 5 — DAST</h3>
+  <div class="tool-grid" id="phase5-tools"></div>
+
+  <h3 data-en="Phase 6 — Evidence Pack" data-pl="Faza 6 — Evidence Pack">Phase 6 — Evidence Pack</h3>
+  <div class="tool-grid" id="phase6-tools"></div>
+</div>
+</div>
+
+<!-- ═════════════════ OIDC FLOW ═════════════════ -->
+<div class="section" id="oidc">
+<div class="wrap">
+  <span class="section-num" data-en="05 — OIDC Federation" data-pl="05 — Federacja OIDC">05 — OIDC Federation</span>
+  <h2 data-en="From GitHub to Azure Without a Static Secret" data-pl="Z GitHub do Azure bez statycznego sekretu">From GitHub to Azure Without a Static Secret</h2>
+  <p data-en="Traditional CI/CD stores a long-lived Azure service principal secret in GitHub Secrets. That secret is the highest-value target in the system. OIDC federation eliminates it by issuing short-lived tokens at runtime." data-pl="Tradycyjne CI/CD przechowuje długoterminowy sekret service principal Azure w GitHub Secrets. Ten sekret to cel o najwyższej wartości. Federacja OIDC eliminuje go, wydając krótkoterminowe tokeny w trakcie runtime.">Traditional CI/CD stores a long-lived service principal secret. OIDC eliminates it.</p>
+
+  <div class="flow-diagram">
+    <svg class="flow-svg" width="100%" viewBox="0 0 800 360" preserveAspectRatio="xMidYMid meet">
+      <defs>
+        <marker id="flowArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="#1A54D9"/>
+        </marker>
+      </defs>
+
+      <!-- GitHub box -->
+      <rect x="20" y="40" width="180" height="80" rx="10" fill="#0D2147"/>
+      <text x="110" y="68" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="#fff" font-weight="600">GitHub Actions</text>
+      <text x="110" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#5B9AF5">Workflow runner</text>
+      <text x="110" y="100" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#5B9AF5">id-token: write</text>
+
+      <!-- Azure AD box -->
+      <rect x="310" y="40" width="180" height="80" rx="10" fill="#1A54D9"/>
+      <text x="400" y="68" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="#fff" font-weight="600">Azure AD</text>
+      <text x="400" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#E8F0FB">Federated Credential</text>
+      <text x="400" y="100" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#E8F0FB">sub=repo:.../env:staging</text>
+
+      <!-- Azure Resources -->
+      <rect x="600" y="40" width="180" height="80" rx="10" fill="#059669"/>
+      <text x="690" y="68" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="12" fill="#fff" font-weight="600">Azure Resources</text>
+      <text x="690" y="86" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#fff">ACR · Container Apps</text>
+      <text x="690" y="100" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#fff">Storage · Key Vault</text>
+
+      <!-- Step 1 -->
+      <line x1="200" y1="80" x2="305" y2="80" stroke="#1A54D9" stroke-width="2" marker-end="url(#flowArrow)"/>
+      <text x="252" y="72" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#1A54D9" font-weight="600">1. OIDC token</text>
+      <text x="252" y="98" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" fill="#64748B">JWT with sub claim</text>
+
+      <!-- Step 2 -->
+      <line x1="305" y1="92" x2="200" y2="92" stroke="#059669" stroke-width="2" marker-end="url(#flowArrow)"/>
+      <text x="252" y="124" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#059669" font-weight="600">2. AAD access token</text>
+
+      <!-- Step 3 -->
+      <line x1="490" y1="80" x2="595" y2="80" stroke="#059669" stroke-width="2" marker-end="url(#flowArrow)"/>
+      <text x="542" y="72" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="9" fill="#059669" font-weight="600">3. ARM API call</text>
+      <text x="542" y="98" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="8" fill="#64748B">terraform / az cli</text>
+
+      <!-- Bottom info -->
+      <text x="400" y="180" text-anchor="middle" font-family="Syne, sans-serif" font-size="13" fill="#0D2147" font-weight="600">Trust is established once. Tokens are minted per workflow run.</text>
+      <text x="400" y="200" text-anchor="middle" font-family="IBM Plex Mono, monospace" font-size="10" fill="#64748B">No secret stored anywhere. No rotation needed. Token TTL: 5 minutes.</text>
+
+      <!-- Federated credential subjects -->
+      <rect x="60" y="230" width="680" height="110" rx="8" fill="#F3F7FD" stroke="#CBD5E8"/>
+      <text x="80" y="252" font-family="IBM Plex Mono, monospace" font-size="11" fill="#0D2147" font-weight="600">4 federated credential subjects:</text>
+      <text x="100" y="275" font-family="IBM Plex Mono, monospace" font-size="10" fill="#334155">• repo:CyberForge-Agency/DevSecOps-Pipeline:ref:refs/heads/main</text>
+      <text x="100" y="294" font-family="IBM Plex Mono, monospace" font-size="10" fill="#334155">• repo:CyberForge-Agency/DevSecOps-Pipeline:environment:staging</text>
+      <text x="100" y="313" font-family="IBM Plex Mono, monospace" font-size="10" fill="#334155">• repo:CyberForge-Agency/DevSecOps-Pipeline:environment:production</text>
+      <text x="100" y="332" font-family="IBM Plex Mono, monospace" font-size="10" fill="#334155">• repo:CyberForge-Agency/DevSecOps-Pipeline:pull_request</text>
+    </svg>
+  </div>
+  <div class="callout callout-warn">
+    <strong data-en="Common gotcha:" data-pl="Częsty błąd:">Common gotcha:</strong>
+    <span data-en="The pull_request subject uses an underscore, not a hyphen. Mistake here results in AADSTS70021: No matching federated identity record. We learned this the hard way." data-pl="Subject pull_request używa podkreślenia, nie myślnika. Błąd tutaj kończy się AADSTS70021: No matching federated identity record. Nauczyliśmy się tego na własnej skórze."> The <code>pull_request</code> subject uses an underscore, not a hyphen.</span>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ COMPLIANCE INTERACTIVE ═════════════════ -->
+<div class="section" id="compliance">
+<div class="wrap">
+  <span class="section-num" data-en="06 — Compliance Matrix" data-pl="06 — Macierz zgodności">06 — Compliance Matrix</span>
+  <h2 data-en="Click a Framework to See the Mapping" data-pl="Kliknij standard, aby zobaczyć mapowanie">Click a Framework to See the Mapping</h2>
+
+  <div class="chart-row">
+    <svg class="donut" viewBox="0 0 120 120">
+      <circle class="donut-track" cx="60" cy="60" r="50"/>
+      <circle class="donut-fill" cx="60" cy="60" r="50" stroke-dasharray="314.16" stroke-dashoffset="314.16" id="donutFill"/>
+      <text class="donut-text" x="60" y="62" text-anchor="middle" font-size="20" id="donutPct">0%</text>
+      <text class="donut-text" x="60" y="80" text-anchor="middle" font-size="8" fill="#94A3B8" font-weight="400">coverage</text>
+    </svg>
+    <div class="chart-legend">
+      <h3 data-en="Pipeline Coverage" data-pl="Pokrycie pipeline">Pipeline Coverage</h3>
+      <ul>
+        <li><span class="dot" style="background:var(--green)"></span><span data-en="Automated controls (pipeline-generated evidence)" data-pl="Automatyczne kontrole (dowody z pipeline)">Automated controls (pipeline-generated evidence)</span></li>
+        <li><span class="dot" style="background:var(--amber)"></span><span data-en="Configured controls (one-time setup)" data-pl="Skonfigurowane kontrole (jednorazowa konfiguracja)">Configured controls (one-time setup)</span></li>
+        <li><span class="dot" style="background:var(--dim)"></span><span data-en="Organizational controls (require human execution)" data-pl="Kontrole organizacyjne (wymagają wykonania przez człowieka)">Organizational controls (require human execution)</span></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="framework-grid" id="fwGrid">
+    <div class="fw-card active" data-fw="dora"><div class="fw-name">DORA</div><div class="fw-coverage">3/4</div><div class="fw-label" data-en="Articles" data-pl="Artykuły">Articles</div></div>
+    <div class="fw-card" data-fw="nis2"><div class="fw-name">NIS2</div><div class="fw-coverage">3/4</div><div class="fw-label" data-en="Articles" data-pl="Artykuły">Articles</div></div>
+    <div class="fw-card" data-fw="iso"><div class="fw-name">ISO 27001</div><div class="fw-coverage">4/4</div><div class="fw-label">Annex A</div></div>
+    <div class="fw-card" data-fw="soc2"><div class="fw-name">SOC 2</div><div class="fw-coverage">4/4</div><div class="fw-label">TSC</div></div>
+    <div class="fw-card" data-fw="gdpr"><div class="fw-name">GDPR</div><div class="fw-coverage">5/5</div><div class="fw-label" data-en="Articles" data-pl="Artykuły">Articles</div></div>
+  </div>
+
+  <div class="fw-tab-content active" id="fw-dora">
+    <h3>DORA — <span data-en="Digital Operational Resilience Act" data-pl="Akt o operacyjnej odporności cyfrowej">Digital Operational Resilience Act</span></h3>
+    <table>
+      <thead><tr><th>Article</th><th data-en="Requirement" data-pl="Wymaganie">Requirement</th><th data-en="Pipeline Coverage" data-pl="Pokrycie pipeline">Pipeline Coverage</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Art. 16.1.a</strong></td><td data-en="Documented ICT risk management framework" data-pl="Udokumentowany framework zarządzania ryzykiem ICT">Documented ICT risk management framework</td><td>OPA policies, risk register, security gates, evidence pack</td></tr>
+        <tr><td><strong>Art. 16.1.c</strong></td><td data-en="System-update and patching procedures" data-pl="Procedury aktualizacji i łatania">System-update and patching procedures</td><td>Trivy SCA, Renovate config, vulnerability management policy</td></tr>
+        <tr><td><strong>Art. 16.1.d</strong></td><td data-en="Anomaly detection" data-pl="Wykrywanie anomalii">Anomaly detection</td><td>Azure Monitor alerts, DAST auto-incident workflow</td></tr>
+        <tr><td><strong>Art. 28</strong></td><td data-en="ICT third-party / supply-chain risk" data-pl="Ryzyko stron trzecich / łańcuch dostaw">ICT third-party / supply-chain risk</td><td>SBOM, Cosign signing, SLSA provenance, vendor risk register</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fw-tab-content" id="fw-nis2">
+    <h3>NIS2 — <span data-en="Network and Information Security 2" data-pl="Bezpieczeństwo Sieci i Informacji 2">Network and Information Security 2</span></h3>
+    <table>
+      <thead><tr><th>Article</th><th data-en="Requirement" data-pl="Wymaganie">Requirement</th><th data-en="Pipeline Coverage" data-pl="Pokrycie pipeline">Pipeline Coverage</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Art. 21.2.b</strong></td><td data-en="Incident handling" data-pl="Obsługa incydentów">Incident handling</td><td>Incident runbook, ICT issue template, DAST auto-incident with SLAs</td></tr>
+        <tr><td><strong>Art. 21.2.d</strong></td><td data-en="Supply chain security" data-pl="Bezpieczeństwo łańcucha dostaw">Supply chain security</td><td>SBOM, signed image attestations, provenance, dependency scanning</td></tr>
+        <tr><td><strong>Art. 21.2.e</strong></td><td data-en="Secure SDLC and acquisition" data-pl="Bezpieczny SDLC i nabywanie">Secure SDLC and acquisition</td><td>All Phase 1+2 controls — SAST, SCA, container scanning, mandatory code review</td></tr>
+        <tr><td><strong>Art. 21.2.h</strong></td><td data-en="Cryptography policies" data-pl="Polityki kryptograficzne">Cryptography policies</td><td>Cosign keyless signing, OIDC federation, TLS 1.2 minimum</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fw-tab-content" id="fw-iso">
+    <h3>ISO/IEC 27001:2022 — Annex A</h3>
+    <table>
+      <thead><tr><th>Control</th><th>Title</th><th data-en="Pipeline Evidence" data-pl="Dowód z pipeline">Pipeline Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>A.8.4</strong></td><td data-en="Access to source code" data-pl="Dostęp do kodu źródłowego">Access to source code</td><td>Branch protection, CODEOWNERS, signed commits, SHA256 manifest</td></tr>
+        <tr><td><strong>A.8.9</strong></td><td data-en="Configuration management" data-pl="Zarządzanie konfiguracją">Configuration management</td><td>Terraform IaC, all infrastructure versioned, change tracked via PRs</td></tr>
+        <tr><td><strong>A.8.25</strong></td><td data-en="Secure development life cycle" data-pl="Bezpieczny SDLC">Secure development life cycle</td><td>Phases 1–6, OPA policies, security gates, mandatory test coverage</td></tr>
+        <tr><td><strong>A.8.28</strong></td><td data-en="Secure coding" data-pl="Bezpieczne kodowanie">Secure coding</td><td>CodeQL semantic analysis, MegaLinter, ZAP runtime testing</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fw-tab-content" id="fw-soc2">
+    <h3>SOC 2 — Trust Services Criteria</h3>
+    <table>
+      <thead><tr><th>Criterion</th><th data-en="Description" data-pl="Opis">Description</th><th data-en="Pipeline Evidence" data-pl="Dowód z pipeline">Pipeline Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>CC6.1</strong></td><td data-en="Logical access controls" data-pl="Logiczne kontrole dostępu">Logical access controls</td><td>OIDC federation, branch protection, GitHub environment approvals, RBAC</td></tr>
+        <tr><td><strong>CC7.1</strong></td><td data-en="System monitoring" data-pl="Monitorowanie systemu">System monitoring</td><td>Log Analytics, Azure Monitor alerts, DAST findings, OPA evidence-completeness</td></tr>
+        <tr><td><strong>CC8.1</strong></td><td data-en="Change management" data-pl="Zarządzanie zmianą">Change management</td><td>Git PRs, signed commits, branch protection 2 approvals, Terraform plans archived</td></tr>
+        <tr><td><strong>PI1.1</strong></td><td data-en="Processing integrity" data-pl="Integralność przetwarzania">Processing integrity</td><td>Cosign signatures verifiable post-deploy, SHA256 manifest, OPA deployment-gate</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="fw-tab-content" id="fw-gdpr">
+    <h3>GDPR / RODO</h3>
+    <table>
+      <thead><tr><th>Article</th><th data-en="Requirement" data-pl="Wymaganie">Requirement</th><th data-en="Pipeline Evidence" data-pl="Dowód z pipeline">Pipeline Evidence</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Art. 5.1.c</strong></td><td data-en="Data minimisation" data-pl="Minimalizacja danych">Data minimisation</td><td>PII scanner blocks PESEL/phone/email; logs sanitised before archival</td></tr>
+        <tr><td><strong>Art. 5.1.e</strong></td><td data-en="Storage limitation" data-pl="Ograniczenie przechowywania">Storage limitation</td><td>Lifecycle deletes evidence after retention; deletion-schedule OPA policy</td></tr>
+        <tr><td><strong>Art. 25</strong></td><td data-en="Data protection by design" data-pl="Ochrona danych w fazie projektowania">Data protection by design</td><td>PII scanner, data-flow diagram, sanitisation, secure infra by default</td></tr>
+        <tr><td><strong>Art. 28</strong></td><td data-en="Processor / sub-processor" data-pl="Przetwarzający / sub-przetwarzający">Processor / sub-processor</td><td>DPA compliance check tracking nine processors with status</td></tr>
+        <tr><td><strong>Art. 30</strong></td><td data-en="Records of processing" data-pl="Rejestr czynności przetwarzania">Records of processing</td><td>Data flow diagram, evidence pack metadata, vendor risk register</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ INTERACTIVE API DEMO ═════════════════ -->
+<div class="section" id="live">
+<div class="wrap">
+  <span class="section-num" data-en="07 — Interactive API Demo" data-pl="07 — Interaktywne demo API">07 — Interactive API Demo</span>
+  <h2 data-en="Try The Live API" data-pl="Wypróbuj API na żywo">Try The Live API</h2>
+  <p data-en="The buttons below make real HTTP calls to the deployed application. The container scales to zero when idle, so the first request after a quiet period takes 30–60 seconds." data-pl="Przyciski poniżej wykonują rzeczywiste wywołania HTTP do wdrożonej aplikacji. Kontener skaluje do zera w bezczynności, więc pierwsze żądanie zajmuje 30–60 sekund.">The buttons below make real HTTP calls. First request after idle takes 30–60s (cold start).</p>
+
+  <div class="live-grid">
+    <div class="live-card">
+      <h3><span class="status-dot"></span><span data-en="Health Endpoint" data-pl="Endpoint Health">Health Endpoint</span></h3>
+      <p class="live-value" id="health-status">Checking...</p>
+    </div>
+    <div class="live-card">
+      <h3>Items API</h3>
+      <p class="live-value" id="items-status">Checking...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Container Image" data-pl="Obraz kontenera">Container Image</h3>
+      <p class="live-value" style="font-size:.7rem">Cosign-signed via GitHub OIDC + Sigstore Fulcio</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Authentication" data-pl="Uwierzytelnianie">Authentication</h3>
+      <p class="live-value" style="font-size:.7rem" data-en="Zero static secrets — OIDC federated" data-pl="Zero statycznych sekretów — federacja OIDC">Zero static secrets — OIDC federated</p>
+    </div>
+  </div>
+
+  <div class="demo-grid">
+    <div class="demo-card">
+      <h3>GET /api/items</h3>
+      <button class="btn btn-secondary" id="btnList" data-en="List items" data-pl="Pobierz listę">List items</button>
+      <div class="demo-output" id="outList">// click to fetch</div>
+    </div>
+    <div class="demo-card">
+      <h3>POST /api/items</h3>
+      <div class="input-row">
+        <input type="text" id="inputName" placeholder="Item name" value="Test from website">
+        <button class="btn" id="btnCreate">POST</button>
+      </div>
+      <div class="demo-output" id="outCreate">// click POST to create</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ VERIFY THIS DEPLOYMENT ═════════════════ -->
+<div class="section" id="verify" style="background:linear-gradient(180deg,var(--mist) 0%,#FFFBEB 100%)">
+<div class="wrap">
+  <span class="section-num" data-en="08 — Verify This Deployment" data-pl="08 — Zweryfikuj to wdrożenie">08 — Verify This Deployment</span>
+  <h2 data-en="Don't Trust. Verify." data-pl="Nie ufaj. Zweryfikuj.">Don't Trust. Verify.</h2>
+  <p class="lead" data-en="Everything above is just words on a page. Below is the verifiable proof. The image digest, signing certificate, and Rekor transparency log entry are all public — anyone in the world can independently confirm this deployment was built and signed by the pipeline described above." data-pl="Wszystko powyżej to tylko słowa na stronie. Poniżej znajduje się weryfikowalny dowód. Image digest, certyfikat podpisu i wpis w logu transparentności Rekor są publiczne — każdy na świecie może niezależnie potwierdzić, że to wdrożenie zostało zbudowane i podpisane przez opisany pipeline.">Everything above is just words. Below is the verifiable proof. The image digest, signing certificate, and Rekor entry are all public — anyone can independently confirm this deployment came from the pipeline described above.</p>
+
+  <div class="callout callout-warn">
+    <strong data-en="Why this matters:" data-pl="Dlaczego to jest ważne:">Why this matters:</strong>
+    <span data-en="The values shown below are fetched live from this running container's /api/build-info endpoint. They were baked into the image at Docker build time (commit SHA, run ID) and injected into the running container at deploy time (image digest, image URI). The container cannot lie about its own digest because the digest is what the registry returned after pushing." data-pl="Wartości poniżej są pobierane na żywo z endpointu /api/build-info tego kontenera. Zostały wpisane do obrazu w czasie budowania Dockera (commit SHA, run ID) i wstrzyknięte do działającego kontenera w czasie wdrożenia (image digest). Kontener nie może kłamać o swoim digest, bo digest to to, co zwróciło registry po pushu."> Values below are fetched live from /api/build-info. They were baked in at Docker build time and injected at deploy time. The container cannot lie about its own digest.</span>
+  </div>
+
+  <h3 data-en="Live Build Metadata" data-pl="Metadane buildu na żywo">Live Build Metadata</h3>
+  <div class="live-grid">
+    <div class="live-card">
+      <h3 data-en="Image Digest" data-pl="Image Digest">Image Digest</h3>
+      <p class="live-value" id="bi-digest" style="font-size:.7rem">loading...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Image URI" data-pl="URI obrazu">Image URI</h3>
+      <p class="live-value" id="bi-uri" style="font-size:.7rem">loading...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Git Commit" data-pl="Git Commit">Git Commit</h3>
+      <p class="live-value" id="bi-sha" style="font-size:.78rem">loading...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Build Time" data-pl="Czas budowania">Build Time</h3>
+      <p class="live-value" id="bi-buildtime" style="font-size:.78rem">loading...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="GitHub Actions Run" data-pl="Uruchomienie GitHub Actions">GitHub Actions Run</h3>
+      <p class="live-value" id="bi-run" style="font-size:.78rem">loading...</p>
+    </div>
+    <div class="live-card">
+      <h3 data-en="Rekor Transparency Log" data-pl="Log transparentności Rekor">Rekor Transparency Log</h3>
+      <p class="live-value" id="bi-rekor" style="font-size:.78rem">loading...</p>
+    </div>
+  </div>
+
+  <h3 style="margin-top:28px" data-en="Verify Yourself (Cosign)" data-pl="Zweryfikuj samodzielnie (Cosign)">Verify Yourself (Cosign)</h3>
+  <p data-en="Copy and run this exact command in a terminal with cosign installed. It will fetch the signature from Sigstore, validate it against the certificate identity (workflow URL), and confirm the image at that digest was signed by this exact pipeline." data-pl="Skopiuj i uruchom dokładnie tę komendę w terminalu z zainstalowanym cosign. Pobierze podpis z Sigstore, zwaliduje go względem tożsamości certyfikatu (URL workflow) i potwierdzi, że obraz w tym digest został podpisany przez ten dokładny pipeline.">Copy and run this exact command in a terminal with <code>cosign</code> installed. It validates the signature against the certificate identity and confirms the image at that digest was signed by this exact pipeline.</p>
+  <div class="codeblock" id="cosignVerifyBlock"><span class="code-copy" id="copyVerify" data-en="copy" data-pl="kopiuj">copy</span><span id="cosignVerifyCmd">loading...</span></div>
+
+  <h3 style="margin-top:20px" data-en="Fetch the SBOM" data-pl="Pobierz SBOM">Fetch the SBOM</h3>
+  <p data-en="The SBOM is attached to the image as a signed Sigstore attestation. To download and verify it:" data-pl="SBOM jest dołączony do obrazu jako podpisana atestacja Sigstore. Aby go pobrać i zweryfikować:">The SBOM is attached to the image as a signed Sigstore attestation. To download:</p>
+  <div class="codeblock" id="cosignAttestBlock"><span class="code-copy" id="copyAttest" data-en="copy" data-pl="kopiuj">copy</span><span id="cosignAttestCmd">loading...</span></div>
+
+  <h3 style="margin-top:20px" data-en="Public Audit Trail" data-pl="Publiczny ślad audytowy">Public Audit Trail</h3>
+  <p data-en="These three links lead to permanent, publicly auditable records. Anyone — including hostile parties — can verify the same chain of custody." data-pl="Te trzy linki prowadzą do trwałych, publicznie audytowalnych zapisów. Każdy — w tym wrogie strony — może zweryfikować ten sam łańcuch dostaw.">These three links lead to permanent, publicly auditable records:</p>
+  <div class="live-grid">
+    <div class="live-card">
+      <h3 data-en="1. Source Commit" data-pl="1. Commit źródłowy">1. Source Commit</h3>
+      <p style="font-size:.78rem;color:var(--mid);margin-bottom:8px" data-en="The exact commit that triggered this build, with GitHub's verification badge." data-pl="Dokładny commit, który wywołał ten build, z odznaką weryfikacji GitHub.">The exact commit that triggered this build.</p>
+      <a class="btn btn-secondary" id="link-commit" href="#" target="_blank" rel="noopener">→ <span data-en="View commit" data-pl="Zobacz commit">View commit</span></a>
+    </div>
+    <div class="live-card">
+      <h3 data-en="2. Workflow Run" data-pl="2. Uruchomienie workflow">2. Workflow Run</h3>
+      <p style="font-size:.78rem;color:var(--mid);margin-bottom:8px" data-en="Full GitHub Actions log for the run that built and signed this image." data-pl="Pełny log GitHub Actions dla runu, który zbudował i podpisał ten obraz.">Full GitHub Actions log (private repo — invite needed).</p>
+      <a class="btn btn-secondary" id="link-run" href="#" target="_blank" rel="noopener">→ <span data-en="View run" data-pl="Zobacz run">View run</span></a>
+    </div>
+    <div class="live-card">
+      <h3 data-en="3. Rekor Log" data-pl="3. Log Rekor">3. Rekor Log</h3>
+      <p style="font-size:.78rem;color:var(--mid);margin-bottom:8px" data-en="Permanent, append-only Sigstore transparency log. Public regardless of repo visibility." data-pl="Trwały, append-only log transparentności Sigstore. Publiczny niezależnie od widoczności repo.">Permanent Sigstore log — public regardless of repo visibility.</p>
+      <a class="btn" id="link-rekor" href="#" target="_blank" rel="noopener">→ <span data-en="Search Rekor" data-pl="Przeszukaj Rekor">Search Rekor</span></a>
+    </div>
+  </div>
+
+  <h3 style="margin-top:28px" data-en="What This Proves" data-pl="Co to udowadnia">What This Proves</h3>
+  <ul>
+    <li><strong data-en="Identity:" data-pl="Tożsamość:">Identity:</strong> <span data-en="The signing certificate's Subject Alternative Name embeds the GitHub workflow URL. If cosign verify succeeds, only a workflow in this exact repository at this exact commit could have produced the signature." data-pl="Subject Alternative Name certyfikatu podpisu zawiera URL workflow GitHub. Jeśli cosign verify się powiedzie, tylko workflow w tym dokładnym repozytorium w tym dokładnym commicie mógł wygenerować podpis."> The signing certificate's SAN embeds the GitHub workflow URL. Only a workflow in this exact repo at this exact commit could have produced the signature.</span></li>
+    <li><strong data-en="Integrity:" data-pl="Integralność:">Integrity:</strong> <span data-en="The signature binds to the image digest (sha256:...). If even one byte of the image were modified, the digest would change and the signature would no longer verify." data-pl="Podpis jest powiązany z image digest (sha256:...). Gdyby zmienił się choć jeden bajt obrazu, digest by się zmienił i podpis przestałby się weryfikować."> The signature binds to the digest. One changed byte = digest changes = signature fails.</span></li>
+    <li><strong data-en="Non-repudiation:" data-pl="Niezaprzeczalność:">Non-repudiation:</strong> <span data-en="Rekor records every signing event in an append-only public log. Even GitHub or CyberForge cannot retroactively delete the entry. The signing event is permanent and globally visible." data-pl="Rekor zapisuje każde zdarzenie podpisu w append-only publicznym logu. Nawet GitHub czy CyberForge nie mogą wstecznie usunąć wpisu. Zdarzenie podpisu jest trwałe i globalnie widoczne."> Rekor records every signing event in an append-only public log. Permanent and globally visible.</span></li>
+  </ul>
+</div>
+</div>
+
+<!-- ═════════════════ AUDITOR ═════════════════ -->
+<div class="section" id="auditor">
+<div class="wrap">
+  <span class="section-num" data-en="09 — Auditor View" data-pl="09 — Widok audytora">09 — Auditor View</span>
+  <h2 data-en="What This Proves to Auditors" data-pl="Co to udowadnia audytorom">What This Proves to Auditors</h2>
+  <p data-en="If a SOC 2 Type I auditor or ISO 27001 certification body asked for evidence today, the conversation would proceed as follows:" data-pl="Gdyby audytor SOC 2 Type I lub jednostka certyfikująca ISO 27001 poprosili o dowody dzisiaj, rozmowa wyglądałaby tak:">If a SOC 2 Type I auditor or ISO 27001 certifier asked for evidence today:</p>
+
+  <h3 data-en="1. End-to-end traceability" data-pl="1. Pełna śledzalność">1. End-to-end traceability</h3>
+  <p data-en="Show us the path from a developer's pull request to the running production system. The pipeline-run.json file contains commit SHA, author, timestamp, image digest, and gate results." data-pl="Pokaż ścieżkę od pull requesta do działającego systemu. Plik pipeline-run.json zawiera SHA commit, autora, timestamp, image digest i wyniki bramek.">Pipeline-run.json contains commit SHA, author, timestamp, image digest, and gate results — combined with GitHub PR history, that's an unbroken chain from human to running container.</p>
+
+  <h3 data-en="2. Cryptographic chain of custody" data-pl="2. Kryptograficzny łańcuch dostaw">2. Cryptographic chain of custody</h3>
+  <p data-en="The cosign-verification.log shows successful verification at deploy time. The certificate identity confirms the image was signed by a workflow running in this exact repository. The signing event is visible in the Rekor public transparency log." data-pl="cosign-verification.log pokazuje pomyślną weryfikację w czasie wdrożenia. Tożsamość certyfikatu potwierdza, że obraz został podpisany przez workflow w tym repo. Zdarzenie podpisu jest widoczne w publicznym logu Rekor.">cosign-verification.log proves the signature is valid; certificate identity ties it to this repo at this commit; Rekor transparency log makes it publicly auditable.</p>
+
+  <h3 data-en="3. Tamper-evident archive" data-pl="3. Archiwum odporne na manipulacje">3. Tamper-evident archive</h3>
+  <p data-en="The SHA256 manifest signs the contents. The Azure Blob immutability policy retains the pack for 1825 days. Even an Azure subscription owner cannot modify or delete blobs within retention." data-pl="Manifest SHA256 podpisuje zawartość. Polityka niezmienialności Azure Blob przechowuje pack przez 1825 dni. Nawet właściciel subskrypcji Azure nie może modyfikować ani usuwać blobów w okresie retencji.">SHA256 manifest + WORM Blob storage = no one (including Azure subscription owners) can modify the archive within 1825 days.</p>
+
+  <h3 data-en="4. Automated, not aspirational" data-pl="4. Automatyczne, nie aspiracyjne">4. Automated, not aspirational</h3>
+  <p data-en="Every push to main produces a new evidence pack. The list of evidence packs in the storage account is the audit trail of releases." data-pl="Każdy push do main generuje nowy Evidence Pack. Lista paczek w storage account TO ślad audytowy wydań.">Every push to main produces a new evidence pack. The list of packs IS the release audit trail.</p>
+
+  <h3 data-en="5. Regulatory mapping" data-pl="5. Mapowanie regulacyjne">5. Regulatory mapping</h3>
+  <p data-en="The compliance-matrix.json maps each artifact to specific articles of DORA, NIS2, ISO 27001, SOC 2, and GDPR. The matrix is generated automatically — its assertions are auditable in source." data-pl="compliance-matrix.json mapuje każdy artefakt do konkretnych artykułów DORA, NIS2, ISO 27001, SOC 2, RODO. Macierz jest generowana automatycznie.">compliance-matrix.json maps every artifact to specific articles. Generated automatically; auditable in source.</p>
+
+  <div class="callout">
+    <strong data-en="The honest caveat:" data-pl="Uczciwa uwaga:">The honest caveat:</strong>
+    <span data-en="The pipeline addresses technical, automatable controls. Organisational controls — management review, completed access reviews, training records, internal audit reports — are templated in the governance documentation but require human execution. A pipeline cannot conduct a management review for you. It can ensure that when you do, the technical controls discussed are demonstrably operating." data-pl="Pipeline adresuje techniczne, automatyzowalne kontrole. Kontrole organizacyjne — przeglądy zarządcze, wykonane review dostępów, zapisy szkoleń, raporty audytów wewnętrznych — są szablonami w dokumentacji governance, ale wymagają wykonania przez człowieka."> Pipeline does technical controls. Organisational controls (management review, access reviews, training records) are templated but require human execution.</span>
+  </div>
+</div>
+</div>
+
+<!-- ═════════════════ CTA → MAIN SITE ═════════════════ -->
+<div class="section" id="next" style="background:linear-gradient(180deg,var(--mist) 0%,var(--white) 100%)">
+<div class="wrap" style="text-align:center">
+  <span class="section-num" data-en="Next Steps" data-pl="Następne kroki">Next Steps</span>
+  <h2 data-en="Want This Pipeline In Your Repo?" data-pl="Chcesz mieć ten pipeline u siebie?">Want This Pipeline In Your Repo?</h2>
+  <p class="lead" style="max-width:640px;margin:0 auto 24px" data-en="This page is the technical proof. Engagement details, pricing, and the discovery process live on the main site." data-pl="Ta strona to dowód techniczny. Szczegóły współpracy, cennik i proces discovery znajdziesz na stronie głównej.">This page is the technical proof. Engagement details, pricing, and the discovery process live on the main site.</p>
+  <a href="https://cyberforge.agency#contact" class="btn" style="font-size:.78rem;padding:12px 22px" data-en="Talk to CyberForge →" data-pl="Skontaktuj się →">Talk to CyberForge →</a>
+</div>
+</div>
+
+<!-- ═════════════════ FOOTER ═════════════════ -->
+<div class="footer">
+<div class="wrap">
+  <span class="footer-tag" data-en="Built, scanned, signed, and archived by the pipeline it documents." data-pl="Zbudowane, przeskanowane, podpisane i zarchiwizowane przez pipeline, który dokumentuje.">Built, scanned, signed, and archived by the pipeline it documents.</span>
+  <p>CyberForge DevSecOps Pipeline · <a href="https://cyberforge.agency">cyberforge.agency</a></p>
+  <p data-en="This application is a live case study. Every element you see was produced by the pipeline described above." data-pl="Ta aplikacja to studium przypadku na żywo. Każdy element został wyprodukowany przez opisany pipeline.">This application is a live case study. Every element you see was produced by the pipeline described above.</p>
+  <p style="margin-top:12px;color:var(--blue3)">DORA · NIS2 · ISO/IEC 27001:2022 · SOC 2 · GDPR/RODO</p>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// PHASE/TOOL DATA - bilingual content
+// ═══════════════════════════════════════════════════════════════════
+const TOOLS = {
+  1: [
+    {tag:'tag-sast', name:'TruffleHog v3.82', t_en:'SECRETS', t_pl:'SEKRETY',
+     en:'Scans commit history for leaked credentials. Combines regex (~700 detectors) with entropy analysis, then verifies matches against live APIs to eliminate false positives.',
+     pl:'Skanuje historię commitów pod kątem wycieków poświadczeń. Łączy regex (~700 detektorów) z analizą entropii, weryfikując dopasowania względem żywych API.',
+     details_en:'For PRs, the scan is range-limited via base/head inputs (under 15s for typical changes). Gate: verified secrets fail the build.',
+     details_pl:'Dla PR skan jest ograniczony przez base/head (poniżej 15s dla typowych zmian). Bramka: zweryfikowane sekrety zatrzymują build.'},
+    {tag:'tag-iac', name:'Checkov v3+', t_en:'IAC', t_pl:'IAC',
+     en:'Scans Terraform against 1000+ policies (CIS Azure + Kubernetes benchmarks). Produces SARIF for GitHub Code Scanning.',
+     pl:'Skanuje Terraform względem 1000+ polityk (CIS Azure + Kubernetes). Tworzy SARIF dla GitHub Code Scanning.',
+     details_en:'19 specific checks skipped via --skip-check with documented justifications (e.g. CKV_AZURE_206 because GRS unavailable in polandcentral).',
+     details_pl:'19 konkretnych checków pominięto przez --skip-check z udokumentowanymi uzasadnieniami (np. CKV_AZURE_206 bo GRS niedostępny w polandcentral).'},
+    {tag:'tag-lint', name:'MegaLinter v8', t_en:'LINT', t_pl:'LINT',
+     en:'Multi-language aggregator: ESLint, TypeScript-ESLint, Hadolint, markdownlint, yamllint, JSON-lint. Runs only on changed files for fast PR feedback.',
+     pl:'Agregator wielojęzyczny: ESLint, TypeScript-ESLint, Hadolint, markdownlint, yamllint, JSON-lint. Działa tylko na zmienionych plikach.',
+     details_en:'Code quality is a security control: most injection vulnerabilities have a stylistic precursor a linter can catch.',
+     details_pl:'Jakość kodu to kontrola bezpieczeństwa: większość podatności injection ma stylistyczny prekursor, który linter wyłapuje.'},
+    {tag:'tag-id', name:'Commit Signing', t_en:'IDENTITY', t_pl:'TOŻSAMOŚĆ',
+     en:'Verifies every PR commit is signed by a GitHub-recognised key. Uses repos.listCommits API to check verification.verified field.',
+     pl:'Weryfikuje, że każdy commit PR jest podpisany kluczem rozpoznanym przez GitHub. Używa API repos.listCommits.',
+     details_en:'Stronger than git verify-commit — relies on the same verification GitHub displays in the UI. Supports both GPG and SSH signatures.',
+     details_pl:'Silniejsze niż git verify-commit — opiera się na tej samej weryfikacji co GitHub UI. Wspiera podpisy GPG i SSH.'},
+    {tag:'tag-pii', name:'PII Scanner', t_en:'PII', t_pl:'PII',
+     en:'Custom regex scanner for Polish PII: PESEL (with checksum), phone (+48 format), email (excluding noreply/corporate domains).',
+     pl:'Niestandardowy regex skaner dla polskich PII: PESEL (z sumą kontrolną), telefon (+48), email (z wyłączeniem noreply/firmowych).',
+     details_en:'Mapped to GDPR Article 25 (data protection by design). Skips test fixtures where dummy PII is expected.',
+     details_pl:'Zmapowane do RODO Art. 25 (ochrona w fazie projektowania). Pomija fixture testowe.'}
+  ],
+  2: [
+    {tag:'tag-sca', name:'Trivy SCA (filesystem)', t_en:'SCA', t_pl:'SCA',
+     en:'Scans package-lock.json against CVE databases (NVD, GitHub Advisories, OSV). Honours .trivyignore VEX justifications.',
+     pl:'Skanuje package-lock.json względem baz CVE (NVD, GitHub Advisories, OSV). Uznaje .trivyignore VEX.',
+     details_en:'Gate: any HIGH/CRITICAL CVE not in .trivyignore fails the build. Each ignore has documented status (not_affected, false_positive, will_not_fix).',
+     details_pl:'Bramka: każdy HIGH/CRITICAL nieobecny w .trivyignore zatrzymuje build. Każde ignore ma udokumentowany status.'},
+    {tag:'tag-sast', name:'CodeQL v4.35', t_en:'SAST', t_pl:'SAST',
+     en:'Semantic code analysis with security-extended query suite. Builds AST and performs taint tracking.',
+     pl:'Semantyczna analiza kodu z security-extended. Buduje AST i wykonuje śledzenie skażenia.',
+     details_en:'Catches: prototype pollution, ReDoS, missing rate limits, unsanitised input flowing into fs/shell. SARIF uploaded to Code Scanning.',
+     details_pl:'Wyłapuje: prototype pollution, ReDoS, brak rate-limit, niesanityzowane wejście. SARIF do Code Scanning.'},
+    {tag:'tag-sast', name:'Jest 80% Coverage', t_en:'QUALITY', t_pl:'JAKOŚĆ',
+     en:'Test gate: 80% statements, branches, functions, lines. Untested paths are where vulnerabilities hide longest.',
+     pl:'Bramka testowa: 80% statements, branches, functions, lines. Nieprzetestowane ścieżki to miejsca gdzie najdłużej kryją się podatności.',
+     details_en:'Currently 100% statements, 85.7% branches. JUnit XML for downstream reporting; HTML coverage in evidence pack.',
+     details_pl:'Aktualnie 100% statements, 85.7% branches. JUnit XML do raportowania; HTML w Evidence Pack.'},
+    {tag:'tag-deploy', name:'Docker Multi-Stage', t_en:'BUILD', t_pl:'BUILD',
+     en:'3-stage: builder (full devDeps), deps (production-only), runtime (gcr.io/distroless/nodejs20:nonroot). No shell, no pkg manager.',
+     pl:'3-fazowy: builder (devDeps), deps (tylko produkcyjne), runtime (distroless:nonroot). Bez shella i menedżera pakietów.',
+     details_en:'Distroless eliminates an enormous class of post-exploitation: no /bin/sh means no shell payload that doesn\'t bring its own interpreter.',
+     details_pl:'Distroless eliminuje ogromną klasę post-exploit: brak /bin/sh = brak payloadu shella bez własnego interpretera.'},
+    {tag:'tag-sca', name:'Trivy Image', t_en:'CONTAINER', t_pl:'KONTENER',
+     en:'Scans built image for OS-package CVEs (Debian 12) and language-package CVEs in node_modules.',
+     pl:'Skanuje zbudowany obraz pod kątem CVE pakietów OS (Debian 12) i pakietów w node_modules.',
+     details_en:'Two CVEs suppressed via .trivyignore: glibc memalign and openssl CMS NULL — distroless base, no upstream fix yet.',
+     details_pl:'Dwa CVE wyciszone w .trivyignore: glibc memalign i openssl CMS NULL — base distroless, brak fixa upstream.'},
+    {tag:'tag-sign', name:'Syft SBOM v1.18', t_en:'SBOM', t_pl:'SBOM',
+     en:'CycloneDX 1.6 SBOM generated from the built container image. Captures exact resolved versions, not declared.',
+     pl:'CycloneDX 1.6 SBOM generowany ze zbudowanego obrazu. Przechwytuje dokładne wersje, nie zadeklarowane.',
+     details_en:'88 components tracked. CycloneDX over SPDX for richer vulnerability+dependency semantics. Then attested in Phase 3.',
+     details_pl:'88 komponentów. CycloneDX nad SPDX dla bogatszej semantyki podatności+zależności. Atestowane w Fazie 3.'}
+  ],
+  3: [
+    {tag:'tag-sign', name:'Cosign Keyless', t_en:'SIGN', t_pl:'PODPIS',
+     en:'Sigstore keyless signing: ephemeral keypair + Fulcio CA + Rekor transparency log + GitHub OIDC identity.',
+     pl:'Sigstore keyless: efemeryczna para kluczy + Fulcio CA + log Rekor + tożsamość GitHub OIDC.',
+     details_en:'No long-lived signing key to lose. Cert valid for 10 minutes. Signing event publicly auditable in Rekor.',
+     details_pl:'Brak długoterminowego klucza. Cert ważny 10 minut. Zdarzenie publicznie audytowalne w Rekor.'},
+    {tag:'tag-sign', name:'SBOM Attestation', t_en:'ATTEST', t_pl:'ATESTACJA',
+     en:'CycloneDX SBOM signed and attached to image as Sigstore attestation. Predicate type: cyclonedx.org/bom.',
+     pl:'CycloneDX SBOM podpisany i dołączony do obrazu jako atestacja Sigstore. Typ predicate: cyclonedx.org/bom.',
+     details_en:'Consumers fetch SBOM directly from registry, verify signature using same Fulcio/Rekor flow.',
+     details_pl:'Konsumenci pobierają SBOM bezpośrednio z registry, weryfikują tym samym przepływem Fulcio/Rekor.'},
+    {tag:'tag-sign', name:'SLSA Provenance', t_en:'PROVENANCE', t_pl:'POCHODZENIE',
+     en:'SLSA v1.0 build provenance via actions/attest-build-provenance, with manual fallback for private repos on personal accounts.',
+     pl:'SLSA v1.0 provenance via actions/attest-build-provenance, z fallback ręcznym dla prywatnych repos.',
+     details_en:'in-toto Statement: subject digest + builder identity + source commit + build timestamps. Sufficient for SLSA L2.',
+     details_pl:'in-toto Statement: subject digest + tożsamość buildera + commit + timestampy. Wystarcza do SLSA L2.'}
+  ],
+  4: [
+    {tag:'tag-deploy', name:'GitHub OIDC → Azure', t_en:'AUTH', t_pl:'AUTH',
+     en:'Federated credentials trust GitHub\'s OIDC issuer for specific subjects. No service principal secret stored anywhere.',
+     pl:'Federowane poświadczenia ufają OIDC GitHub dla konkretnych subjectów. Brak sekretu service principal.',
+     details_en:'4 subjects: refs/heads/main, environment:staging, environment:production, pull_request (note: underscore!).',
+     details_pl:'4 subjecty: refs/heads/main, environment:staging, environment:production, pull_request (uwaga: underscore!).'},
+    {tag:'tag-deploy', name:'Terraform OIDC Backend', t_en:'IAC', t_pl:'IAC',
+     en:'State stored in Azure Storage with use_oidc=true and use_azuread_auth=true. State accessed via federated identity, not storage keys.',
+     pl:'Stan w Azure Storage z use_oidc=true i use_azuread_auth=true. Stan przez federowaną tożsamość, nie klucze storage.',
+     details_en:'Avoids common regression where pipelines use OIDC for provider but storage keys for state.',
+     details_pl:'Unika regresji gdzie pipeline używa OIDC dla providera ale kluczy storage dla stanu.'},
+    {tag:'tag-deploy', name:'Container Apps + AcrPull', t_en:'RUNTIME', t_pl:'RUNTIME',
+     en:'Container App uses system-assigned managed identity granted AcrPull on registry. No credentials in workflow.',
+     pl:'Container App używa system-assigned managed identity z AcrPull na registry. Brak poświadczeń w workflow.',
+     details_en:'Decoupled approach: Terraform manages infra, az containerapp update handles image deploy with retry on RBAC propagation.',
+     details_pl:'Rozdzielenie: Terraform zarządza infrą, az containerapp update obsługuje deploy z retry na propagację RBAC.'},
+    {tag:'tag-sign', name:'Pre-Deploy Verify', t_en:'VERIFY', t_pl:'WERYFIKACJA',
+     en:'Fresh cosign verify against image digest before terraform apply. Re-checks signature was valid at deploy time.',
+     pl:'Świeża cosign verify względem digest przed terraform apply. Re-weryfikuje, że podpis był ważny.',
+     details_en:'Defends against registry-level attack between Phase 3 and Phase 4. Produces second verification log for evidence.',
+     details_pl:'Broni przed atakiem na registry między Fazą 3 i 4. Tworzy drugi log do dowodów.'}
+  ],
+  5: [
+    {tag:'tag-dast', name:'OWASP ZAP Baseline', t_en:'DAST', t_pl:'DAST',
+     en:'Passive scan only (~80 rules) plus brief spider. Safe for production-equivalent staging — no malicious payloads sent.',
+     pl:'Tylko skan pasywny (~80 reguł) + krótki spider. Bezpieczny dla staging — bez złośliwych payloadów.',
+     details_en:'Catches: missing security headers, insecure cookies, disclosed framework versions, content-type mismatches, mixed content.',
+     details_pl:'Wyłapuje: brakujące nagłówki, niezabezpieczone cookies, ujawnione wersje, niezgodności content-type.'},
+    {tag:'tag-dast', name:'Auto-Incident Workflow', t_en:'INCIDENT', t_pl:'INCYDENT',
+     en:'On HIGH/CRITICAL findings, github-script POSTs to /repos/.../issues with security-incident labels and DORA-aligned SLA timeline.',
+     pl:'Przy HIGH/CRITICAL, github-script POSTuje do /issues z etykietami security-incident i timeline SLA zgodnym z DORA.',
+     details_en:'4h triage / 48h fix / 72h deploy / verification rescan. Calibrated to DORA Art.19 reporting windows.',
+     details_pl:'4h triage / 48h fix / 72h deploy / rescan weryfikacyjny. Skalibrowane do okien DORA Art.19.'}
+  ],
+  6: [
+    {tag:'tag-evidence', name:'Evidence Collection', t_en:'COLLECT', t_pl:'ZBIERANIE',
+     en:'Downloads all artifacts from prior phases, normalises filenames, validates required artifacts present.',
+     pl:'Pobiera wszystkie artefakty z poprzednich faz, normalizuje nazwy, waliduje obecność wymaganych.',
+     details_en:'11 artifacts: pipeline-run, security-report, sbom, cosign-log, provenance, zap-report, compliance-matrix, dpa-check, data-flow, manifest, html-report.',
+     details_pl:'11 artefaktów: pipeline-run, security-report, sbom, cosign-log, provenance, zap-report, compliance-matrix, dpa-check, data-flow, manifest, html-report.'},
+    {tag:'tag-pii', name:'PII Sanitisation', t_en:'SANITISE', t_pl:'SANITYZACJA',
+     en:'Python-based regex sanitiser: emails → [REDACTED_EMAIL], PESELs → [REDACTED_PESEL], phones → [REDACTED_PHONE].',
+     pl:'Regex sanitizer w Pythonie: emaile → [REDACTED_EMAIL], PESELe → [REDACTED_PESEL], telefony → [REDACTED_PHONE].',
+     details_en:'Runs before SHA256 manifest computation. Logs from earlier phases occasionally contain author emails from git metadata.',
+     details_pl:'Działa przed obliczeniem SHA256 manifestu. Logi z poprzednich faz czasem zawierają emaile autorów z metadanych git.'},
+    {tag:'tag-evidence', name:'SHA256 + WORM Archive', t_en:'ARCHIVE', t_pl:'ARCHIWUM',
+     en:'SHA256 manifest of all files. ZIP uploaded to Azure Blob with time-based immutability policy (1825 days = 5 years per DORA Art.17).',
+     pl:'Manifest SHA256 wszystkich plików. ZIP do Azure Blob z polityką niezmienialności (1825 dni = 5 lat per DORA Art.17).',
+     details_en:'Even Azure subscription owners cannot modify or delete blobs within retention. Lifecycle: Hot → Cool (30d) → Archive (90d) → Delete (1825d).',
+     details_pl:'Nawet właściciele Azure nie mogą modyfikować ani usuwać. Lifecycle: Hot → Cool (30d) → Archive (90d) → Delete (1825d).'}
+  ]
+};
+
+// Phase descriptions for SVG hover/click
+const PHASE_INFO = {
+  1: {
+    title_en: 'Phase 1 — Security Gate (~1 min)',
+    title_pl: 'Faza 1 — Brama Bezpieczeństwa (~1 min)',
+    desc_en: 'Five parallel checks before any code builds. Catches roughly 70% of rejected PRs in our reference deployments.',
+    desc_pl: 'Pięć równoległych sprawdzeń przed buildem. Wyłapuje około 70% odrzuconych PR w deploymentach referencyjnych.',
+    tools: ['TruffleHog', 'Checkov', 'MegaLinter', 'Commit Signing', 'PII Scanner']
+  },
+  2: {
+    title_en: 'Phase 2 — Build & Scan (~4 min)',
+    title_pl: 'Faza 2 — Build i Skanowanie (~4 min)',
+    desc_en: 'Produces the deployable container image. Four parallel scan jobs gate the docker-build step.',
+    desc_pl: 'Tworzy gotowy do wdrożenia obraz. Cztery równoległe skany strzegą kroku docker-build.',
+    tools: ['Trivy SCA', 'CodeQL', 'Jest 80%', 'Docker buildx', 'Trivy Image', 'Syft SBOM']
+  },
+  3: {
+    title_en: 'Phase 3 — Sign & Attest (~45s)',
+    title_pl: 'Faza 3 — Podpis i Atestacja (~45s)',
+    desc_en: 'Cryptographic chain of custody. Cosign keyless via Sigstore, SBOM attestation, SLSA provenance.',
+    desc_pl: 'Kryptograficzny łańcuch dostaw. Cosign keyless via Sigstore, atestacja SBOM, provenance SLSA.',
+    tools: ['Cosign', 'SBOM Attest', 'SLSA Provenance']
+  },
+  4: {
+    title_en: 'Phase 4 — Deploy (~2 min)',
+    title_pl: 'Faza 4 — Wdrożenie (~2 min)',
+    desc_en: 'GitHub OIDC → Azure WIF → Terraform → Container Apps. Pre-deploy cosign verify + smoke test.',
+    desc_pl: 'GitHub OIDC → Azure WIF → Terraform → Container Apps. Pre-deploy cosign verify + smoke test.',
+    tools: ['azure/login', 'cosign verify', 'Terraform', 'Container Apps', 'Smoke test']
+  },
+  5: {
+    title_en: 'Phase 5 — DAST (~90s)',
+    title_pl: 'Faza 5 — DAST (~90s)',
+    desc_en: 'OWASP ZAP baseline scan against the running app. HIGH/CRITICAL findings auto-create incident issues.',
+    desc_pl: 'OWASP ZAP baseline na działającej aplikacji. HIGH/CRITICAL automatycznie tworzą issue incydentu.',
+    tools: ['OWASP ZAP', 'Auto-Incident']
+  },
+  6: {
+    title_en: 'Phase 6 — Evidence Pack (~30s)',
+    title_pl: 'Faza 6 — Evidence Pack (~30s)',
+    desc_en: 'Collect, sanitise PII, SHA256 manifest, HTML report, upload to Azure Blob WORM (5-year retention).',
+    desc_pl: 'Zbierz, sanityzuj PII, manifest SHA256, raport HTML, upload do Azure Blob WORM (5 lat retencji).',
+    tools: ['Collect', 'Sanitise', 'SHA256', 'HTML Report', 'WORM Archive']
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// LANGUAGE SWITCHING
+// ═══════════════════════════════════════════════════════════════════
+let currentLang = localStorage.getItem('cf_lang') || 'en';
+
+function applyLang(lang) {
+  currentLang = lang;
+  localStorage.setItem('cf_lang', lang);
+  document.documentElement.lang = lang;
+  document.querySelectorAll('[data-en]').forEach(el => {
+    const txt = el.getAttribute('data-' + lang);
+    if (txt) el.textContent = txt;
+  });
+  document.querySelectorAll('[data-en-html]').forEach(el => {
+    const html = el.getAttribute('data-' + lang + '-html');
+    if (html) el.innerHTML = html;
+  });
+  document.querySelectorAll('.lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === lang);
+  });
+  // Re-render tool cards
+  renderToolCards();
+  // Re-render phase info if shown
+  const active = document.querySelector('.phase-node.active');
+  if (active) updatePhaseInfo(active.dataset.phase);
+}
+
+document.querySelectorAll('.lang-btn').forEach(btn => {
+  btn.addEventListener('click', () => applyLang(btn.dataset.lang));
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// TOOL CARDS RENDER (expandable, bilingual)
+// ═══════════════════════════════════════════════════════════════════
+function renderToolCards() {
+  for (let phase = 1; phase <= 6; phase++) {
+    const grid = document.getElementById('phase' + phase + '-tools');
+    if (!grid) continue;
+    grid.innerHTML = '';
+    TOOLS[phase].forEach(tool => {
+      const card = document.createElement('div');
+      card.className = 'tool-card';
+      const lang = currentLang;
+      card.innerHTML = `
+        <h3>
+          <span><span class="tool-tag ${tool.tag}">${lang==='pl'?tool.t_pl:tool.t_en}</span> ${tool.name}</span>
+          <span class="toggle-icon">+</span>
+        </h3>
+        <p>${lang==='pl'?tool.pl:tool.en}</p>
+        <div class="details">
+          <p>${lang==='pl'?tool.details_pl:tool.details_en}</p>
+        </div>
+      `;
+      card.addEventListener('click', () => card.classList.toggle('expanded'));
+      grid.appendChild(card);
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PIPELINE SVG INTERACTION
+// ═══════════════════════════════════════════════════════════════════
+function updatePhaseInfo(phase) {
+  const info = PHASE_INFO[phase];
+  if (!info) return;
+  const panel = document.getElementById('phaseInfoPanel');
+  const lang = currentLang;
+  panel.innerHTML = `
+    <div class="phase-info-title">${lang==='pl'?info.title_pl:info.title_en}</div>
+    <div class="phase-info-desc">${lang==='pl'?info.desc_pl:info.desc_en}</div>
+    <div class="phase-info-tools">${info.tools.map(t=>`<span class="phase-tool-tag">${t}</span>`).join('')}</div>
+  `;
+}
+document.querySelectorAll('.phase-node').forEach(node => {
+  node.addEventListener('click', () => {
+    document.querySelectorAll('.phase-node').forEach(n => n.classList.remove('active'));
+    node.classList.add('active');
+    updatePhaseInfo(node.dataset.phase);
+  });
+  node.addEventListener('mouseenter', () => updatePhaseInfo(node.dataset.phase));
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPLIANCE TABS
+// ═══════════════════════════════════════════════════════════════════
+document.querySelectorAll('.fw-card').forEach(card => {
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.fw-card').forEach(c => c.classList.remove('active'));
+    document.querySelectorAll('.fw-tab-content').forEach(c => c.classList.remove('active'));
+    card.classList.add('active');
+    document.getElementById('fw-' + card.dataset.fw).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// COUNTER ANIMATION
+// ═══════════════════════════════════════════════════════════════════
+function animateCounter(el) {
+  const target = parseInt(el.dataset.count || '0', 10);
+  const duration = 1200;
+  const step = Math.max(1, Math.floor(target / 30));
+  let current = 0;
+  const timer = setInterval(() => {
+    current += step;
+    if (current >= target) { current = target; clearInterval(timer); }
+    el.textContent = current;
+  }, duration / 30);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DONUT CHART
+// ═══════════════════════════════════════════════════════════════════
+function animateDonut() {
+  const fill = document.getElementById('donutFill');
+  const pct = document.getElementById('donutPct');
+  const target = 86; // 19/22 controls automated
+  const circ = 2 * Math.PI * 50;
+  fill.setAttribute('stroke-dasharray', circ);
+  fill.setAttribute('stroke-dashoffset', circ - (circ * target / 100));
+  let cur = 0;
+  const t = setInterval(() => {
+    cur += 2;
+    if (cur >= target) { cur = target; clearInterval(t); }
+    pct.textContent = cur + '%';
+  }, 25);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// API DEMO
+// ═══════════════════════════════════════════════════════════════════
+function fmtJSON(obj) { return JSON.stringify(obj, null, 2); }
+
+document.getElementById('btnList').addEventListener('click', async () => {
+  const out = document.getElementById('outList');
+  out.textContent = '// loading...';
+  try {
+    const r = await fetch('/api/items');
+    const data = await r.json();
+    out.textContent = `HTTP ${r.status}\n` + fmtJSON(data);
+  } catch (e) {
+    out.textContent = '// error: ' + e.message;
+  }
+});
+
+document.getElementById('btnCreate').addEventListener('click', async () => {
+  const out = document.getElementById('outCreate');
+  const name = document.getElementById('inputName').value || 'unnamed';
+  out.textContent = '// loading...';
+  try {
+    const r = await fetch('/api/items', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({name})
+    });
+    const data = await r.json();
+    out.textContent = `HTTP ${r.status}\n` + fmtJSON(data);
+  } catch (e) {
+    out.textContent = '// error: ' + e.message;
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// LIVE STATUS
+// ═══════════════════════════════════════════════════════════════════
+fetch('/health').then(r => r.json()).then(d => {
+  document.getElementById('health-status').innerHTML =
+    'HTTP 200 · status: <strong>' + d.status + '</strong> · v' + d.version + '<br>' + d.timestamp;
+}).catch(() => {
+  document.getElementById('health-status').textContent = 'Unreachable (cold start, retry)';
+});
+
+fetch('/api/items').then(r => r.json()).then(d => {
+  document.getElementById('items-status').innerHTML = 'HTTP 200 · ' + d.length + ' item(s)';
+}).catch(() => {
+  document.getElementById('items-status').textContent = 'Unreachable';
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// VERIFY THIS DEPLOYMENT — fetch /api/build-info and populate
+// ═══════════════════════════════════════════════════════════════════
+function setText(id, txt) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = txt;
+}
+function setHTML(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+function copyToClipboard(text, btnId) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        const orig = btn.textContent;
+        btn.textContent = 'copied!';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1500);
+      }
+    });
+  }
+}
+
+fetch('/api/build-info').then(r => r.json()).then(d => {
+  // Image digest — show truncated for readability, full on hover
+  const digest = d.image_digest || 'unknown';
+  const digestShort = digest.length > 24 ? digest.slice(0, 20) + '...' : digest;
+  setHTML('bi-digest', '<span title="' + digest + '">' + digestShort + '</span>');
+
+  setText('bi-uri', d.image_uri || 'unknown');
+
+  // Commit — short SHA + link
+  const sha = d.git_sha || 'unknown';
+  const shaShort = sha.length > 7 ? sha.slice(0, 7) : sha;
+  setHTML('bi-sha', '<a href="' + d.github_commit_url + '" target="_blank" rel="noopener">' + shaShort + '</a> on ' + (d.git_ref || ''));
+
+  setText('bi-buildtime', d.build_time || 'unknown');
+  setHTML('bi-run', '<a href="' + d.github_run_url + '" target="_blank" rel="noopener">Run #' + (d.run_number || '?') + ' (' + (d.run_id || '?') + ')</a>');
+  setHTML('bi-rekor', '<a href="' + d.rekor_search_url + '" target="_blank" rel="noopener">→ search.sigstore.dev</a>');
+
+  // Cosign commands
+  setText('cosignVerifyCmd', d.cosign_verify_command || '...');
+  setText('cosignAttestCmd', d.cosign_attest_command || '...');
+
+  // Audit trail links
+  document.getElementById('link-commit').href = d.github_commit_url || '#';
+  document.getElementById('link-run').href = d.github_run_url || '#';
+  document.getElementById('link-rekor').href = d.rekor_search_url || '#';
+
+  // Wire up copy buttons
+  document.getElementById('copyVerify').addEventListener('click', () =>
+    copyToClipboard(d.cosign_verify_command, 'copyVerify'));
+  document.getElementById('copyAttest').addEventListener('click', () =>
+    copyToClipboard(d.cosign_attest_command, 'copyAttest'));
+}).catch(err => {
+  setText('bi-digest', 'Unable to fetch build info: ' + err.message);
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// TOC ACTIVE LINK ON SCROLL
+// ═══════════════════════════════════════════════════════════════════
+const sections = document.querySelectorAll('.section[id]');
+const tocLinks = document.querySelectorAll('.toc-list a');
+window.addEventListener('scroll', () => {
+  let current = '';
+  sections.forEach(sec => {
+    const top = sec.offsetTop - 200;
+    if (window.scrollY >= top) current = sec.id;
+  });
+  tocLinks.forEach(a => {
+    a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+applyLang(currentLang);
+document.querySelectorAll('.stat-num').forEach(animateCounter);
+setTimeout(animateDonut, 300);
+// Activate Phase 1 by default
+const firstPhase = document.querySelector('.phase-node[data-phase="1"]');
+if (firstPhase) { firstPhase.classList.add('active'); updatePhaseInfo('1'); }
+</script>
+</body>
+</html>

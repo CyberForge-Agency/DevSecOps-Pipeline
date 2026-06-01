@@ -1,0 +1,107 @@
+name: "CyberForge DevSecOps Pipeline"
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_environment:
+        description: "Target environment"
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+  security-events: write
+  id-token: write
+  packages: write
+  attestations: write
+  issues: write
+
+# Cancel in-progress runs for the same PR/branch
+concurrency:
+  group: pipeline-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================
+  # Phase 1: Security Gate (always runs)
+  # ============================================
+  security-gate:
+    name: "Phase 1: Security Gate"
+    uses: ./.github/workflows/security-gate.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      is_pull_request: ${{ format('{0}', github.event_name == 'pull_request') }}
+      pr_base_sha: ${{ github.event.pull_request.base.sha || '' }}
+      pr_number: ${{ github.event.pull_request.number || 0 }}
+
+  # ============================================
+  # Phase 2: Build & Scan (always runs)
+  # ============================================
+  build-and-scan:
+    name: "Phase 2: Build & Scan"
+    needs: [security-gate]
+    uses: ./.github/workflows/build-and-scan.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      push_image: ${{ format('{0}', github.event_name != 'pull_request') }}
+
+  # ============================================
+  # Phase 3: Sign & Attest (main branch only)
+  # ============================================
+  sign-and-attest:
+    name: "Phase 3: Sign & Attest"
+    if: github.event_name != 'pull_request'
+    needs: [build-and-scan]
+    uses: ./.github/workflows/sign-and-attest.yml
+    with:
+      image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
+      image_digest: ${{ needs.build-and-scan.outputs.image_digest }}
+
+  # ============================================
+  # Phase 4: Deploy to Staging (main branch only)
+  # ============================================
+  deploy:
+    name: "Phase 4: Deploy"
+    if: github.event_name != 'pull_request'
+    needs: [sign-and-attest, build-and-scan]
+    uses: ./.github/workflows/deploy.yml
+    with:
+      image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
+      image_digest: ${{ needs.build-and-scan.outputs.image_digest }}
+      environment: ${{ inputs.deploy_environment || 'staging' }}
+
+  # ============================================
+  # Phase 5: DAST (main branch only, after deploy)
+  # ============================================
+  dast:
+    name: "Phase 5: DAST"
+    if: github.event_name != 'pull_request'
+    needs: [deploy]
+    uses: ./.github/workflows/dast.yml
+    with:
+      target_url: ${{ needs.deploy.outputs.app_url }}
+
+  # ============================================
+  # Phase 6: Evidence Pack (always runs)
+  # ============================================
+  evidence-pack:
+    name: "Phase 6: Evidence Pack"
+    if: always()
+    needs: [security-gate, build-and-scan, sign-and-attest, deploy, dast]
+    uses: ./.github/workflows/evidence-pack.yml
+    with:
+      image_uri: ${{ needs.build-and-scan.outputs.image_uri || 'N/A' }}
+      image_digest: ${{ needs.build-and-scan.outputs.image_digest || 'N/A' }}
+      app_url: ${{ needs.deploy.outputs.app_url || 'N/A' }}
+      environment: ${{ inputs.deploy_environment || 'staging' }}
+      gate_results: >-
+        {"security_gate":"${{ needs.security-gate.result }}","build_scan":"${{ needs.build-and-scan.result }}","sign_attest":"${{ needs.sign-and-attest.result || 'skipped' }}","deploy":"${{ needs.deploy.result || 'skipped' }}","dast":"${{ needs.dast.result || 'skipped' }}"}

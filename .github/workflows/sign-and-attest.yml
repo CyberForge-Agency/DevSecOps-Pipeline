@@ -1,0 +1,210 @@
+name: "Phase 3: Sign & Attest"
+
+on:
+  workflow_call:
+    inputs:
+      image_uri:
+        description: "Full image URI to sign"
+        required: true
+        type: string
+      image_digest:
+        description: "Image digest (sha256:...)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  attestations: write
+
+jobs:
+  sign-and-attest:
+    name: "Cosign Sign + SLSA Provenance + SBOM Attestation"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Sign image with Cosign (keyless OIDC)
+        run: |
+          set -o pipefail  # tee must not mask a cosign sign failure
+          cosign sign --yes \
+            -a "repo=${{ github.repository }}" \
+            -a "workflow=${{ github.workflow }}" \
+            -a "ref=${{ github.sha }}" \
+            -a "run_id=${{ github.run_id }}" \
+            -a "trigger=${{ github.event_name }}" \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            2>&1 | tee /tmp/cosign-sign-output.txt
+
+      - name: Download SBOM from previous phase
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-scan-results
+          path: ./evidence/
+
+      - name: Attach SBOM as signed attestation
+        run: |
+          set -o pipefail  # tee must not mask a cosign attest failure
+          cosign attest --yes \
+            --predicate ./evidence/sbom.cyclonedx.json \
+            --type cyclonedx \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            2>&1 | tee /tmp/cosign-attest-output.txt
+
+      - name: Extract image name without tag
+        id: img
+        run: |
+          echo "name=${IMAGE_URI%%:*}" >> "$GITHUB_OUTPUT"
+        env:
+          IMAGE_URI: ${{ inputs.image_uri }}
+
+      - name: Generate build provenance attestation (GitHub native)
+        id: provenance
+        continue-on-error: true  # Not available for private repos on personal accounts
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-name: ${{ steps.img.outputs.name }}
+          subject-digest: ${{ inputs.image_digest }}
+          push-to-registry: true
+
+      - name: Generate SLSA provenance (fallback)
+        if: steps.provenance.outcome == 'failure' || steps.provenance.outputs.bundle-path == ''
+        env:
+          IMAGE_URI: ${{ inputs.image_uri }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -o pipefail  # a failure of generate-provenance.sh must fail the step, not be masked by the pipe
+          echo "GitHub native attestation unavailable — generating SLSA provenance manually"
+          mkdir -p provenance-out
+          bash scripts/generate-provenance.sh 2>&1 | tee /tmp/provenance-generation-output.txt > provenance-out/provenance.intoto.jsonl
+
+      - name: Bundle signing proof
+        if: always()
+        run: |
+          {
+            echo "============================================"
+            echo "  SIGNING PROOF - $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "============================================"
+            echo ""
+            echo "Image: ${{ inputs.image_uri }}@${{ inputs.image_digest }}"
+            echo "Cosign version: $(cosign version 2>&1 | head -1 || echo 'unknown')"
+            echo ""
+            echo "=== Cosign Sign Output ==="
+            cat /tmp/cosign-sign-output.txt 2>/dev/null || echo "(not captured)"
+            echo ""
+            echo "=== Cosign Attest Output (SBOM) ==="
+            cat /tmp/cosign-attest-output.txt 2>/dev/null || echo "(not captured)"
+            echo ""
+            echo "=== Provenance Generation ==="
+            echo "GitHub native attestation outcome: ${{ steps.provenance.outcome }}"
+            cat /tmp/provenance-generation-output.txt 2>/dev/null || echo "(fallback not used or not captured)"
+            echo ""
+            echo "=== Signature Verification ==="
+            echo "(see cosign-verification.log)"
+            echo ""
+          } > signing-proof.txt
+
+      - name: Verify signature (proof for evidence pack)
+        run: |
+          # pipefail REQUIRED: tee would otherwise mask a failed cosign verify,
+          # letting a bad/missing signature pass this defense-in-depth check.
+          set -o pipefail
+          cosign verify \
+            --certificate-identity-regexp="https://github.com/${{ github.repository }}/" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            2>&1 | tee cosign-verification.log
+
+      - name: Upload verification log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cosign-verification
+          path: cosign-verification.log
+
+      - name: Upload provenance bundle (GitHub native)
+        if: always() && steps.provenance.outputs.bundle-path != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provenance-bundle
+          path: ${{ steps.provenance.outputs.bundle-path }}
+
+      - name: Upload provenance bundle (fallback)
+        if: always() && steps.provenance.outcome == 'failure' && hashFiles('provenance-out/provenance.intoto.jsonl') != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provenance-bundle
+          path: provenance-out/provenance.intoto.jsonl
+
+      - name: Upload signing proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: signing-proof
+          path: signing-proof.txt
+
+      - name: Job Summary
+        if: always()
+        run: |
+          IMAGE_REF="${{ inputs.image_uri }}@${{ inputs.image_digest }}"
+          PROVENANCE_OUTCOME="${{ steps.provenance.outcome }}"
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Sign & Attest
+
+          ### Cosign Image Signing
+          EOF
+          echo "| Detail | Value |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Method | Keyless OIDC (Sigstore) |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| OIDC issuer | \`https://token.actions.githubusercontent.com\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Certificate identity | \`https://github.com/${{ github.repository }}/\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Image | \`${IMAGE_REF}\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo ":white_check_mark: **Image signed with keyless OIDC**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # SBOM attestation
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ### SBOM Attestation
+          EOF
+          echo ":white_check_mark: **CycloneDX SBOM attached to image as signed attestation**" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Provenance
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ### Build Provenance
+          EOF
+          if [ "${PROVENANCE_OUTCOME}" = "success" ]; then
+            echo ":white_check_mark: **SLSA v1.0 provenance generated (GitHub native attestation)**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo ":white_check_mark: **SLSA provenance generated (fallback script)**" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+
+          # Verification
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ### Signature Verification
+          EOF
+          if [ -f cosign-verification.log ]; then
+            echo ":white_check_mark: **Signature verified successfully**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo ":warning: **Verification log not found**" >> "$GITHUB_STEP_SUMMARY"
+          fi

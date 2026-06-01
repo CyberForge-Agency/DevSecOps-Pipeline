@@ -1,0 +1,549 @@
+name: "Phase 6: Evidence Pack"
+
+on:
+  workflow_call:
+    inputs:
+      image_uri:
+        description: "Image URI for metadata"
+        required: true
+        type: string
+      image_digest:
+        description: "Image digest for metadata"
+        required: true
+        type: string
+      app_url:
+        description: "Deployed application URL"
+        required: true
+        type: string
+      environment:
+        description: "Deployment environment name"
+        required: false
+        type: string
+        default: "staging"
+      gate_results:
+        description: "JSON string of gate pass/fail results from orchestrator"
+        required: false
+        type: string
+        default: "{}"
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  generate-evidence:
+    name: "Collect, Sanitize, Package, Archive"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Create evidence directory
+        run: mkdir -p evidence
+
+      # Download all artifacts from previous phases
+      - name: Download Trivy SCA results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: trivy-sca-results
+          path: evidence/
+        continue-on-error: true
+
+      - name: Download image scan + SBOM
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-scan-results
+          path: evidence/
+        continue-on-error: true
+
+      - name: Download CodeQL results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: codeql-results
+          path: evidence/codeql/
+        continue-on-error: true
+
+      - name: Download Checkov results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: checkov-results
+          path: evidence/
+        continue-on-error: true
+
+      - name: Download Cosign verification log
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cosign-verification
+          path: evidence/
+        continue-on-error: true
+
+      - name: Download provenance bundle
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: provenance-bundle
+          path: evidence/provenance/
+        continue-on-error: true
+
+      - name: Download ZAP results
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: zap-results
+          path: evidence/
+        continue-on-error: true
+
+      - name: Download coverage report
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage-report
+          path: evidence/coverage/
+        continue-on-error: true
+
+      # Consolidate security reports into single file
+      - name: Generate consolidated security report
+        run: |
+          python3 -c "
+          import json, glob, os, datetime
+          reports = {}
+          for f in glob.glob('evidence/*.json') + glob.glob('evidence/**/*.sarif', recursive=True):
+              try:
+                  with open(f) as fh:
+                      reports[os.path.basename(f)] = json.load(fh)
+              except: pass
+          with open('evidence/security-report.json', 'w') as out:
+              json.dump({'consolidated_at': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'), 'reports': reports}, out, indent=2)
+          "
+
+      # Rename Trivy SCA for clarity
+      - name: Rename dependency review
+        run: |
+          if [ -f evidence/trivy-sca-results.json ]; then
+            cp evidence/trivy-sca-results.json evidence/dependency-review.json
+          fi
+
+      - name: Normalize provenance filename
+        run: |
+          PROV_FILE=$(find evidence/provenance -type f 2>/dev/null | head -n 1 || true)
+          if [ -n "${PROV_FILE}" ]; then
+            cp "${PROV_FILE}" evidence/provenance.intoto.jsonl
+          fi
+
+      - name: Parse gate results
+        env:
+          GATE_RESULTS_JSON: ${{ inputs.gate_results }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+
+          data = {}
+          raw = os.environ.get("GATE_RESULTS_JSON", "{}")
+          try:
+              data = json.loads(raw)
+          except json.JSONDecodeError:
+              data = {}
+
+          mapping = {
+              "security_gate": "GATE_SECURITY",
+              "build_scan": "GATE_BUILD",
+              "sign_attest": "GATE_SIGN",
+              "deploy": "GATE_DEPLOY",
+              "dast": "GATE_DAST",
+          }
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as fh:
+              for key, env_name in mapping.items():
+                  fh.write(f"{env_name}={data.get(key, 'unknown')}\n")
+          PY
+
+      # Generate pipeline metadata
+      - name: Generate pipeline-run.json
+        env:
+          IMAGE_URI: ${{ inputs.image_uri }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+        run: bash scripts/generate-pipeline-run.sh > evidence/pipeline-run.json
+
+      # Sanitize PII from logs
+      - name: Sanitize logs
+        run: bash scripts/sanitize-logs.sh evidence/
+
+      # DPA check
+      - name: Generate DPA compliance check
+        run: bash scripts/check-dpa.sh > evidence/dpa-compliance-check.json
+
+      # Data flow diagram
+      - name: Generate data flow diagram
+        run: bash scripts/generate-data-flow.sh > evidence/data-flow-diagram.json
+
+      # Compliance matrix
+      - name: Generate compliance matrix
+        run: bash scripts/generate-compliance-matrix.sh evidence/ > evidence/compliance-matrix.json
+
+      # Generate human-readable README for auditors
+      - name: Generate evidence README
+        run: |
+          cat > evidence/README.md <<'EOFREADME'
+          # Evidence Pack
+
+          Generated by CyberForge DevSecOps Pipeline.
+
+          ## Contents
+
+          | File | Description | Compliance |
+          |------|-------------|------------|
+          | security-report.json | Consolidated SAST + SCA + DAST | ISO 27001 A.8.28, DORA Art.16 |
+          | sbom.cyclonedx.json | Software Bill of Materials | NIS2 Art.21.2.d, DORA Art.28 |
+          | provenance.intoto.jsonl | Build provenance attestation bundle | NIS2 Art.21.2.d, DORA Art.28, SLSA |
+          | cosign-verification.log | Image signature proof | NIS2 Art.21.2.h, SLSA L3 |
+          | pipeline-run.json | Pipeline metadata & gate results | ISO 27001 A.8.25, SOC 2 CC8.1 |
+          | dependency-review.json | SCA results with VEX | DORA Art.16.1.c |
+          | zap-report.json | DAST scan results | ISO 27001 A.8.28, NIS2 Art.21.2.e |
+          | dpa-compliance-check.json | DPA status for processors | RODO Art.28 |
+          | data-flow-diagram.json | PII data flow mapping | RODO Art.25, Art.30 |
+          | compliance-matrix.json | Regulation -> evidence mapping | All frameworks |
+          | manifest.sha256 | SHA256 checksums | SOC 2 CC7.1 |
+          EOFREADME
+
+      # Validate completeness BEFORE packaging or archive.
+      # Warns on missing evidence but does NOT block archival — an incomplete
+      # evidence pack is still better than no evidence pack for audit trails.
+      - name: Validate evidence completeness
+        run: |
+          echo "Checking evidence completeness..."
+          python3 - <<'PY'
+          import json, sys
+
+          with open("evidence/compliance-matrix.json") as f:
+              data = json.load(f)
+
+          missing = []
+          for framework, controls in data["frameworks"].items():
+              for c in controls:
+                  if c["status"] != "PASS":
+                      missing.append(f"{framework} {c['article']}: {c['evidence']}")
+
+          if missing:
+              for m in missing:
+                  print(f"::warning::{m}")
+              print(f"::warning::{len(missing)} evidence items missing — pack will be archived as incomplete")
+          else:
+              print(f"All evidence present across {len(data['frameworks'])} frameworks")
+          PY
+
+      # Generate HTML report
+      - name: Generate HTML evidence report
+        run: bash scripts/generate-html-report.sh evidence/ evidence/evidence-report.html
+
+      # Package
+      - name: Generate SHA256 manifest
+        working-directory: evidence/
+        run: find . -type f ! -name 'manifest.sha256' -exec sha256sum {} \; | sort > manifest.sha256
+
+      # ---------------------------------------------------------------------
+      # Audit-grade PDF evidence (component 8).
+      #
+      # Ordering rationale: the legacy "Generate SHA256 manifest" step above
+      # produces a first-pass manifest.sha256 over the raw evidence files. This
+      # block then (1) builds the structured manifest.json + RFC-6962 Merkle
+      # root, (2) emits the OSCAL twin, (3) re-renders the data-driven report
+      # HTML, (4) assembles the full forensic audit HTML, (5) renders PDF/A-3b
+      # with embedded attachments, (6) seals it (qpdf/veraPDF/cosign/RFC-3161/
+      # PAdES) and runs the verify runbook. Crucially the structured manifest
+      # generator is run AFTER the sealed PDF + sealing artifacts land in
+      # evidence/, and it REWRITES BOTH manifest.json AND the legacy
+      # manifest.sha256, so the final hashes cover the PDF, OSCAL, bundles and
+      # TSRs. "Package evidence pack" below then zips the complete, fully-hashed
+      # evidence/ directory. This is why the structured manifest generation
+      # lives here (after the PDF exists) rather than relying solely on the
+      # earlier first-pass manifest.sha256.
+      #
+      # Fail-closed: EVIDENCE_ALLOW_DEGRADE is left UNSET for all non-PR runs.
+      # This reusable workflow is invoked via workflow_call (and the parent
+      # only triggers it on non-PR pushes/dispatches), so missing weasyprint /
+      # veraPDF / cosign HARD-FAIL the job. The conditional below documents the
+      # intent and keeps PR-scoped reuse degradable.
+      # ---------------------------------------------------------------------
+      - name: Install WeasyPrint system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangocairo-1.0-0 libcairo2 \
+            libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info \
+            fonts-dejavu-core fonts-liberation2 \
+            qpdf jq poppler-utils ghostscript
+
+      - name: Install Python PDF toolchain
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-pdf.txt
+
+      - name: Install veraPDF
+        run: |
+          set -euo pipefail
+          VERAPDF_VER="1.26.2"
+          VERAPDF_MINOR="1.26"   # release dir = MINOR version; filename = patch version
+          VERAPDF_ZIP="verapdf-greenfield-${VERAPDF_VER}-installer.zip"
+          curl -fsSL -o "/tmp/${VERAPDF_ZIP}" \
+            "https://software.verapdf.org/releases/${VERAPDF_MINOR}/${VERAPDF_ZIP}"
+          unzip -q "/tmp/${VERAPDF_ZIP}" -d /tmp/verapdf-installer
+          INSTALLER_JAR="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -n1)"
+          cat > /tmp/verapdf-auto.xml <<'XML'
+          <?xml version="1.0" encoding="UTF-8" standalone="no"?>
+          <AutomatedInstallation langpack="eng">
+            <com.izforge.izpack.panels.htmlhello.HTMLHelloPanel id="welcome"/>
+            <com.izforge.izpack.panels.target.TargetPanel id="install_dir">
+              <installpath>/opt/verapdf</installpath>
+            </com.izforge.izpack.panels.target.TargetPanel>
+            <com.izforge.izpack.panels.packs.PacksPanel id="sdk_pack_select">
+              <pack index="0" name="veraPDF GUI" selected="true"/>
+              <pack index="1" name="veraPDF Batch files" selected="true"/>
+              <pack index="2" name="veraPDF Validation model" selected="true"/>
+              <pack index="3" name="veraPDF Documentation" selected="false"/>
+              <pack index="4" name="veraPDF Sample Files" selected="false"/>
+            </com.izforge.izpack.panels.packs.PacksPanel>
+            <com.izforge.izpack.panels.install.InstallPanel id="install"/>
+            <com.izforge.izpack.panels.finish.FinishPanel id="finish"/>
+          </AutomatedInstallation>
+          XML
+          java -jar "${INSTALLER_JAR}" /tmp/verapdf-auto.xml
+          echo "/opt/verapdf" >> "${GITHUB_PATH}"
+
+      - name: Cosign install
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Build audit-grade PDF evidence
+        env:
+          # Fail-closed for non-PR triggers. workflow_call from a non-PR parent
+          # leaves this unset, so missing tools hard-fail. The conditional keeps
+          # PR-scoped reuse degradable without weakening the production path.
+          EVIDENCE_ALLOW_DEGRADE: ${{ github.event_name == 'pull_request' && '1' || '' }}
+          GIT_SHA: ${{ github.sha }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+          TSA_URL: https://freetsa.org/tsr
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 -c "import json; print(json.load(open('app/package.json'))['version'])")"
+          SHORT_SHA="$(echo "${GIT_SHA}" | cut -c1-7)"
+          REPORT_ID="cyberforge-evidence-v${VERSION}-${SHORT_SHA}"
+          export REPORT_ID
+          GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          export GENERATED_AT
+          # 30-day attestation window ending at generation time (UTC).
+          PERIOD_END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          PERIOD_START="$(date -u -d '30 days ago' +%Y-%m-%dT%H:%M:%SZ)"
+          export PERIOD_START PERIOD_END
+          echo "REPORT_ID=${REPORT_ID}"
+          echo "PERIOD: ${PERIOD_START} .. ${PERIOD_END}"
+
+          # (1) Structured manifest + Merkle root (first pass, pre-PDF).
+          python3 scripts/generate-evidence-manifest.py evidence \
+            --out evidence/manifest.json \
+            --legacy-out evidence/manifest.sha256
+
+          # (2) OSCAL assessment results derived from the compliance matrix.
+          python3 scripts/generate-oscal.py evidence evidence/compliance-matrix.json \
+            --manifest evidence/manifest.json \
+            --out evidence/oscal-assessment-results.json
+
+          # (3) Re-render the per-control evidence report HTML (data-driven body).
+          bash scripts/generate-html-report.sh evidence evidence/evidence-report.html
+
+          # (4) Assemble the full forensic audit document (single self-contained HTML).
+          python3 scripts/build-audit-document.py \
+            --evidence-dir evidence \
+            --manifest evidence/manifest.json \
+            --report-html evidence/evidence-report.html \
+            --compliance-matrix evidence/compliance-matrix.json \
+            --out evidence/audit-document.html
+
+          # (5) Render PDF/A-3b with embedded raw evidence attachments.
+          python3 scripts/render-evidence-pdf.py \
+            --html evidence/audit-document.html \
+            --evidence-dir evidence \
+            --out evidence/evidence-report.pdf \
+            --attach evidence/manifest.json \
+            --attach evidence/oscal-assessment-results.json \
+            --attach evidence/sbom.cyclonedx.json \
+            --attach evidence/provenance.intoto.jsonl
+
+          # (6) Seal: qpdf normalize, veraPDF gate, cosign, RFC-3161 TSA, PAdES.
+          bash scripts/seal-evidence.sh evidence evidence/evidence-report.pdf evidence/manifest.json
+
+          # Re-stamp the manifest so its hashes/Merkle cover the SEALED pdf and
+          # all sealing artifacts (bundles, tsr, verapdf-report). This rewrites
+          # both manifest.json and the legacy manifest.sha256 used by the pack.
+          python3 scripts/generate-evidence-manifest.py evidence \
+            --out evidence/manifest.json \
+            --legacy-out evidence/manifest.sha256
+
+          # Verify runbook (must exit 0; SKIP allowed for absent tools only).
+          bash scripts/verify-evidence-pack.sh evidence
+
+          echo "Sealed audit PDF + manifest regenerated:"
+          ls -la evidence/
+
+      - name: Upload audit PDF and sealing artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evidence-audit-pdf
+          path: |
+            evidence/evidence-report.pdf
+            evidence/audit-document.html
+            evidence/manifest.json
+            evidence/oscal-assessment-results.json
+            evidence/verapdf-report.json
+            evidence/*.bundle
+            evidence/*.tsr
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Package evidence pack
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          VERSION=$(python3 -c "import json; print(json.load(open('app/package.json'))['version'])")
+          SHORT_SHA=$(echo "${COMMIT_SHA}" | cut -c1-7)
+          TIMESTAMP=$(date -u +%Y%m%dT%H%M%SZ)
+          PACK_NAME="evidence-pack-v${VERSION}-${SHORT_SHA}-${TIMESTAMP}"
+          cd evidence && zip -r "../${PACK_NAME}.zip" .
+          echo "PACK_NAME=${PACK_NAME}" >> "$GITHUB_ENV"
+          echo "Evidence pack created: ${PACK_NAME}.zip"
+
+      # Upload as workflow artifact
+      - name: Upload evidence pack
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ env.PACK_NAME }}
+          path: ${{ env.PACK_NAME }}.zip
+          retention-days: 90
+
+      # Upload HTML report separately for easy viewing
+      - name: Upload HTML evidence report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: evidence-report-html
+          path: evidence/evidence-report.html
+          retention-days: 90
+
+      # Archive to WORM storage (main branch only — PRs don't have OIDC for blob upload)
+      - name: Azure Login (OIDC)
+        if: github.event_name != 'pull_request'
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Upload to Azure Blob WORM storage
+        id: blob-upload
+        if: github.event_name != 'pull_request'
+        run: |
+          az storage blob upload \
+            --account-name ${{ vars.EVIDENCE_STORAGE_ACCOUNT }} \
+            --container-name evidence-packs \
+            --name "${{ env.PACK_NAME }}.zip" \
+            --file "${{ env.PACK_NAME }}.zip" \
+            --auth-mode login \
+            --overwrite false
+
+          echo "Evidence pack archived to WORM storage: ${{ env.PACK_NAME }}.zip"
+          echo "blob_uploaded=true" >> "$GITHUB_OUTPUT"
+
+      - name: Job Summary
+        if: always()
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## Evidence Pack
+
+          ### Evidence Inventory
+          EOF
+          python3 - <<'PY'
+          import os, glob, json
+
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+
+          evidence_files = {
+              "security-report.json": "Consolidated SAST + SCA + DAST reports",
+              "sbom.cyclonedx.json": "Software Bill of Materials (CycloneDX)",
+              "provenance.intoto.jsonl": "Build provenance attestation",
+              "cosign-verification.log": "Image signature verification proof",
+              "pipeline-run.json": "Pipeline metadata and gate results",
+              "dependency-review.json": "SCA results (Trivy)",
+              "zap-report.json": "DAST scan results (ZAP)",
+              "zap-report.html": "DAST scan report (HTML)",
+              "dpa-compliance-check.json": "DPA compliance status",
+              "data-flow-diagram.json": "PII data flow mapping",
+              "compliance-matrix.json": "Regulation to evidence mapping",
+              "manifest.sha256": "SHA256 checksums",
+              "evidence-report.html": "Human-readable HTML report",
+              "README.md": "Evidence pack documentation",
+          }
+
+          with open(summary, "a") as fh:
+              fh.write("\n| File | Description | Status |\n")
+              fh.write("|------|-------------|--------|\n")
+              present = 0
+              total = len(evidence_files)
+              for filename, desc in evidence_files.items():
+                  path = f"evidence/{filename}"
+                  if os.path.exists(path):
+                      size = os.path.getsize(path)
+                      size_str = f"{size / 1024:.1f} KB" if size > 1024 else f"{size} B"
+                      fh.write(f"| `{filename}` | {desc} | :white_check_mark: ({size_str}) |\n")
+                      present += 1
+                  else:
+                      fh.write(f"| `{filename}` | {desc} | :x: Missing |\n")
+              fh.write(f"\n**{present}/{total} evidence files present**\n\n")
+
+          # Compliance coverage
+          try:
+              with open("evidence/compliance-matrix.json") as f:
+                  matrix = json.load(f)
+              with open(summary, "a") as fh:
+                  fh.write("### Compliance Coverage\n\n")
+                  fh.write("| Framework | Controls | Pass | Fail |\n")
+                  fh.write("|-----------|----------|------|------|\n")
+                  for framework, controls in matrix.get("frameworks", {}).items():
+                      total_c = len(controls)
+                      pass_c = sum(1 for c in controls if c.get("status") == "PASS")
+                      fail_c = total_c - pass_c
+                      icon = ":white_check_mark:" if fail_c == 0 else ":warning:"
+                      fh.write(f"| {framework} | {total_c} | {pass_c} | {fail_c} {icon} |\n")
+                  fh.write("\n")
+          except Exception:
+              pass
+          PY
+
+          # Pack details
+          PACK_SIZE=""
+          if [ -f "${PACK_NAME}.zip" ]; then
+            PACK_SIZE=$(du -h "${PACK_NAME}.zip" | cut -f1)
+          fi
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ### Evidence Pack Archive
+          | Detail | Value |
+          |--------|-------|
+          | Filename | \`${PACK_NAME}.zip\` |
+          | Size | ${PACK_SIZE:-N/A} |
+          | Retention | 90 days (workflow artifact) |
+          EOF
+
+          # Blob upload status
+          BLOB_UPLOADED="${{ steps.blob-upload.outputs.blob_uploaded }}"
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            if [ "${BLOB_UPLOADED}" = "true" ]; then
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo ":white_check_mark: **Uploaded to Azure Blob WORM storage**" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo ":x: **Azure Blob upload failed or skipped**" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo ":information_source: Azure Blob upload skipped (PR event)" >> "$GITHUB_STEP_SUMMARY"
+          fi

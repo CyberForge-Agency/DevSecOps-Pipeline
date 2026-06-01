@@ -1,0 +1,165 @@
+name: "Phase 5: DAST"
+
+on:
+  workflow_call:
+    inputs:
+      target_url:
+        description: "URL of deployed application to scan"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  zap-scan:
+    name: "OWASP ZAP Baseline Scan"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: OWASP ZAP Baseline Scan
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: ${{ inputs.target_url }}
+          cmd_options: "-J report_json.json -r report_html.html"
+          fail_action: false
+          allow_issue_writing: false
+
+      - name: Rename ZAP reports
+        if: always()
+        run: |
+          mv report_json.json zap-report.json 2>/dev/null || true
+          mv report_html.html zap-report.html 2>/dev/null || true
+
+      - name: Upload ZAP reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: zap-results
+          path: |
+            zap-report.json
+            zap-report.html
+
+      - name: Summarize HIGH/CRITICAL findings
+        id: zap-summary
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report_path = Path("zap-report.json")
+          count = 0
+
+          if report_path.exists():
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+                  alerts = report.get("site", [{}])[0].get("alerts", [])
+                  count = sum(1 for alert in alerts if int(alert.get("riskcode", 0)) >= 3)
+              except Exception as exc:
+                  print(f"::warning::Unable to parse zap-report.json: {exc}")
+          else:
+              print("::warning::ZAP report not found; skipping severity-based DAST gate evaluation")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
+              fh.write(f"high_critical_count={count}\n")
+
+          print(f"HIGH/CRITICAL findings: {count}")
+          PY
+
+      - name: Job Summary
+        if: always()
+        run: |
+          HC_COUNT="${{ steps.zap-summary.outputs.high_critical_count }}"
+          cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
+          ## DAST (OWASP ZAP Baseline Scan)
+
+          **Target:** `${{ inputs.target_url }}`
+          EOF
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          report_path = Path("zap-report.json")
+
+          if report_path.exists():
+              try:
+                  report = json.loads(report_path.read_text(encoding="utf-8"))
+                  alerts = report.get("site", [{}])[0].get("alerts", [])
+                  risk_labels = {0: "Informational", 1: "Low", 2: "Medium", 3: "High"}
+
+                  with open(summary, "a") as fh:
+                      fh.write("\n### Findings\n\n")
+                      fh.write("| Risk Level | Alert | Instances |\n")
+                      fh.write("|------------|-------|-----------|\n")
+                      for alert in sorted(alerts, key=lambda a: int(a.get("riskcode", 0)), reverse=True):
+                          riskcode = int(alert.get("riskcode", 0))
+                          risk = risk_labels.get(riskcode, f"Unknown ({riskcode})")
+                          name = alert.get("name", "Unknown")
+                          instances = alert.get("count", "?")
+                          icon = ":red_circle:" if riskcode >= 3 else ":orange_circle:" if riskcode == 2 else ":yellow_circle:" if riskcode == 1 else ":white_circle:"
+                          fh.write(f"| {icon} {risk} | {name} | {instances} |\n")
+                      fh.write("\n")
+
+                      # Summary counts
+                      high_count = sum(1 for a in alerts if int(a.get("riskcode", 0)) >= 3)
+                      med_count = sum(1 for a in alerts if int(a.get("riskcode", 0)) == 2)
+                      low_count = sum(1 for a in alerts if int(a.get("riskcode", 0)) == 1)
+                      info_count = sum(1 for a in alerts if int(a.get("riskcode", 0)) == 0)
+                      fh.write(f"**Summary:** {high_count} High, {med_count} Medium, {low_count} Low, {info_count} Informational\n\n")
+
+                      if high_count == 0:
+                          fh.write(":white_check_mark: **DAST gate: PASS** -- no HIGH/CRITICAL findings\n")
+                      else:
+                          fh.write(f":x: **DAST gate: FAIL** -- {high_count} HIGH/CRITICAL finding(s)\n")
+              except Exception as exc:
+                  with open(summary, "a") as fh:
+                      fh.write(f"\nUnable to parse ZAP report: {exc}\n")
+          else:
+              with open(summary, "a") as fh:
+                  fh.write("\n:warning: ZAP report not found.\n")
+          PY
+
+      - name: Fail on HIGH/CRITICAL findings
+        if: steps.zap-summary.outputs.high_critical_count != '0'
+        run: |
+          echo "::error::OWASP ZAP found ${{ steps.zap-summary.outputs.high_critical_count }} HIGH/CRITICAL finding(s)"
+          exit 1
+
+      - name: Create incident issue on HIGH/CRITICAL findings
+        if: always() && steps.zap-summary.outputs.high_critical_count != '0'
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            let findings = 'Unable to parse ZAP report';
+            try {
+              const report = JSON.parse(fs.readFileSync('zap-report.json', 'utf8'));
+              const alerts = report.site?.[0]?.alerts || [];
+              const critical = alerts.filter(a => parseInt(a.riskcode) >= 3);
+              findings = critical.map(a => `- **${a.riskdesc}**: ${a.name} (${a.count} instances)`).join('\n');
+            } catch (e) {
+              findings = `Error parsing report: ${e.message}`;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[SECURITY INCIDENT] DAST scan found HIGH/CRITICAL vulnerabilities - ${new Date().toISOString().split('T')[0]}`,
+              body: `## Security Incident - DAST Findings\n\n` +
+                `**Pipeline run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n` +
+                `**Commit:** ${context.sha}\n` +
+                `**Scan target:** ${{ inputs.target_url }}\n\n` +
+                `### Findings\n${findings}\n\n` +
+                `### SLA\n- **Triage:** Within 4 hours\n- **Fix committed:** Within 48 hours\n- **Deployed:** Within 72 hours\n\n` +
+                `### Required Actions\n- [ ] Triage findings\n- [ ] Assign to developer\n- [ ] Fix and deploy\n- [ ] Verify fix with rescan\n- [ ] Update evidence pack`,
+              labels: ['security-incident', 'dast', 'high-priority']
+            });

@@ -1,0 +1,89 @@
+name: "Risk Acceptance Request"
+description: "Request to accept a security risk with documented justification"
+title: "[Risk Acceptance] "
+labels:
+  - "risk-acceptance"
+  - "security"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Risk Acceptance Request
+
+        Use this template to request formal acceptance of a security risk that cannot be remediated within the defined SLA. All fields are required.
+
+        Refer to the [Risk Acceptance Process](docs/governance/risk-acceptance-process.md) for the full process description.
+
+  - type: input
+    id: vulnerability-id
+    attributes:
+      label: "Vulnerability ID"
+      description: "CVE identifier or tool-specific finding ID (e.g., CVE-2024-12345, CodeQL finding ID, ZAP alert ID)"
+      placeholder: "CVE-2024-XXXXX"
+    validations:
+      required: true
+
+  - type: input
+    id: affected-component
+    attributes:
+      label: "Affected Component"
+      description: "The specific package, image, file, or infrastructure resource affected by this vulnerability"
+      placeholder: "e.g., express@4.18.2 in app/package.json"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: "Severity"
+      description: "Severity classification per the Vulnerability Management Policy (aligned with CVSS)"
+      options:
+        - "Critical"
+        - "High"
+        - "Medium"
+        - "Low"
+    validations:
+      required: true
+
+  - type: input
+    id: risk-owner
+    attributes:
+      label: "Risk Owner"
+      description: "Named individual who owns this risk and is accountable for monitoring it. Must be different from the approver."
+      placeholder: "e.g., Jan Kowalski (@jkowalski)"
+    validations:
+      required: true
+
+  - type: textarea
+    id: business-justification
+    attributes:
+      label: "Business Justification"
+      description: "Explain why this vulnerability cannot be remediated within the SLA and why accepting this risk is appropriate."
+      placeholder: |
+        - Why can the vulnerability not be fixed within the SLA?
+        - What is the impact of not fixing it?
+        - Why is the residual risk acceptable?
+    validations:
+      required: true
+
+  - type: textarea
+    id: compensating-controls
+    attributes:
+      label: "Compensating Controls"
+      description: "Describe the specific technical or procedural measures that mitigate the risk while the vulnerability remains unresolved."
+      placeholder: |
+        - e.g., WAF rule blocking the attack vector
+        - e.g., Network segmentation limiting exposure
+        - e.g., Monitoring alert for exploitation attempts
+        - e.g., Restricted access to the affected component
+    validations:
+      required: true
+
+  - type: input
+    id: expiry-date
+    attributes:
+      label: "Requested Expiry Date"
+      description: "Date by which this risk acceptance expires and must be re-reviewed. Maximum 12 months from today. Format: YYYY-MM-DD."
+      placeholder: "YYYY-MM-DD"
+    validations:
+      required: true

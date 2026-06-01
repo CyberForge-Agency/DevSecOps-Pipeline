@@ -1,0 +1,256 @@
+name: "Phase 4: Deploy to Staging"
+
+on:
+  workflow_call:
+    inputs:
+      image_uri:
+        description: "Full image URI to deploy"
+        required: true
+        type: string
+      image_digest:
+        description: "Image digest for signature verification"
+        required: true
+        type: string
+      environment:
+        description: "Target environment"
+        required: false
+        type: string
+        default: "staging"
+    outputs:
+      app_url:
+        description: "Deployed application URL"
+        value: ${{ jobs.deploy.outputs.app_url }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: "OIDC Login -> Verify Signature -> Terraform Apply"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: ${{ inputs.environment }}
+    outputs:
+      app_url: ${{ steps.get-url.outputs.app_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Azure Login (OIDC - zero static secrets)
+        uses: azure/login@532459ea530d8321f2fb9bb10d1e0bcf23869a43 # v3.0.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: az acr login --name ${{ vars.ACR_NAME }}
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      - name: Verify image signature before deploy
+        run: |
+          # pipefail REQUIRED: this is THE deploy admission gate. Without it, tee
+          # masks a failed cosign verify and an unsigned/tampered image deploys.
+          set -o pipefail
+          echo "Verifying image signature..."
+          cosign verify \
+            --certificate-identity-regexp="https://github.com/${{ github.repository }}/" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            2>&1 | tee /tmp/cosign-deploy-verify.log
+          echo "Image signature verified successfully."
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
+        with:
+          terraform_version: "~> 1.7"
+
+      - name: Terraform Init
+        working-directory: infra/
+        env:
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+          ARM_USE_AZUREAD: "true"
+          TFSTATE_RESOURCE_GROUP: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          TFSTATE_STORAGE_ACCOUNT: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          TFSTATE_CONTAINER: ${{ vars.TFSTATE_CONTAINER }}
+          TFSTATE_KEY: ${{ vars.TFSTATE_KEY }}
+        run: |
+          if [ -n "${TFSTATE_RESOURCE_GROUP:-}" ] && \
+             [ -n "${TFSTATE_STORAGE_ACCOUNT:-}" ] && \
+             [ -n "${TFSTATE_CONTAINER:-}" ] && \
+             [ -n "${TFSTATE_KEY:-}" ]; then
+            echo "Using remote azurerm backend configuration from repository variables."
+            terraform init \
+              -backend-config="resource_group_name=${TFSTATE_RESOURCE_GROUP}" \
+              -backend-config="storage_account_name=${TFSTATE_STORAGE_ACCOUNT}" \
+              -backend-config="container_name=${TFSTATE_CONTAINER}" \
+              -backend-config="key=${TFSTATE_KEY}"
+          else
+            echo "::warning::Terraform backend variables are not fully configured. Falling back to local state (-backend=false) for this run."
+            terraform init -backend=false
+          fi
+
+      - name: Terraform Plan
+        id: tf-plan
+        working-directory: infra/
+        env:
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+        run: |
+          set -o pipefail  # tee must not mask a terraform plan failure
+          terraform plan \
+            -var="environment=${{ inputs.environment }}" \
+            -out=tfplan 2>&1 | tee /tmp/tf-plan-output.txt
+          # Extract plan summary
+          PLAN_SUMMARY=$(grep -E "Plan:|No changes" /tmp/tf-plan-output.txt | tail -1 || echo "Plan completed")
+          echo "plan_summary=${PLAN_SUMMARY}" >> "$GITHUB_OUTPUT"
+
+      - name: Terraform Apply
+        id: tf-apply
+        working-directory: infra/
+        env:
+          ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          ARM_USE_OIDC: "true"
+        run: |
+          set -o pipefail  # tee must not mask a terraform apply failure
+          terraform apply -auto-approve tfplan 2>&1 | tee /tmp/tf-apply-output.txt
+          APPLY_SUMMARY=$(grep -E "Apply complete|No changes" /tmp/tf-apply-output.txt | tail -1 || echo "Apply completed")
+          echo "apply_summary=${APPLY_SUMMARY}" >> "$GITHUB_OUTPUT"
+
+      - name: Configure ACR registry on Container App
+        run: |
+          APP_NAME="cyberforge-${{ inputs.environment }}-app"
+          RG="cyberforge-${{ inputs.environment }}-rg"
+          ACR="${{ vars.ACR_REGISTRY }}"
+          # Get the managed identity resource ID
+          IDENTITY_ID=$(az containerapp show --name "$APP_NAME" -g "$RG" \
+            --query "identity.principalId" -o tsv)
+          echo "Container App identity: ${IDENTITY_ID}"
+          # Set registry with managed identity authentication
+          az containerapp registry set \
+            --name "$APP_NAME" \
+            --resource-group "$RG" \
+            --server "$ACR" \
+            --identity system 2>&1 || echo "::warning::Registry set failed (may already be configured)"
+
+      - name: Deploy image via Azure CLI
+        run: |
+          # pipefail REQUIRED: the `az containerapp update | tee` below feeds an
+          # `if`; without pipefail tee's 0 exit would make a FAILED deploy look
+          # successful and break the retry loop on a broken deployment.
+          set -o pipefail
+          APP_NAME="cyberforge-${{ inputs.environment }}-app"
+          RG="cyberforge-${{ inputs.environment }}-rg"
+          IMAGE="${{ inputs.image_uri }}@${{ inputs.image_digest }}"
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          echo "Deploying image: ${IMAGE}"
+          for attempt in 1 2 3; do
+            if az containerapp update \
+              --name "$APP_NAME" \
+              --resource-group "$RG" \
+              --image "$IMAGE" \
+              --set-env-vars \
+                "IMAGE_DIGEST=${{ inputs.image_digest }}" \
+                "IMAGE_URI=${IMAGE}" \
+                "RUN_URL=${RUN_URL}" \
+                "RUN_ID=${{ github.run_id }}" \
+                "REPOSITORY=${{ github.repository }}" \
+                "GIT_SHA=${{ github.sha }}" \
+              2>&1 | tee /tmp/containerapp-update-output.txt; then
+              echo "Container App updated successfully on attempt ${attempt}"
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::All 3 deploy attempts failed"
+              exit 1
+            fi
+            echo "::warning::Attempt ${attempt} failed. Waiting 30s..."
+            sleep 30
+          done
+
+      - name: Get application URL
+        id: get-url
+        run: |
+          APP_NAME="cyberforge-${{ inputs.environment }}-app"
+          RG="cyberforge-${{ inputs.environment }}-rg"
+          APP_URL=$(az containerapp show --name "$APP_NAME" --resource-group "$RG" \
+            --query "properties.configuration.ingress.fqdn" -o tsv)
+          APP_URL="https://${APP_URL}"
+          echo "app_url=${APP_URL}" >> "$GITHUB_OUTPUT"
+          echo "Application deployed to: ${APP_URL}"
+
+      - name: Smoke test - health endpoint
+        id: smoke-test
+        run: |
+          APP_URL="${{ steps.get-url.outputs.app_url }}"
+          echo "Running smoke test against ${APP_URL}/health..."
+          for i in $(seq 1 12); do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/health" || true)
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed (HTTP 200)"
+              HEALTH_BODY=$(curl -s "${APP_URL}/health")
+              echo "$HEALTH_BODY" | python3 -m json.tool
+              echo "health_status=passed" >> "$GITHUB_OUTPUT"
+              echo "health_body=${HEALTH_BODY}" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Attempt $i: HTTP ${STATUS}, retrying in 10s..."
+            sleep 10
+          done
+          echo "health_status=failed" >> "$GITHUB_OUTPUT"
+          echo "::error::Smoke test failed - health endpoint did not return 200 within 2 minutes"
+          exit 1
+
+      - name: Job Summary
+        if: always()
+        run: |
+          APP_URL="${{ steps.get-url.outputs.app_url }}"
+          IMAGE="${{ inputs.image_uri }}@${{ inputs.image_digest }}"
+          TF_PLAN="${{ steps.tf-plan.outputs.plan_summary }}"
+          TF_APPLY="${{ steps.tf-apply.outputs.apply_summary }}"
+          SMOKE="${{ steps.smoke-test.outputs.health_status }}"
+          HEALTH_BODY="${{ steps.smoke-test.outputs.health_body }}"
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Deploy to Staging
+
+          ### Azure OIDC Authentication
+          :white_check_mark: **Authenticated via OIDC federation** (zero static secrets)
+
+          ### Terraform
+          | Stage | Result |
+          |-------|--------|
+          | Plan | \`${TF_PLAN:-completed}\` |
+          | Apply | \`${TF_APPLY:-completed}\` |
+
+          ### Container App Deployment
+          | Detail | Value |
+          |--------|-------|
+          | Image | \`${IMAGE}\` |
+          | Environment | \`${{ inputs.environment }}\` |
+          | Application URL | ${APP_URL} |
+
+          ### Smoke Test
+          EOF
+          if [ "${SMOKE}" = "passed" ]; then
+            echo ":white_check_mark: **Health check passed (HTTP 200)**" >> "$GITHUB_STEP_SUMMARY"
+            if [ -n "${HEALTH_BODY}" ]; then
+              echo "" >> "$GITHUB_STEP_SUMMARY"
+              echo '```json' >> "$GITHUB_STEP_SUMMARY"
+              echo "${HEALTH_BODY}" | python3 -m json.tool 2>/dev/null >> "$GITHUB_STEP_SUMMARY" || echo "${HEALTH_BODY}" >> "$GITHUB_STEP_SUMMARY"
+              echo '```' >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo ":x: **Smoke test failed** -- health endpoint did not return HTTP 200" >> "$GITHUB_STEP_SUMMARY"
+          fi

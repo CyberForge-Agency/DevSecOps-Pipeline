@@ -1,0 +1,8 @@
+# Security-sensitive paths require security team review
+# See: ISO 27001 A.8.4, SOC 2 CC6.1
+
+/.github/workflows/    @CyberForge-Agency/security-team
+/infra/                @CyberForge-Agency/security-team
+/policies/             @CyberForge-Agency/security-team
+/app/Dockerfile        @CyberForge-Agency/security-team
+/scripts/              @CyberForge-Agency/security-team

@@ -1,0 +1,32 @@
+# CyberForge evidence-PDF toolchain — Python dependencies
+# Used only by the Phase 6 evidence-pdf steps (scripts/render-evidence-pdf.py +
+# scripts/seal-evidence.sh). These exact pins were resolved together in a clean
+# venv and verified: weasyprint renders PDF/A-3b with embedded attachments and
+# pyhanko applies PAdES signatures.
+#
+# Install:  pip install -r requirements-pdf.txt
+# System libs also required (Debian/Ubuntu): libpango-1.0-0 libpangocairo-1.0-0
+# libgdk-pixbuf-2.0-0 libffi-dev libcairo2 fonts-dejavu-core  (see
+# docs/runbooks/evidence-pdf.md). A hash-locked file (--require-hashes) is the
+# eventual CI target; these == pins are the current reproducibility floor.
+#
+# Degradation: NONE of these are needed by the stdlib scripts
+# (generate-evidence-manifest.py, generate-oscal.py, build-audit-document.py,
+# verify-evidence-pack.sh). With EVIDENCE_ALLOW_DEGRADE=1 the whole chain runs
+# without any of these installed.
+
+# --- PDF rendering (render-evidence-pdf.py) -> PDF/A-3b + embedded attachments ---
+weasyprint==68.1
+pydyf==0.12.1
+tinycss2==1.5.1
+cssselect2==0.9.0
+tinyhtml5==2.1.0
+fonttools==4.63.0
+pillow==12.2.0
+pyphen==0.17.2
+
+# --- PAdES self-seal (seal-evidence.sh -> pyhanko; fail-soft if absent) ---
+pyhanko==0.35.1
+pyhanko-certvalidator==0.31.1
+cryptography==48.0.0
+asn1crypto==1.5.1
