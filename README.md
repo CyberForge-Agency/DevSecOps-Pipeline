@@ -29,8 +29,10 @@ The pipeline runs as six modular, reusable workflows, gated end to end:
 5. **DAST** — OWASP ZAP scan against the deployed app, with incident creation
    on high-severity findings.
 6. **Evidence Pack** — collects all phase artifacts, sanitizes logs, computes an
-   RFC-6962 Merkle root over every artifact, and produces a signed,
-   RFC-3161-timestamped, **PDF/A-3 audit report** archived to immutable storage.
+   RFC-6962 Merkle root over every artifact, keyless Cosign `sign-blob`s the
+   root (fail-closed in CI) and RFC-3161-timestamps it (a standard TSA, not a
+   qualified eIDAS QTS — see upgrade path below), and produces a **PDF/A-3 audit
+   report** archived to immutable storage.
 
 ## Security & supply-chain posture
 
@@ -42,8 +44,15 @@ The pipeline runs as six modular, reusable workflows, gated end to end:
   attestation, SLSA provenance; the signature is re-verified before deploy.
 - **Hardened runtime** — minimal, non-root container image, scanned to
   0 HIGH/CRITICAL.
-- **Tamper-evident evidence** — per-artifact SHA-256 + Merkle root, Cosign
-  `sign-blob`, RFC-3161 timestamps, and PDF/A-3 archival.
+- **Tamper-evident evidence** — per-artifact SHA-256 + RFC-6962 Merkle root, a
+  keyless Cosign `sign-blob` over the root, and RFC-3161 timestamps. The Merkle
+  root is signed on every production run: a missing or empty
+  `merkle-root.cosign.bundle` is a hard CI failure, so the pack cannot be sealed
+  without it. The RFC-3161 stamp uses a standard public TSA (freetsa.org),
+  **not** a qualified eIDAS Qualified Timestamp Service (QTS); a pluggable QTS
+  upgrade path (KIR Szafir / Certum / EuroCert / CenCert) is documented
+  separately. On local/degrade runs the Cosign and TSA steps soft-degrade on
+  signing-infra/TSA flakiness; PDF/A-3 archival anchors the pack regardless.
 
 ## Repository layout
 

@@ -146,6 +146,10 @@ LIVE_SUBSTRINGS = (
     "cosign",
     "scan",
     "vuln",
+    # OpenVEX exploitability triage is machine-derived from the Trivy scan
+    # results + the curated governance file; it is a "live" pipeline output
+    # (see generate-vex.py), not a hand-asserted governance document.
+    "vex",
 )
 
 # Exact filenames or substrings that mark statically asserted evidence.
@@ -198,6 +202,24 @@ def classify_source(relpath: str, provenance: str) -> str:
         return "build-provenance"
     if "cosign" in name:
         return "signing-tool"
+    # OpenVEX exploitability triage (generate-vex.py / vex.py validator).
+    if "vex" in name:
+        return "vex-generator"
+    # Organizational / compliance verdicts emitted by the A.x validators and the
+    # T-30 aggregator (uniform libcompliance T-33 envelopes). These are machine-
+    # produced verdicts over human-curated governance inputs.
+    if name == "compliance-status.json":
+        return "compliance-aggregator"
+    if (
+        name in ("soa-maturity.json", "residual-risk.json", "scope-determination.json")
+        or name.endswith("-validation.json")
+        or name in (
+            "roi-validation.json", "ropa-completeness.json", "incident-readiness.json",
+            "governance-evidence.json", "tpp-clauses.json", "access-review.json",
+            "crypto-posture.json", "restore-test.json",
+        )
+    ):
+        return "compliance-validator"
     if provenance == "live":
         return "pipeline-tool"
     return "asserted-document"

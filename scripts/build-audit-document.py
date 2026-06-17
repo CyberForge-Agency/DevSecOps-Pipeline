@@ -103,15 +103,21 @@ SECTION_ORDER: List[Tuple[str, str]] = [
     ("toc", "Table of Contents"),
     ("authority", "Statement of Authority & Document Relationship"),
     ("exec-summary", "Executive Assurance Summary"),
+    ("compliance-as-code", "Compliance-as-Code — Organizational-Control Verdicts (Part A)"),
+    ("soa-maturity", "Statement of Applicability + Maturity Scores (Part D.3 / §9)"),
+    ("scope-applicability", "Scope & Regulatory-Applicability Determination (Part B)"),
     ("scope", "Scope, Boundaries, Subservice Carve-Outs & CUECs"),
     ("attestation", "Management Attestation of Accuracy & Completeness"),
     ("ipe", "Methodology, Sampling & Population Statement (IPE)"),
     ("control-matrix", "Control-to-Evidence Cross-Reference Matrix"),
+    ("crosswalk", "Auto-Generated Regulatory Crosswalk (one evidence → many clauses)"),
     ("provenance-sbom", "Verified Provenance & SBOM Attestation"),
     ("evidence-detail", "Per-Control Evidence Detail"),
     ("vuln-mgmt", "Vulnerability Management"),
+    ("vex", "Vulnerability-Exploitability Exchange (VEX) Summary"),
     ("change-approval", "Change & Approval Records"),
     ("exceptions", "Exceptions / Deviation Register"),
+    ("residual-risk", "Risk-Acceptance & Residual-Risk Statement (Part J.2 / D.4)"),
     ("break-glass", "Emergency-Change / Break-Glass Disclosure"),
     ("kpi-trends", "DORA & Security-KPI Trends"),
     ("retention", "Retention & Records-Management Metadata"),
@@ -165,6 +171,24 @@ def read_text(path: Optional[str]) -> Optional[str]:
         return None
 
 
+def load_yaml(path: Optional[str]) -> Optional[Any]:
+    """Load YAML from path, degrading gracefully. The audit document is otherwise stdlib-only; PyYAML
+    is imported lazily and any failure (missing lib, parse error, missing file) returns None so the
+    section that consumes it renders the verdict-derived data alone. We only use YAML to enrich a
+    section with maintained source text (e.g. applicability.yaml rationales), never for a verdict."""
+    if not path or not os.path.isfile(path):
+        return None
+    try:
+        import yaml  # type: ignore
+    except ImportError:
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            return yaml.safe_load(handle)
+    except Exception:  # noqa: BLE001 - never let optional enrichment crash the doc build
+        return None
+
+
 def short_hash(value: Optional[str], head: int = 16, tail: int = 8) -> str:
     """Render a hash with an abbreviated middle for tables; full value kept in title attr by caller."""
     if not value:
@@ -211,6 +235,32 @@ def status_badge(status: Optional[str]) -> str:
         return '<span class="badge badge-fail">FAIL</span>'
     if norm in ("NA", "N/A", "NOT-APPLICABLE", "NOT_APPLICABLE"):
         return '<span class="badge badge-na">N/A</span>'
+    if norm:
+        return f'<span class="badge badge-unknown">{esc(norm)}</span>'
+    return '<span class="badge badge-unknown">&mdash;</span>'
+
+
+def compliance_status_badge(status: Optional[str]) -> str:
+    """Render a PASS/FAIL/INDETERMINATE result badge for an A.x verdict (libcompliance vocab)."""
+    norm = (status or "").strip().upper()
+    if norm == "PASS":
+        return '<span class="badge badge-pass">PASS</span>'
+    if norm == "FAIL":
+        return '<span class="badge badge-fail">FAIL</span>'
+    if norm == "INDETERMINATE":
+        return '<span class="badge badge-indet">INDETERMINATE</span>'
+    if norm:
+        return f'<span class="badge badge-unknown">{esc(norm)}</span>'
+    return '<span class="badge badge-unknown">NOT REPORTED</span>'
+
+
+def tier_badge(tier: Optional[str]) -> str:
+    """Render a BLOCKING / EVIDENCE-ONLY tier badge (libcompliance.Tier)."""
+    norm = (tier or "").strip().upper()
+    if norm == "BLOCKING":
+        return '<span class="badge badge-blocking">BLOCKING</span>'
+    if norm in ("EVIDENCE-ONLY", "EVIDENCE_ONLY"):
+        return '<span class="badge badge-evidence">EVIDENCE-ONLY</span>'
     if norm:
         return f'<span class="badge badge-unknown">{esc(norm)}</span>'
     return '<span class="badge badge-unknown">&mdash;</span>'
@@ -329,6 +379,88 @@ def compute_coverage(controls: List[Dict[str, Any]]) -> Dict[str, Dict[str, int]
     return coverage
 
 
+# --------------------------------------------------------------------------------------------------
+# Regulatory crosswalk (T-102 render half). The spec (5.2 / struktura D.2) requires a crosswalk where
+# ONE evidence item maps to MANY framework clauses, derived from the actual evidence set — a clause is
+# "satisfied" only when its row is present AND PASS. We do NOT recompute verdicts here; we derive the
+# crosswalk by GROUPING the already-validated matrix controls (each carries framework + clause id +
+# evidence label + status) by their evidence artifact, then listing every framework clause that
+# evidence backs and whether the row PASSed. This is a render of real state, never a hardcoded map.
+# --------------------------------------------------------------------------------------------------
+
+# Status tokens that count as a clause being satisfied (a clause is satisfied only when present AND
+# PASS — an INDETERMINATE / FAIL / N/A clause is listed but marked unsatisfied).
+_SATISFIED_STATUSES = {"PASS", "PASSED", "OK", "SATISFIED", "IMPLEMENTED"}
+
+
+def _clause_label(ctrl: Dict[str, Any]) -> str:
+    """Render a 'FRAMEWORK clause' label for a crosswalk clause cell."""
+    fw = str(ctrl.get("framework") or "").strip()
+    cid = str(ctrl.get("id") or "").strip()
+    if fw and cid:
+        return f"{fw} {cid}"
+    return cid or fw or "—"
+
+
+def build_crosswalk(controls: List[Dict[str, Any]],
+                    catalog_rows: Optional[List[Dict[str, Any]]] = None) -> List[Dict[str, Any]]:
+    """Group validated controls (+ the A.1-A.10 catalog rows) by evidence artifact into crosswalk
+    rows, each mapping ONE evidence item to the MANY framework clauses it backs.
+
+    Returns a list of dicts: {evidence, clauses: [{label, framework, status, satisfied}],
+    frameworks (sorted unique), satisfied_count, total_count}. Rows are sorted so the widest-spanning
+    (most frameworks) evidence appears first — the spec acceptance wants the first row to span >=3
+    frameworks. An evidence with no parsable label is bucketed under '(unmapped evidence)'."""
+    buckets: Dict[str, Dict[str, Any]] = {}
+
+    def add(evidence: Any, clause_label: str, framework: Any, status: Any) -> None:
+        ev = str(evidence).strip() if evidence not in (None, "") else "(no evidence artifact)"
+        norm = (str(status or "")).strip().upper()
+        satisfied = norm in _SATISFIED_STATUSES
+        bucket = buckets.setdefault(ev, {"evidence": ev, "clauses": [], "_seen": set()})
+        key = (clause_label, str(framework or ""))
+        if key in bucket["_seen"]:
+            return
+        bucket["_seen"].add(key)
+        bucket["clauses"].append({
+            "label": clause_label,
+            "framework": str(framework or "").strip() or "Unspecified",
+            "status": norm or "NOT REPORTED",
+            "satisfied": satisfied,
+        })
+
+    for ctrl in controls:
+        add(ctrl.get("evidence"), _clause_label(ctrl), ctrl.get("framework"), ctrl.get("status"))
+
+    # Fold in the A.1-A.10 organizational-control catalog: each carries an evidence_file, a clause
+    # string (which may span several frameworks), and a resolved status from the gate.
+    for row in catalog_rows or []:
+        clause_text = str(row.get("clause") or "").strip()
+        # The catalog clause string already enumerates multiple frameworks (e.g.
+        # "DORA Art.11-12; NIS2 Art.21(2)(c); ISO 27001 A.8.13"); split on ';' into clauses,
+        # inferring each clause's framework token from its leading word.
+        parts = [p.strip() for p in clause_text.split(";") if p.strip()] or [clause_text]
+        for part in parts:
+            fw_token = part.split()[0] if part.split() else "Unspecified"
+            add(row.get("evidence_file"), part, fw_token, row.get("status"))
+
+    rows: List[Dict[str, Any]] = []
+    for bucket in buckets.values():
+        clauses = bucket["clauses"]
+        frameworks = sorted({c["framework"] for c in clauses})
+        satisfied = sum(1 for c in clauses if c["satisfied"])
+        rows.append({
+            "evidence": bucket["evidence"],
+            "clauses": clauses,
+            "frameworks": frameworks,
+            "satisfied_count": satisfied,
+            "total_count": len(clauses),
+        })
+    # Widest-spanning evidence first; stable tiebreak by evidence name.
+    rows.sort(key=lambda r: (-len(r["frameworks"]), -r["total_count"], r["evidence"]))
+    return rows
+
+
 # UKSC Art.8 and CRA Art.13 must be present in the cross-reference matrix per the contract. If the
 # supplied matrix omits them, we append explicit "asserted — pending" placeholder rows (clearly
 # labelled, never faked as live/measured). This keeps the document honest while satisfying the
@@ -392,6 +524,192 @@ def extract_ssdf_controls(controls: List[Dict[str, Any]]) -> List[Dict[str, Any]
         if "SSDF" in fw or re.match(r"^(PO|PS|PW|RV)[.\-]?\d", cid):
             result.append(ctrl)
     return result
+
+
+# --------------------------------------------------------------------------------------------------
+# Compliance-as-code pack (A.1-A.10 organizational-control verdicts + the signed compliance gate).
+#
+# This is the differentiator the buyer pays for: the signed PASS/FAIL ORG-control verdicts, not just
+# DevSecOps SARIF. The aggregate gate (scripts/aggregate-compliance.py, read-only, owned by the
+# wiring lane) reads each validator's T-33 envelope (scripts/validators/libcompliance.py) and writes
+# evidence/compliance-status.json with an overall_status + a per-check list carrying
+# status / measured / tier (and, where present, a remediation hint). We RENDER that here as a
+# readable Part A/D table that maps each control -> evidence -> clause (struktura §6 golden thread).
+#
+# We do NOT recompute verdicts (that is the gate's job) and we NEVER fake a PASS: a missing status
+# file degrades to "Not available this run"; an INDETERMINATE / FAIL row is shown verbatim with its
+# measured value and remediation pointer, so the deliberately-included BLOCKING FAIL (e.g. the
+# past-due access review or "restore not yet conducted") is visible to the auditor, honestly.
+# --------------------------------------------------------------------------------------------------
+
+# Canonical A.1-A.10 catalog: control id -> (validator verdict filenames, control title, framework
+# clause per struktura §6). The verdict filenames are the artifacts each A.x validator emits
+# (scripts/validators/*.py); the gate keys its per-check list by validator/filename, so we match on
+# several aliases (basename without extension, the validator module name, and the A.x id itself).
+# This is a fixed editorial mapping (a clause crosswalk), NOT a computed compliance figure.
+COMPLIANCE_AS_CODE_CATALOG: List[Dict[str, Any]] = [
+    {"id": "A.1", "title": "DORA Register of Information (RoI) — critical/important ICT providers, "
+        "exit strategy & substitutability",
+     "clause": "DORA Art.28(3); Reg (EU) 2024/2956 (ITS on RoI)",
+     "files": ["roi-validation.json"], "validator": "validate-roi"},
+    {"id": "A.2", "title": "Data Processing Agreements (DPA) register — Art.28 processor clauses",
+     "clause": "GDPR/RODO Art.28(3)",
+     "files": ["dpa-compliance-check.json"], "validator": "check-dpa-register"},
+    {"id": "A.3", "title": "Records of Processing (RoPA) + DPIA completeness",
+     "clause": "GDPR/RODO Art.30(1)-(2), Art.35",
+     "files": ["ropa-completeness.json"], "validator": "validate-ropa"},
+    {"id": "A.4", "title": "Incident register — statutory-clock schema (3-phase DORA clock)",
+     "clause": "DORA Art.19; NIS2 Art.23",
+     "files": ["incident-readiness.json"], "validator": "check-incident-register"},
+    {"id": "A.5", "title": "PII data-flow / transfer map",
+     "clause": "GDPR/RODO Art.30(5), Art.25",
+     "files": ["data-flow-diagram.json"], "validator": "check-data-flow"},
+    {"id": "A.6", "title": "Governance freshness — management review & NIS2 management training",
+     "clause": "DORA Art.5; NIS2 Art.20(2); ISO 27001 9.3",
+     "files": ["governance-evidence.json"], "validator": "check-governance"},
+    {"id": "A.7", "title": "ICT third-party clauses + documented & tested exit strategy",
+     "clause": "DORA Art.28-30 (Art.30(2)-(3), Art.28(8)); ISO 27001 A.5.19-A.5.23",
+     "files": ["tpp-clauses.json"], "validator": "check-thirdparty-clauses"},
+    {"id": "A.8", "title": "Access-review cadence freshness (privileged re-certification)",
+     "clause": "NIS2 Art.21(2)(i); ISO 27001 A.8.2",
+     "files": ["access-review.json"], "validator": "check-access-reviews"},
+    {"id": "A.9", "title": "Cryptographic posture — TLS floor & key management threshold",
+     "clause": "NIS2 Art.21(2)(h); ISO 27001 A.8.24; SOC2 CC7.1",
+     "files": ["crypto-posture.json"], "validator": "assert-crypto"},
+    {"id": "A.10", "title": "Backup restore-test proof + freshness (successful restore conducted)",
+     "clause": "DORA Art.11-12; NIS2 Art.21(2)(c); ISO 27001 A.8.13",
+     "files": ["restore-test.json"], "validator": "check-restore-test"},
+]
+
+# Aliases used to look a verdict up inside the gate's per-check list. The gate is owned by another
+# lane; to stay robust to its key choice we try the A.x id, the validator module name, and each
+# verdict filename (with and without the .json extension).
+def _catalog_aliases(entry: Dict[str, Any]) -> List[str]:
+    aliases = [str(entry["id"]), str(entry["id"]).replace(".", ""), str(entry.get("validator") or "")]
+    for fname in entry.get("files") or []:
+        aliases.append(fname)
+        aliases.append(os.path.splitext(fname)[0])
+    return [a.lower() for a in aliases if a]
+
+
+def _norm_key(value: Any) -> str:
+    return re.sub(r"[^a-z0-9]", "", str(value or "").lower())
+
+
+def normalize_compliance_status(status: Optional[Any]) -> Dict[str, Any]:
+    """Normalize the aggregator's compliance-status.json into a uniform shape.
+
+    The aggregate-compliance.py contract (T-19/T-30 DoD) is: an ``overall_status``/``overall`` field
+    plus a per-check list whose rows each carry ``status`` / ``measured`` / ``tier`` (and often a
+    remediation hint + the source validator/filename). The exact container key is owned by the wiring
+    lane, so we accept any of the common shapes and index the rows by every alias we can derive.
+
+    Returns a dict with keys: ``overall`` (str|None), ``counts`` (dict|None), ``rows`` (indexed
+    dict alias->row), ``raw`` (the original), ``available`` (bool).
+    """
+    if not isinstance(status, dict):
+        return {"overall": None, "counts": None, "rows": {}, "raw": status, "available": False}
+
+    overall = (status.get("overall_status") or status.get("overall")
+               or status.get("status") or status.get("result"))
+    counts = None
+    for key in ("counts", "summary", "totals", "tally"):
+        if isinstance(status.get(key), dict):
+            counts = status[key]
+            break
+
+    # Find the per-check list under any of the documented/likely container keys.
+    rows_list: List[Dict[str, Any]] = []
+    for key in ("checks", "controls", "results", "rows", "verdicts", "checks_list", "items"):
+        val = status.get(key)
+        if isinstance(val, list):
+            rows_list = [r for r in val if isinstance(r, dict)]
+            break
+        if isinstance(val, dict):
+            # dict-of-checks keyed by control/validator name: fold the key in as an id hint.
+            for k, v in val.items():
+                if isinstance(v, dict):
+                    row = dict(v)
+                    row.setdefault("_key", k)
+                    rows_list.append(row)
+            break
+
+    # Index every row by every alias we can derive (id, control, validator, file, basename).
+    indexed: Dict[str, Dict[str, Any]] = {}
+    for row in rows_list:
+        for alias_src in (row.get("id"), row.get("control"), row.get("control_id"),
+                          row.get("validator"), row.get("name"), row.get("file"),
+                          row.get("artifact"), row.get("_key")):
+            if alias_src:
+                indexed.setdefault(_norm_key(alias_src), row)
+                # also index by basename-without-extension for filename-style keys
+                base = os.path.splitext(os.path.basename(str(alias_src)))[0]
+                indexed.setdefault(_norm_key(base), row)
+    return {"overall": overall, "counts": counts, "rows": indexed,
+            "raw": status, "available": True}
+
+
+def _row_field(row: Optional[Dict[str, Any]], *keys: str) -> Any:
+    """First present, non-empty value among ``keys`` from a verdict/gate row."""
+    if not isinstance(row, dict):
+        return None
+    for key in keys:
+        if key in row and row[key] not in (None, ""):
+            return row[key]
+    return None
+
+
+def match_catalog_row(entry: Dict[str, Any], status_norm: Dict[str, Any],
+                      art_idx: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    """Resolve one A.x catalog entry against the aggregated status + the manifest.
+
+    Returns a render-ready dict: id, title, clause, status, tier, measured, detail, remediation,
+    evidence_file, provenance. Honest defaults when the gate did not report the control.
+    """
+    row = None
+    for alias in _catalog_aliases(entry):
+        row = status_norm["rows"].get(_norm_key(alias))
+        if row is not None:
+            break
+
+    status_val = _row_field(row, "status", "result", "state")
+    tier = _row_field(row, "tier")
+    measured = _row_field(row, "measured", "value", "measurement")
+    detail = _row_field(row, "detail", "message", "description")
+    remediation = _row_field(row, "remediation", "remediation_hint", "hint", "fix", "next_step")
+    threshold = _row_field(row, "threshold")
+
+    # Evidence-file provenance: prefer the manifest's per-artifact provenance flag for the verdict.
+    evidence_file = None
+    provenance = None
+    for fname in entry.get("files") or []:
+        art = art_idx.get(fname) or art_idx.get(os.path.basename(fname))
+        if art:
+            evidence_file = art.get("path") or fname
+            provenance = art.get("provenance")
+            break
+    if evidence_file is None and entry.get("files"):
+        evidence_file = entry["files"][0]
+    # A measured org-control verdict is a live-measured artifact (the validator ran); when we have no
+    # gate row at all we leave provenance untagged rather than overclaim.
+    if provenance is None and row is not None:
+        provenance = "live"
+
+    return {
+        "id": entry["id"],
+        "title": entry["title"],
+        "clause": entry["clause"],
+        "validator": entry.get("validator"),
+        "status": status_val,
+        "tier": tier,
+        "measured": measured,
+        "threshold": threshold,
+        "detail": detail,
+        "remediation": remediation,
+        "evidence_file": evidence_file,
+        "provenance": provenance,
+        "reported": row is not None,
+    }
 
 
 # --------------------------------------------------------------------------------------------------
@@ -587,6 +905,9 @@ thead {{ display: table-header-group; }}
 .badge-pass {{ background: #e3f5ea; color: var(--pass); border-color: var(--pass); }}
 .badge-fail {{ background: #fde7e6; color: var(--fail); border-color: var(--fail); }}
 .badge-na {{ background: #eef0f4; color: var(--na); border-color: #b9bfca; }}
+.badge-indet {{ background: #fff7e6; color: var(--static); border-color: var(--warn-border); }}
+.badge-blocking {{ background: #fdeceb; color: var(--fail); border-color: var(--fail); }}
+.badge-evidence {{ background: #eef2fb; color: var(--accent); border-color: var(--accent); }}
 
 /* ---- Cover ---- */
 .cover-title {{ font-size: 24pt; margin-top: 18mm; }}
@@ -842,6 +1163,459 @@ def render_exec_summary(ctx: Dict[str, Any]) -> str:
   {cov_block}
   <h3>One-line verification</h3>
   <pre class="mono">bash scripts/verify-evidence-pack.sh &lt;evidence_dir&gt;</pre>
+</section>
+"""
+
+
+def render_compliance_as_code(ctx: Dict[str, Any]) -> str:
+    """Render the compliance-as-code pack: the signed A.1-A.10 organizational-control verdicts +
+    the aggregate compliance gate (PASS/FAIL per control, with tier, measured value, clause, and a
+    remediation pointer). This is Part A's machine-checked organizational layer — the proof the
+    differentiator is real: a buyer sees signed PASS/FAIL ORG-control verdicts, not just SARIF.
+
+    Source: evidence/compliance-status.json (overall_status + per-check status/measured/tier),
+    produced by scripts/aggregate-compliance.py from each validator's T-33 envelope. We render, we
+    do NOT recompute; an unreported control degrades honestly to NOT REPORTED."""
+    status_norm = ctx["compliance_status"]
+    art_idx = ctx["artifact_index"]
+    rows = [match_catalog_row(entry, status_norm, art_idx)
+            for entry in COMPLIANCE_AS_CODE_CATALOG]
+
+    # Overall gate verdict line. Prefer the aggregator's overall; otherwise derive a HONEST summary
+    # banner (we never invent a PASS — if the file is absent we say so).
+    overall = status_norm.get("overall")
+    if status_norm.get("available"):
+        overall_badge = compliance_status_badge(overall)
+        gate_line = (
+            f'<p><strong>Aggregate compliance gate:</strong> {overall_badge} '
+            f'<span class="small">(read from compliance-status.json overall_status — the signed, '
+            f'fail-closed verdict; not recomputed here).</span></p>'
+        )
+    else:
+        gate_line = (
+            '<p><strong>Aggregate compliance gate:</strong> '
+            '<span class="badge badge-unknown">NOT AVAILABLE</span> '
+            '<span class="small">— compliance-status.json was not present in this evidence pack; '
+            'the per-control table below shows NOT REPORTED for each control rather than a fabricated '
+            'PASS.</span></p>'
+        )
+
+    # Honest counts computed from the rendered rows (live, from the gate output we read).
+    n_pass = sum(1 for r in rows if (r["status"] or "").upper() == "PASS")
+    n_fail = sum(1 for r in rows if (r["status"] or "").upper() == "FAIL")
+    n_indet = sum(1 for r in rows if (r["status"] or "").upper() == "INDETERMINATE")
+    n_unrep = sum(1 for r in rows if not r["reported"])
+    n_block_fail = sum(1 for r in rows
+                       if (r["status"] or "").upper() == "FAIL"
+                       and (r["tier"] or "").upper() == "BLOCKING")
+
+    summary = (
+        f'<p class="small">A.1-A.10 verdicts: '
+        f'{n_pass} PASS, {n_fail} FAIL ({n_block_fail} BLOCKING), {n_indet} INDETERMINATE, '
+        f'{n_unrep} NOT REPORTED. Only a BLOCKING FAIL fails the gate; an EVIDENCE-ONLY FAIL is '
+        f'recorded honestly but does not break the build (per the validator tiers in '
+        f'libcompliance.Tier).</p>'
+    )
+
+    body_rows = ""
+    for r in rows:
+        measured = r["measured"]
+        if isinstance(measured, (dict, list)):
+            measured_cell = f'<span class="mono">{esc(json.dumps(measured)[:120])}</span>'
+        elif measured is None:
+            measured_cell = "&mdash;"
+        else:
+            measured_cell = f'<span class="mono">{esc(measured)}</span>'
+        thr = r["threshold"]
+        thr_cell = (f' / thr {esc(json.dumps(thr) if isinstance(thr, (dict, list)) else thr)}'
+                    if thr not in (None, "") else "")
+        # Remediation: only shown for non-PASS rows; a PASS needs no fix pointer.
+        is_pass = (r["status"] or "").upper() == "PASS"
+        remediation = r["remediation"]
+        if not is_pass and not remediation and r["reported"]:
+            remediation = r["detail"]
+        rem_cell = esc(remediation) if (remediation and not is_pass) else "&mdash;"
+        ev = r["evidence_file"]
+        ev_cell = (f'<span class="mono">{esc(ev)}</span>' if ev else "&mdash;")
+        body_rows += (
+            "<tr>"
+            f'<td class="mono">{esc(r["id"])}</td>'
+            f'<td>{esc(r["title"])}</td>'
+            f'<td>{esc(r["clause"])}</td>'
+            f'<td>{ev_cell}<br>{provenance_badge(r["provenance"])}</td>'
+            f'<td>{tier_badge(r["tier"])}</td>'
+            f'<td>{compliance_status_badge(r["status"])}<br>'
+            f'<span class="small">{measured_cell}{thr_cell}</span></td>'
+            f'<td class="small">{rem_cell}</td>'
+            "</tr>"
+        )
+
+    table = (
+        '<table><thead><tr>'
+        '<th>Control</th><th>Organizational control</th><th>Framework clause</th>'
+        '<th>Evidence verdict (provenance)</th><th>Tier</th>'
+        '<th>Result / measured</th><th>Remediation pointer</th>'
+        '</tr></thead><tbody>' + body_rows + '</tbody></table>'
+    )
+
+    return f"""
+<section class="page-landscape section" id="compliance-as-code">
+  <h2>3a. Compliance-as-Code — Organizational-Control Verdicts (Part A)</h2>
+  <p>The signed organizational-control layer (struktura &sect;6 'bramka zgodno&#347;ci' / compliance
+  gate). Each A.x control is checked by a content validator that emits a verdict only when it parsed
+  a value and that value met a stated threshold (libcompliance) &mdash; never a silent PASS. The
+  verdicts are aggregated into the fail-closed gate below. This is the proof that the differentiator
+  is machine-checked: a buyer sees signed PASS/FAIL org-control verdicts, not just DevSecOps SARIF.</p>
+  {gate_line}
+  {summary}
+  {table}
+  <p class="small"><strong>Golden thread (struktura &sect;1):</strong> every row maps
+  control &rarr; evidence verdict (SHA-bound in the manifest &amp; &sect;17) &rarr; framework clause.
+  A BLOCKING FAIL (e.g. a past-due access review under A.8, or 'restore not yet conducted' under
+  A.10) makes the aggregate gate exit non-zero on a non-PR run &mdash; honest, fail-closed
+  enforcement with a concrete remediation pointer, not a green-for-show banner.</p>
+</section>
+"""
+
+
+def _maturity_badge(level: Optional[str]) -> str:
+    """Render an L1-L5 maturity-level badge (computed, never hardcoded)."""
+    norm = (str(level or "")).strip().upper()
+    if not norm:
+        return '<span class="badge badge-unknown">&mdash;</span>'
+    try:
+        n = int(norm.lstrip("L"))
+    except ValueError:
+        return f'<span class="badge badge-unknown">{esc(norm)}</span>'
+    cls = "badge-pass" if n >= 3 else "badge-fail" if n <= 2 else "badge-indet"
+    return f'<span class="badge {cls}">{esc(norm)}</span>'
+
+
+def render_soa_maturity(ctx: Dict[str, Any]) -> str:
+    """Render the Statement of Applicability coverage + the §9 L1-L5 maturity score (Part D.3, T-122).
+
+    Source: evidence/soa-maturity.json from scripts/validators/soa_maturity.py — overall_level is the
+    COMPUTED lowest-of-dimensions level (corrects the struktura §13 hardcoded-L5 overclaim). We render
+    the measured number verbatim; an absent/INDETERMINATE artifact degrades honestly, never a fake L5.
+    """
+    sm = ctx["soa_maturity"]
+    if not isinstance(sm, dict):
+        body = unavailable("soa-maturity.json not provided (run scripts/validators/soa_maturity.py)")
+        return f"""
+<section class="section" id="soa-maturity">
+  <h2>3b. Statement of Applicability + Maturity Scores (Part D.3 / &sect;9)</h2>
+  {body}
+</section>
+"""
+
+    status = sm.get("status")
+    overall = sm.get("overall_level") or (
+        (sm.get("measured") or {}).get("overall_level") if isinstance(sm.get("measured"), dict)
+        else None)
+    weakest = sm.get("weakest_dimensions") or []
+    soa = sm.get("soa") if isinstance(sm.get("soa"), dict) else {}
+    dims = sm.get("dimensions") if isinstance(sm.get("dimensions"), dict) else {}
+
+    if (status or "").strip().upper() == "INDETERMINATE" or not overall:
+        headline = (
+            '<p><strong>Computed pack maturity:</strong> '
+            '<span class="badge badge-indet">INDETERMINATE</span> '
+            f'<span class="small">{esc(sm.get("detail"))}</span></p>'
+        )
+    else:
+        weak_str = (f' Weakest dimension(s): {esc(", ".join(weakest))}.' if weakest else "")
+        headline = (
+            f'<p><strong>Computed pack maturity:</strong> {_maturity_badge(overall)} '
+            f'<span class="small">(the LOWEST of the five &sect;9 dimensions &mdash; a chain is as '
+            f'strong as its weakest link; this is the COMPUTED level, never a hardcoded L5).{weak_str}'
+            f'</span></p>'
+        )
+
+    # SoA coverage block (computed from the parsed Annex A rows, not the doc's own summary table).
+    if soa and not soa.get("error"):
+        complete = soa.get("structurally_complete")
+        complete_badge = (status_badge("PASS") if complete else status_badge("FAIL"))
+        soa_block = (
+            "<h3>3b.1 ISO 27001 Statement of Applicability — coverage (computed)</h3>"
+            '<div class="kv">'
+            f'<div class="k">Annex A controls parsed</div><div>{esc(soa.get("total_controls_parsed"))} '
+            f'of {esc(soa.get("iso_total_expected"))} expected {complete_badge}</div>'
+            f'<div class="k">Applicable</div><div>{esc(soa.get("applicable"))}</div>'
+            f'<div class="k">Not applicable</div><div>{esc(soa.get("not_applicable"))}</div>'
+            f'<div class="k">Implemented</div><div>{esc(soa.get("implemented"))}</div>'
+            f'<div class="k">Partially implemented</div><div>{esc(soa.get("partially_implemented"))}</div>'
+            f'<div class="k">Planned</div><div>{esc(soa.get("planned"))}</div>'
+            f'<div class="k">Implementation rate (applicable)</div>'
+            f'<div>{esc(soa.get("implementation_rate_applicable"))}</div>'
+            "</div>"
+        )
+    elif soa.get("error"):
+        soa_block = ("<h3>3b.1 ISO 27001 Statement of Applicability — coverage</h3>"
+                     + unavailable(f"SoA could not be parsed — {soa.get('error')}"))
+    else:
+        soa_block = ""
+
+    # Per-dimension §9 maturity table.
+    if dims:
+        drows = ""
+        for name in sorted(dims):
+            d = dims[name] if isinstance(dims[name], dict) else {}
+            level = d.get("level")
+            lvl = f"L{level}" if level is not None else d.get("measured")
+            drows += (
+                "<tr>"
+                f'<td>{esc(name.replace("_", " ").title())}</td>'
+                f'<td>{_maturity_badge(lvl)}</td>'
+                f'<td class="small">{esc(d.get("detail"))}</td>'
+                "</tr>"
+            )
+        dim_block = (
+            "<h3>3b.2 §9 maturity dimensions (L1 minimum &rarr; L5 state-of-the-art)</h3>"
+            "<table><thead><tr><th>Dimension</th><th>Level</th><th>Why this level (measured)</th>"
+            "</tr></thead><tbody>" + drows + "</tbody></table>"
+        )
+    else:
+        dim_block = ""
+
+    return f"""
+<section class="section" id="soa-maturity">
+  <h2>3b. Statement of Applicability + Maturity Scores (Part D.3 / &sect;9)</h2>
+  <p>The ISO 27001 Statement of Applicability coverage and the spec &sect;9 maturity benchmark.
+  The headline maturity is the <strong>computed</strong> lowest-of-dimensions level from real
+  evidence state &mdash; it deliberately corrects the legacy "L5 (state-of-the-art)" headline that
+  was hard-coded in the struktura, since two dimensions are honestly capped below L5 (SLSA Build L2,
+  not L3; non-qualified TSA, not a QTS).</p>
+  {headline}
+  {soa_block}
+  {dim_block}
+  <p class="small">Maturity is recorded at the EVIDENCE-ONLY tier (a measured fact for the pack, not
+  a build-breaking gate). The per-article A.1-A.10 validators own the blocking gate.</p>
+</section>
+"""
+
+
+def render_scope_applicability(ctx: Dict[str, Any]) -> str:
+    """Render the machine-validated scope & regulatory-applicability determination (Part B, T-120).
+
+    Source: evidence/scope-determination.json from scripts/validators/applicability.py — each regime
+    (DORA / NIS2-KSC / CRA / RODO) carries an explicit applies + rationale + clause/legal basis. We
+    render the per-regime applies map + the determination ownership; an absent artifact degrades to
+    'Not available this run', and a FAIL (a regime missing a rationale) is shown honestly."""
+    sd = ctx["scope_determination"]
+    appl = ctx["applicability_yaml"]  # the maintained source, for the per-regime rationale text
+    if not isinstance(sd, dict):
+        body = unavailable(
+            "scope-determination.json not provided (run scripts/validators/applicability.py); the "
+            "narrative scope below (Part 4) still applies")
+        return f"""
+<section class="section" id="scope-applicability">
+  <h2>3c. Scope &amp; Regulatory-Applicability Determination (Part B)</h2>
+  {body}
+</section>
+"""
+
+    status = (sd.get("status") or "").strip().upper()
+    measured = sd.get("measured") if isinstance(sd.get("measured"), dict) else {}
+    applies_map = measured.get("applies") if isinstance(measured.get("applies"), dict) else {}
+
+    if status == "INDETERMINATE":
+        verdict = ('<p><strong>Determination:</strong> '
+                   '<span class="badge badge-indet">INDETERMINATE</span> '
+                   f'<span class="small">{esc(sd.get("detail"))}</span></p>')
+    elif status == "FAIL":
+        verdict = ('<p><strong>Determination:</strong> '
+                   f'{status_badge("FAIL")} '
+                   f'<span class="small">{esc(sd.get("detail"))} '
+                   '(spec &sect;8 anti-pattern #10 — scope hand-waving is a rejection trigger).'
+                   '</span></p>')
+    else:
+        verdict = ('<p><strong>Determination:</strong> '
+                   f'{status_badge("PASS")} '
+                   f'<span class="small">{esc(sd.get("detail"))}</span></p>')
+
+    # Per-regime table. Prefer the applies map from the verdict (authoritative measured), enriching
+    # each row with the rationale/basis from the maintained applicability.yaml when available.
+    yaml_regimes = {}
+    if isinstance(appl, dict) and isinstance(appl.get("regimes"), dict):
+        yaml_regimes = appl["regimes"]
+
+    regime_keys = sorted(set(applies_map) | set(yaml_regimes))
+    if regime_keys:
+        rrows = ""
+        for key in regime_keys:
+            block = yaml_regimes.get(key) if isinstance(yaml_regimes.get(key), dict) else {}
+            applies = applies_map.get(key)
+            if applies is None:
+                applies = block.get("applies")
+            applies_cell = (status_badge("PASS") + " applies" if applies is True
+                            else status_badge("NA") + " not applicable" if applies is False
+                            else "&mdash;")
+            rationale = block.get("rationale")
+            basis = block.get("clause_basis") or block.get("legal_basis")
+            rrows += (
+                "<tr>"
+                f'<td>{esc(block.get("name") or key)}</td>'
+                f'<td>{applies_cell}</td>'
+                f'<td class="small">{esc(rationale)}</td>'
+                f'<td class="small">{esc(basis)}</td>'
+                "</tr>"
+            )
+        regime_block = (
+            "<table><thead><tr><th>Regime</th><th>Applies?</th><th>Rationale</th>"
+            "<th>Clause / legal basis</th></tr></thead><tbody>" + rrows + "</tbody></table>"
+        )
+    else:
+        regime_block = unavailable("no per-regime applicability data parsed from the determination")
+
+    return f"""
+<section class="section" id="scope-applicability">
+  <h2>3c. Scope &amp; Regulatory-Applicability Determination (Part B)</h2>
+  <p>The machine-validated answer to "why does DORA / NIS2-KSC / CRA / RODO apply (or not)?". This is
+  the structured, signed determination the spec mandates in Part B.3 and that closes &sect;8
+  anti-pattern #10 (scope hand-waving). The validator FAILs the pipeline if any regime lacks an
+  explicit <code>applies</code> decision or a documented rationale.</p>
+  {verdict}
+  {regime_block}
+  <p class="small"><strong>Honesty:</strong> the validator proves the determination is structurally
+  complete and OWNED (named approver + date). It does NOT assert the legal correctness of the
+  classification &mdash; that is an EVIDENCE-ONLY attestation by the named accountable officer.</p>
+</section>
+"""
+
+
+def render_crosswalk(ctx: Dict[str, Any]) -> str:
+    """Render the auto-generated regulatory crosswalk: ONE evidence item -> MANY framework clauses
+    (Part D.2 / spec 5.2, T-102 render half). Derived by grouping the validated matrix controls + the
+    A.1-A.10 catalog by evidence artifact; a clause is 'satisfied' only when its row is present AND
+    PASS. We do NOT recompute verdicts — we render the verdicts the validators already produced."""
+    rows = ctx["crosswalk_rows"]
+    if not rows:
+        body = unavailable(
+            "compliance-matrix.json not provided or contained no controls — no crosswalk to derive")
+        return f"""
+<section class="page-landscape section" id="crosswalk">
+  <h2>7a. Auto-Generated Regulatory Crosswalk</h2>
+  {body}
+</section>
+"""
+
+    trows = ""
+    for r in rows:
+        clause_cells = ""
+        for c in r["clauses"]:
+            badge = status_badge("PASS") if c["satisfied"] else status_badge(c["status"])
+            clause_cells += f'<div>{esc(c["label"])} {badge}</div>'
+        fw_str = ", ".join(r["frameworks"])
+        trows += (
+            "<tr>"
+            f'<td class="mono">{esc(r["evidence"])}</td>'
+            f'<td>{esc(len(r["frameworks"]))}<br><span class="small">{esc(fw_str)}</span></td>'
+            f'<td>{clause_cells}</td>'
+            f'<td>{esc(r["satisfied_count"])} / {esc(r["total_count"])}</td>'
+            "</tr>"
+        )
+    table = (
+        "<table><thead><tr><th>Evidence artifact</th><th>Frameworks spanned</th>"
+        "<th>Clauses mapped (satisfied only when present AND PASS)</th>"
+        "<th>Satisfied / total</th></tr></thead><tbody>" + trows + "</tbody></table>"
+    )
+
+    multi = [r for r in rows if len(r["frameworks"]) >= 3]
+    lead = (
+        f'<p class="small">{len(rows)} evidence artifact(s) mapped; '
+        f'{len(multi)} span &ge;3 frameworks. The widest-spanning evidence is listed first: a single '
+        f'artifact (e.g. the SBOM + provenance) simultaneously backs DORA, NIS2 and ISO clauses &mdash; '
+        f'the "one evidence &rarr; many clauses" relationship the spec requires. Unsatisfied clauses '
+        f'(absent or non-PASS) are listed but flagged, not hidden, so they feed the gap register.</p>'
+    )
+
+    return f"""
+<section class="page-landscape section" id="crosswalk">
+  <h2>7a. Auto-Generated Regulatory Crosswalk (one evidence &rarr; many clauses)</h2>
+  <p>The content-derived crosswalk mandated by spec 5.2 / struktura D.2. Unlike a presence-only matrix,
+  each row pivots on an <strong>evidence artifact</strong> and enumerates every framework clause that
+  artifact satisfies, with the real per-clause verdict. A clause is satisfied <strong>only</strong>
+  when its validated row is present AND PASS &mdash; a missing or failing artifact never satisfies a
+  clause.</p>
+  {lead}
+  {table}
+</section>
+"""
+
+
+def render_vex(ctx: Dict[str, Any]) -> str:
+    """Render the VEX exploitability-triage summary (Part C.11, T-116 render half).
+
+    Source: evidence/vex.openvex.json (OpenVEX statements[]) — we compute a by_status tally so an
+    auditor sees triaged/non-exploitable CVEs are HANDLED, not open (spec §8 'no VEX, so every CVE
+    looks unhandled'). An absent VEX degrades honestly; under_investigation is surfaced as open
+    triage, never hidden."""
+    vex = ctx["vex_doc"]
+    if not isinstance(vex, dict):
+        body = unavailable(
+            "vex.openvex.json not provided (run scripts/generate-vex.py with the image digest)")
+        return f"""
+<section class="section" id="vex">
+  <h2>10a. Vulnerability-Exploitability Exchange (VEX) Summary</h2>
+  {body}
+</section>
+"""
+
+    statements = vex.get("statements") if isinstance(vex.get("statements"), list) else []
+    by_status: Dict[str, int] = {}
+    cve_rows = ""
+    for stmt in statements:
+        if not isinstance(stmt, dict):
+            continue
+        status = str(stmt.get("status") or "").strip() or "unknown"
+        by_status[status] = by_status.get(status, 0) + 1
+        cve = (stmt.get("vulnerability") or {}).get("name") if isinstance(
+            stmt.get("vulnerability"), dict) else None
+        just = stmt.get("justification") or stmt.get("impact_statement") or stmt.get("status_notes")
+        cve_rows += (
+            "<tr>"
+            f'<td class="mono">{esc(cve)}</td>'
+            f'<td>{esc(status)}</td>'
+            f'<td class="small">{esc(just)}</td>'
+            "</tr>"
+        )
+
+    if by_status:
+        status_cells = "".join(
+            f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
+            for k, v in sorted(by_status.items())
+        )
+        summary_block = f'<h3>10a.1 Statements by status (by_status)</h3><div class="kv">{status_cells}</div>'
+    else:
+        summary_block = unavailable("VEX document carried no statements")
+
+    detail_block = ""
+    if cve_rows:
+        detail_block = (
+            "<h3>10a.2 Per-CVE exploitability statements</h3>"
+            "<table><thead><tr><th>CVE</th><th>Status</th><th>Justification / note</th>"
+            "</tr></thead><tbody>" + cve_rows + "</tbody></table>"
+        )
+
+    n_open = by_status.get("under_investigation", 0)
+    open_note = (
+        f'<p class="small">{n_open} statement(s) are <code>under_investigation</code> (reported by '
+        'the scanner, not yet triaged) &mdash; surfaced honestly so the open triage is visible, never '
+        'silently marked not_affected.</p>' if n_open else "")
+
+    return f"""
+<section class="section" id="vex">
+  <h2>10a. Vulnerability-Exploitability Exchange (VEX) Summary</h2>
+  <p>Per-release OpenVEX exploitability triage (Part C.11). Without a VEX every CVE reads as an open
+  finding to an auditor (spec &sect;8 anti-pattern "no VEX"). Each <code>not_affected</code>/
+  <code>fixed</code> statement carries a CISA-category justification and is bound to the released
+  image digest; the companion validator FAILs the build on any unjustified non-<code>affected</code>
+  claim.</p>
+  {summary_block}
+  {open_note}
+  {detail_block}
+  <p class="small">VEX author: {esc(vex.get("author"))}. This summary is rendered from the signed
+  OpenVEX document committed-to by the Merkle root; verdicts are not recomputed here.</p>
 </section>
 """
 
@@ -1414,20 +2188,129 @@ def render_exceptions(ctx: Dict[str, Any]) -> str:
 """
 
 
+def render_residual_risk(ctx: Dict[str, Any]) -> str:
+    """Render the risk-acceptance discipline check + the residual-risk statement (Part J.2 / D.4,
+    T-121 render half).
+
+    Source: evidence/residual-risk.json from scripts/validators/risk_acceptance.py — the validator
+    FAILs (BLOCKING) on any open accepted risk lacking a named approver / justification / future
+    expiry (spec §8 anti-pattern #5, unbounded risk acceptances). We render the residual posture +
+    each open acceptance; an absent artifact degrades honestly."""
+    rr = ctx["residual_risk"]
+    if not isinstance(rr, dict):
+        body = unavailable(
+            "residual-risk.json not provided (run scripts/validators/risk_acceptance.py); see the "
+            "Exceptions register above for the raw acceptances")
+        return f"""
+<section class="section" id="residual-risk">
+  <h2>12a. Risk-Acceptance &amp; Residual-Risk Statement (Part J.2 / D.4)</h2>
+  {body}
+</section>
+"""
+
+    status = (rr.get("status") or "").strip().upper()
+    detail = rr.get("detail")
+    block = rr.get("residual_risk") if isinstance(rr.get("residual_risk"), dict) else {}
+
+    if status == "INDETERMINATE":
+        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+                   f'<span class="badge badge-indet">INDETERMINATE</span> '
+                   f'<span class="small">{esc(detail)}</span></p>')
+    elif status == "FAIL":
+        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+                   f'{status_badge("FAIL")} '
+                   f'<span class="small">{esc(detail)} '
+                   '(spec &sect;8 anti-pattern #5 — unbounded risk acceptances are a rejection '
+                   'trigger; this BLOCKING FAIL fails the gate on a non-PR run).</span></p>')
+    else:
+        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+                   f'{status_badge("PASS")} '
+                   f'<span class="small">{esc(detail)}</span></p>')
+
+    open_count = block.get("open_accepted_risks")
+    by_sev = block.get("by_severity") if isinstance(block.get("by_severity"), dict) else {}
+    soonest = block.get("soonest_expiry") if isinstance(block.get("soonest_expiry"), dict) else {}
+    open_risks = block.get("open_risks") if isinstance(block.get("open_risks"), list) else []
+    statement = block.get("statement")
+    board = block.get("board_tolerance") if isinstance(block.get("board_tolerance"), dict) else {}
+
+    sev_str = ", ".join(f"{k}: {v}" for k, v in by_sev.items()) if by_sev else "&mdash;"
+    soonest_str = (f"{esc(soonest.get('id'))} expires {esc(soonest.get('expiry'))} "
+                   f"({esc(soonest.get('days_to_expiry'))}d)" if soonest else "&mdash;")
+    posture = (
+        '<div class="kv">'
+        f'<div class="k">Open accepted risks</div><div>{esc(open_count)}</div>'
+        f'<div class="k">By severity</div><div>{sev_str}</div>'
+        f'<div class="k">Soonest expiry</div><div>{soonest_str}</div>'
+        "</div>"
+    )
+
+    if open_risks:
+        orows = ""
+        for r in open_risks:
+            if not isinstance(r, dict):
+                continue
+            orows += (
+                "<tr>"
+                f'<td class="mono">{esc(r.get("id"))}</td>'
+                f'<td>{esc(r.get("control") or r.get("vuln_id"))}</td>'
+                f'<td>{esc(r.get("severity"))}</td>'
+                f'<td>{esc(r.get("owner"))}</td>'
+                f'<td>{esc(r.get("approver"))}</td>'
+                f'<td>{esc(r.get("expiry"))}</td>'
+                "</tr>"
+            )
+        open_table = (
+            "<h3>12a.1 Open accepted risks (named approver + expiry required)</h3>"
+            "<table><thead><tr><th>ID</th><th>Control / vuln</th><th>Severity</th><th>Owner</th>"
+            "<th>Approver</th><th>Expiry</th></tr></thead><tbody>" + orows + "</tbody></table>"
+        )
+    else:
+        open_table = ('<p><strong>No open accepted risks</strong> — register clean / no exceptions '
+                      'noted.</p>')
+
+    board_block = ""
+    if board:
+        board_block = (
+            '<h3>12a.2 Board risk-tolerance basis (Part D.4)</h3>'
+            f'<div class="note">{esc(board.get("basis"))} {esc(board.get("iso_27001_2022"))}</div>'
+        )
+
+    return f"""
+<section class="section" id="residual-risk">
+  <h2>12a. Risk-Acceptance &amp; Residual-Risk Statement (Part J.2 / D.4)</h2>
+  <p>The residual-risk posture, tied to the board-approved risk tolerance (DORA Art. 5(2)). Every
+  open accepted risk must carry a named approver, a justification, and a future expiry within the
+  12-month maximum; an unbounded acceptance is a documented rejection trigger.</p>
+  {verdict}
+  <h3>Residual posture</h3>
+  {posture}
+  <div class="note">{esc(statement)}</div>
+  {open_table}
+  {board_block}
+  <p class="small"><strong>Honesty:</strong> this artifact is the machine-readable substrate of the
+  residual-risk statement. The accountable-officer signature is a human act applied at seal time
+  (<code>signed_by_accountable_officer</code> is recorded honestly, not asserted here).</p>
+</section>
+"""
+
+
 def render_break_glass(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="break-glass">
   <h2>13. Emergency-Change / Break-Glass Disclosure</h2>
   <p>The pipeline is the only normal path to production. A break-glass procedure (ticket +
-  retroactive approval + post-incident review) exists for emergencies; out-of-pipeline changes to
-  Azure are detected via Activity-Log drift alerting, proving the pipeline is the sole standard
-  change channel.</p>
+  retroactive approval + post-incident review) exists for emergencies. Detecting out-of-pipeline
+  changes to Azure (e.g. via Activity-Log drift alerting) is a <strong>design-stage</strong> control
+  &mdash; no live posture/drift scan runs in this pipeline yet, so this report does not claim live
+  detection coverage.</p>
   <div class="kv">
     <div class="k">Break-glass events this period</div><div>0 (no emergency changes recorded this run).</div>
-    <div class="k">Out-of-pipeline change detection</div><div>Azure Activity-Log drift alerting (design-stage).</div>
+    <div class="k">Out-of-pipeline change detection</div><div>Azure Activity-Log drift alerting — design-stage (no live scan).</div>
   </div>
-  <p class="small">A count of zero is asserted for this single-run report; continuous detection
-  evidence accrues over an operating window.</p>
+  <p class="small">A count of zero is asserted for this single-run report. Continuous out-of-pipeline
+  detection (a live CSPM / drift scan) is not yet wired; until it is, this control is design-stage
+  only and no operating coverage is claimed.</p>
 </section>
 """
 
@@ -1638,15 +2521,21 @@ SECTION_RENDERERS = {
     "toc": render_toc,
     "authority": render_authority,
     "exec-summary": render_exec_summary,
+    "compliance-as-code": render_compliance_as_code,
+    "soa-maturity": render_soa_maturity,
+    "scope-applicability": render_scope_applicability,
     "scope": render_scope,
     "attestation": render_attestation,
     "ipe": render_ipe,
     "control-matrix": render_control_matrix,
+    "crosswalk": render_crosswalk,
     "provenance-sbom": render_provenance_sbom,
     "evidence-detail": render_evidence_detail,
     "vuln-mgmt": render_vuln_mgmt,
+    "vex": render_vex,
     "change-approval": render_change_approval,
     "exceptions": render_exceptions,
+    "residual-risk": render_residual_risk,
     "break-glass": render_break_glass,
     "kpi-trends": render_kpi_trends,
     "retention": render_retention,
@@ -1680,6 +2569,35 @@ def build_document(args: argparse.Namespace) -> str:
     ssdf_controls = extract_ssdf_controls(matrix_controls)
     coverage = compute_coverage(controls)
 
+    # Compliance-as-code gate output (A.1-A.10 verdicts aggregate). Default to
+    # <evidence-dir>/compliance-status.json when --compliance-status is not given.
+    status_path = args.compliance_status
+    if not status_path and args.evidence_dir:
+        status_path = os.path.join(args.evidence_dir, "compliance-status.json")
+    compliance_status = normalize_compliance_status(load_json(status_path))
+
+    # Auto-generated crosswalk (T-102 render half): group validated controls + the A.1-A.10 catalog
+    # rows by evidence artifact so one evidence maps to many framework clauses. Resolve the catalog
+    # rows against the gate output (and the manifest provenance) so a clause's satisfied flag tracks
+    # the real verdict, not mere presence.
+    catalog_rows = [match_catalog_row(entry, compliance_status, artifact_index(manifest))
+                    for entry in COMPLIANCE_AS_CODE_CATALOG]
+    crosswalk_rows = build_crosswalk(controls, catalog_rows)
+
+    # New audit-render artifacts (each degrades to None -> a "Not available this run" section).
+    def evidence_path(name: str, override: Optional[str]) -> Optional[str]:
+        if override:
+            return override
+        if args.evidence_dir:
+            return os.path.join(args.evidence_dir, name)
+        return None
+
+    soa_maturity = load_json(evidence_path("soa-maturity.json", args.soa_maturity))
+    scope_determination = load_json(evidence_path("scope-determination.json", args.scope_determination))
+    vex_doc = load_json(evidence_path("vex.openvex.json", args.vex))
+    residual_risk = load_json(evidence_path("residual-risk.json", args.residual_risk))
+    applicability_yaml = load_yaml(args.applicability)
+
     report_html = read_text(args.report_html)
     report_body = extract_report_body(report_html)
 
@@ -1703,6 +2621,13 @@ def build_document(args: argparse.Namespace) -> str:
         "matrix_controls": matrix_controls,
         "ssdf_controls": ssdf_controls,
         "coverage": coverage,
+        "compliance_status": compliance_status,
+        "crosswalk_rows": crosswalk_rows,
+        "soa_maturity": soa_maturity,
+        "scope_determination": scope_determination,
+        "applicability_yaml": applicability_yaml,
+        "vex_doc": vex_doc,
+        "residual_risk": residual_risk,
         "artifacts": get_artifacts(manifest),
         "artifact_index": artifact_index(manifest),
         "evidence_dir": args.evidence_dir,
@@ -1821,12 +2746,106 @@ def selftest() -> int:
             "components": [{"type": "library", "name": "express", "version": "4.19.2"}]
         }), encoding="utf-8")
 
+        # Compliance-as-code gate fixture: an honest mix — one BLOCKING FAIL (A.8 overdue access
+        # review), one PASS, one EVIDENCE-ONLY FAIL, and the rest unreported. Exercises the
+        # render_compliance_as_code path with the deliberately-included BLOCKING FAIL.
+        status_p = tmp_path / "compliance-status.json"
+        status_p.write_text(json.dumps({
+            "overall_status": "FAIL",
+            "counts": {"pass": 1, "fail": 2, "indeterminate": 0},
+            "checks": [
+                {"id": "A.1", "validator": "validate-roi", "file": "roi-validation.json",
+                 "status": "PASS", "tier": "BLOCKING", "measured": 7, "threshold": 7,
+                 "detail": "RoI complete"},
+                {"id": "A.8", "validator": "check-access-reviews", "file": "access-review.json",
+                 "status": "FAIL", "tier": "BLOCKING", "measured": 123, "threshold": 90,
+                 "detail": "privileged access review last run 123 days ago; limit 90",
+                 "remediation": "Run the privileged access re-certification; update "
+                                "docs/governance/access-review-log.md Last Reviewed date."},
+                {"id": "A.7", "validator": "check-thirdparty-clauses", "file": "tpp-clauses.json",
+                 "status": "FAIL", "tier": "EVIDENCE-ONLY", "measured": 2,
+                 "detail": "2 of 4 critical providers missing a tested exit plan"},
+            ],
+        }), encoding="utf-8")
+
+        # T-102/T-116/T-120/T-121/T-122 render artifacts: SoA-maturity, scope determination, VEX,
+        # residual-risk. Each exercises the corresponding new render path with realistic shapes.
+        soa_p = tmp_path / "soa-maturity.json"
+        soa_p.write_text(json.dumps({
+            "status": "PASS", "tier": "EVIDENCE-ONLY",
+            "measured": {"overall_level": "L3"},
+            "overall_level": "L3",
+            "weakest_dimensions": ["scanning"],
+            "detail": "computed pack maturity = L3 (lowest of dimensions)",
+            "soa": {"total_controls_parsed": 93, "iso_total_expected": 93,
+                    "structurally_complete": True, "applicable": 80, "not_applicable": 13,
+                    "implemented": 60, "partially_implemented": 15, "planned": 5,
+                    "implementation_rate_applicable": 0.84},
+            "dimensions": {
+                "build_integrity": {"level": 4, "measured": "L4",
+                                    "detail": "SBOM + provenance; capped at L4 (SLSA Build L2)"},
+                "scanning": {"level": 3, "measured": "L3", "detail": "scan + SCA present"},
+            },
+        }), encoding="utf-8")
+        scope_p = tmp_path / "scope-determination.json"
+        scope_p.write_text(json.dumps({
+            "status": "PASS", "tier": "BLOCKING",
+            "measured": {"regimes": 4, "violations": 0,
+                         "applies": {"DORA": True, "NIS2-KSC": True, "CRA": False, "RODO": True}},
+            "detail": "scope & applicability determination complete: 4 regimes; "
+                      "approved_by='CISO', dated 2026-05-01.",
+        }), encoding="utf-8")
+        vex_p = tmp_path / "vex.openvex.json"
+        vex_p.write_text(json.dumps({
+            "@context": "https://openvex.dev/ns/v0.2.0",
+            "author": "CyberForge Security Team",
+            "timestamp": "2026-05-30T12:00:00Z",
+            "version": 1,
+            "statements": [
+                {"vulnerability": {"name": "CVE-2024-0001"}, "status": "not_affected",
+                 "justification": "vulnerable_code_not_in_execute_path",
+                 "products": [{"@id": "pkg:oci/app@sha256:deadbeef"}]},
+                {"vulnerability": {"name": "CVE-2024-0002"}, "status": "under_investigation",
+                 "status_notes": "Reported by the scanner; not yet triaged.",
+                 "products": [{"@id": "pkg:oci/app@sha256:deadbeef"}]},
+            ],
+        }), encoding="utf-8")
+        rr_p = tmp_path / "residual-risk.json"
+        rr_p.write_text(json.dumps({
+            "status": "PASS", "tier": "BLOCKING",
+            "detail": "1 open accepted risk(s); all bounded with named approver + expiry",
+            "residual_risk": {
+                "open_accepted_risks": 1,
+                "by_severity": {"Medium": 1},
+                "soonest_expiry": {"id": "EX-001", "expiry": "2027-01-01", "days_to_expiry": 200},
+                "open_risks": [{"id": "EX-001", "control": "DORA TLPT", "severity": "Medium",
+                                "owner": "CISO", "approver": "CEO", "expiry": "2027-01-01"}],
+                "statement": "As of today, 1 accepted ICT risk remains open, formally approved.",
+                "board_tolerance": {"basis": "DORA Art. 5(2) — board risk tolerance.",
+                                    "iso_27001_2022": "Clause 6.1.2 — risk acceptance criteria."},
+                "signed_by_accountable_officer": False,
+            },
+        }), encoding="utf-8")
+        appl_p = tmp_path / "applicability.yaml"
+        appl_p.write_text(
+            "regimes:\n"
+            "  DORA:\n    name: DORA\n    applies: true\n"
+            "    rationale: CyberForge supports an ICT third-party service.\n"
+            "    clause_basis: DORA Art.28\n",
+            encoding="utf-8")
+
         args = argparse.Namespace(
             evidence_dir=str(tmp_path),
             manifest=str(man_p),
             report_html=str(rep_p),
             out=str(tmp_path / "audit-document.html"),
             compliance_matrix=str(mat_p),
+            compliance_status=str(status_p),
+            soa_maturity=str(soa_p),
+            scope_determination=str(scope_p),
+            vex=str(vex_p),
+            residual_risk=str(rr_p),
+            applicability=str(appl_p),
             governance_dir=None,
             exception_register=str(exc_p),
             control_owners=str(own_p),
@@ -1886,18 +2905,67 @@ def selftest() -> int:
         check(doc.startswith("<!DOCTYPE html>"), "doctype missing")
         check(doc.count("<body>") == 1 and doc.count("</body>") == 1, "body tag count wrong")
 
-        # 13. Degradation: build with all optional inputs missing.
+        # 13. Compliance-as-code section: A.1-A.10 catalog rendered, overall gate read from status,
+        #     BLOCKING FAIL surfaced honestly, remediation pointer present, EVIDENCE-ONLY shown.
+        check('id="compliance-as-code"' in doc, "compliance-as-code section missing")
+        for ax in ("A.1", "A.4", "A.8", "A.10"):
+            check(ax in doc, f"compliance-as-code missing control {ax}")
+        check("DORA Art.28(3)" in doc, "A.1 DORA Art.28(3) clause mapping missing")
+        check("BLOCKING" in doc and "EVIDENCE-ONLY" in doc, "tier badges missing")
+        check(">123</span>" in doc or ">123<" in doc or "123 / thr 90" in doc,
+              "A.8 BLOCKING FAIL measured value (123) not surfaced")
+        check("re-certification" in doc, "A.8 remediation pointer not rendered")
+        check("INDETERMINATE" not in doc or "badge-indet" in doc,
+              "INDETERMINATE badge class missing when status used")
+        # Honest overall: the gate FAILed, and the section must reflect that (not a fabricated PASS).
+        check("Aggregate compliance gate" in doc, "aggregate gate verdict line missing")
+        check("NOT REPORTED" in doc, "unreported A.x controls not shown as NOT REPORTED")
+
+        # 13b. New render sections (T-102 crosswalk, T-116 VEX, T-120 scope, T-121 residual,
+        #      T-122 SoA/maturity) present with real (not fabricated) data.
+        check('id="soa-maturity"' in doc, "soa-maturity section missing")
+        check("L3" in doc and "maturity" in doc.lower(), "computed maturity level not surfaced")
+        check("93" in doc, "SoA control coverage (93) not rendered")
+        check('id="scope-applicability"' in doc, "scope-applicability section missing")
+        check("NIS2-KSC" in doc or "NIS2" in doc, "scope regime not rendered")
+        check('id="crosswalk"' in doc, "crosswalk section missing")
+        # The SBOM+provenance evidence spans DORA + NIS2 (>=2 frameworks) in the matrix fixture.
+        check("Frameworks spanned" in doc, "crosswalk framework-span column missing")
+        check('id="vex"' in doc, "vex section missing")
+        check("CVE-2024-0001" in doc and "not_affected" in doc, "VEX statement not rendered")
+        check("under_investigation" in doc, "VEX under_investigation not surfaced")
+        check('id="residual-risk"' in doc, "residual-risk section missing")
+        check("EX-001" in doc and "DORA Art. 5(2)" in doc,
+              "residual-risk open acceptance / board tolerance not rendered")
+
+        # 13c. T-117 relabel: no implied LIVE cloud/drift posture (design-stage only).
+        check("design-stage (no live scan)" in doc or "no live scan" in doc,
+              "T-117 relabel missing: break-glass must say no live drift/posture scan")
+        check("drift alerting (design-stage)" not in doc,
+              "T-117: stale 'drift alerting (design-stage)' wording still present")
+
+        # 14. Degradation: build with all optional inputs missing.
         args_min = argparse.Namespace(
             evidence_dir=str(tmp_path), manifest=str(tmp_path / "nope.json"),
             report_html=str(tmp_path / "nope.html"), out=str(tmp_path / "o2.html"),
-            compliance_matrix=None, governance_dir=None,
-            exception_register=None, control_owners=None,
+            compliance_matrix=None, compliance_status=str(tmp_path / "nope-status.json"),
+            soa_maturity=str(tmp_path / "nope-soa.json"),
+            scope_determination=str(tmp_path / "nope-scope.json"),
+            vex=str(tmp_path / "nope-vex.json"),
+            residual_risk=str(tmp_path / "nope-rr.json"),
+            applicability=str(tmp_path / "nope-appl.yaml"),
+            governance_dir=None, exception_register=None, control_owners=None,
         )
         doc_min = build_document(args_min)
         check("Not available this run" in doc_min, "degraded section marker missing")
         for sid, _ in SECTION_ORDER:
             check(f'id="{sid}"' in doc_min, f"degraded doc missing section id={sid}")
         check(doc_min.startswith("<!DOCTYPE html>"), "degraded doc not valid HTML")
+        # When the gate file is absent, the compliance-as-code section degrades to NOT AVAILABLE and
+        # never fabricates a PASS (every control shows NOT REPORTED).
+        check("NOT AVAILABLE" in doc_min, "compliance-as-code did not degrade to NOT AVAILABLE")
+        check("A.1" in doc_min and "A.10" in doc_min,
+              "compliance-as-code catalog rows missing in degraded mode")
 
     if failures:
         print("SELFTEST FAILED:", file=sys.stderr)
@@ -1924,6 +2992,24 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     p.add_argument("--report-html", dest="report_html")
     p.add_argument("--out", dest="out")
     p.add_argument("--compliance-matrix", dest="compliance_matrix", default=None)
+    p.add_argument("--compliance-status", dest="compliance_status", default=None,
+                   help="Aggregated A.1-A.10 gate output (compliance-status.json). Defaults to "
+                        "<evidence-dir>/compliance-status.json when omitted.")
+    p.add_argument("--soa-maturity", dest="soa_maturity", default=None,
+                   help="SoA + §9 maturity output (soa-maturity.json). Defaults to "
+                        "<evidence-dir>/soa-maturity.json.")
+    p.add_argument("--scope-determination", dest="scope_determination", default=None,
+                   help="Scope & applicability determination (scope-determination.json). Defaults to "
+                        "<evidence-dir>/scope-determination.json.")
+    p.add_argument("--vex", dest="vex", default=None,
+                   help="Per-release OpenVEX document (vex.openvex.json). Defaults to "
+                        "<evidence-dir>/vex.openvex.json.")
+    p.add_argument("--residual-risk", dest="residual_risk", default=None,
+                   help="Residual-risk / risk-acceptance output (residual-risk.json). Defaults to "
+                        "<evidence-dir>/residual-risk.json.")
+    p.add_argument("--applicability", dest="applicability",
+                   default="/home/xrne/Dokumenty/CyberForge/Pipeline/docs/governance/applicability.yaml",
+                   help="Maintained applicability.yaml (source rationale text for the scope section).")
     p.add_argument("--governance-dir", dest="governance_dir",
                    default="/home/xrne/Dokumenty/CyberForge/Pipeline/docs/governance")
     p.add_argument("--exception-register", dest="exception_register",

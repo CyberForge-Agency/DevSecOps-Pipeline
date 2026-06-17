@@ -1,0 +1,31 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "providers_total": 10,
+    "lei_checked": 2,
+    "lei_format_valid": 2,
+    "lei_registration": {
+      "issued": 0,
+      "placeholder": 2,
+      "pending": 0,
+      "not_lei_eligible": 8,
+      "other": 0
+    },
+    "maintaining_entity_lei_pending": true,
+    "schema_violations": 0,
+    "completeness_violations": 0,
+    "register_age_days": 94,
+    "blocking_problem_count": 0
+  },
+  "threshold": {
+    "schema_violations": 0,
+    "lei_format_invalid": 0,
+    "completeness_violations": 0,
+    "register_age_days_max": 365
+  },
+  "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 94d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
+  "tool_version": null,
+  "validator": "validate-roi",
+  "checked_at": "2026-06-17T14:57:47Z"
+}

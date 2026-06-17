@@ -1,0 +1,14 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "activities": 3,
+    "violations": 0,
+    "dpia_determination": "not-required"
+  },
+  "threshold": "0 violations; Art.30(1)/(2) complete + DPIA determination recorded",
+  "detail": "RoPA present and complete: 3 processing activities satisfy RODO Art.30; DPIA determination='not-required'. NOTE: completeness verified, factual truth of recorded content is EVIDENCE-ONLY.",
+  "tool_version": "jsonschema 4.26.0",
+  "validator": "validate-ropa",
+  "checked_at": "2026-06-17T09:40:49Z"
+}

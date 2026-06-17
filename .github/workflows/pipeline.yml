@@ -32,10 +32,22 @@ concurrency:
 
 jobs:
   # ============================================
+  # Phase 0: Self-Test (quality gate; always runs first)
+  # ============================================
+  # The pipeline's own gate: opa test + T-71 action-pin audit + pytest
+  # tests/compliance + T-81 bats. Every later phase chains off this via `needs`,
+  # so a broken validator/policy or a re-introduced unpinned action fails the run
+  # before anything builds, signs or deploys — nothing can depend-around it.
+  self-test:
+    name: "Phase 0: Self-Test"
+    uses: ./.github/workflows/self-test.yml
+
+  # ============================================
   # Phase 1: Security Gate (always runs)
   # ============================================
   security-gate:
     name: "Phase 1: Security Gate"
+    needs: [self-test]
     uses: ./.github/workflows/security-gate.yml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}

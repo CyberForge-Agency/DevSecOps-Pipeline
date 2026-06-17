@@ -73,7 +73,14 @@ jobs:
           path: evidence/
         continue-on-error: true
 
-      - name: Download Cosign verification log
+      # The `cosign-verification` artifact (uploaded by sign-and-attest.yml) carries
+      # BOTH cosign-verification.log (image-signature verify) AND, per T-51,
+      # cosign-attestation-verification.log (the SBOM attestation Rekor-inclusion
+      # proof: `cosign verify-attestation --type cyclonedx --insecure-ignore-tlog=false`
+      # + a REKOR_SBOM_ATTESTATION_INCLUSION_VERIFIED marker). Both land in evidence/
+      # here — well before the manifest/Merkle step — so the Rekor attestation proof
+      # is leaf-hashed into manifest.json and sealed into the pack (spec §7.2/Part I.2).
+      - name: Download Cosign verification logs (image sig + SBOM attestation Rekor proof, T-51)
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: cosign-verification
@@ -101,20 +108,91 @@ jobs:
           path: evidence/coverage/
         continue-on-error: true
 
-      # Consolidate security reports into single file
+      # Consolidate security reports into single file (T-43).
+      #
+      # The former `except: pass` swallowed every parse failure, so a corrupt /
+      # empty scanner output produced an empty consolidated report that the
+      # presence-only matrix could not flag (blueprint §6.3-C: 'a green pack does
+      # not imply the scanners ran'). We now RECORD each failure into parse_errors,
+      # ALWAYS write the JSON (so it is sealed regardless of verdict), and gate:
+      # non-PR runs FAIL if zero reports parsed OR any parse_errors touch a
+      # required scanner; PR runs WARN-only (the established degrade-on-PR pattern).
       - name: Generate consolidated security report
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
         run: |
-          python3 -c "
+          set -euo pipefail
+          python3 - <<'PY'
           import json, glob, os, datetime
           reports = {}
-          for f in glob.glob('evidence/*.json') + glob.glob('evidence/**/*.sarif', recursive=True):
+          parse_errors = []
+          for f in sorted(set(glob.glob('evidence/*.json') + glob.glob('evidence/**/*.sarif', recursive=True))):
+              base = os.path.basename(f)
+              # security-report.json is our own output — never re-ingest it.
+              if base == 'security-report.json':
+                  continue
               try:
-                  with open(f) as fh:
-                      reports[os.path.basename(f)] = json.load(fh)
-              except: pass
-          with open('evidence/security-report.json', 'w') as out:
-              json.dump({'consolidated_at': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'), 'reports': reports}, out, indent=2)
-          "
+                  with open(f, encoding='utf-8') as fh:
+                      reports[base] = json.load(fh)
+              except Exception as e:
+                  parse_errors.append({'file': f, 'error': str(e)})
+          with open('evidence/security-report.json', 'w', encoding='utf-8') as out:
+              json.dump({
+                  'consolidated_at': datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                  'reports': reports,
+                  'parse_errors': parse_errors,
+              }, out, indent=2)
+          print(f"consolidated {len(reports)} report(s); {len(parse_errors)} parse error(s)")
+          PY
+
+          # Gate: zero parsed reports OR a parse error on a REQUIRED scanner output
+          # is a HARD FAIL on non-PR (an empty/corrupt consolidation is not honest
+          # evidence). Required scanner artifacts are matched by basename substring.
+          # `set +e` around the capture so the gate's exit(1) is read into GATE_RC
+          # rather than aborting the step under `set -e`.
+          set +e
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open('evidence/security-report.json', encoding='utf-8'))
+          reports = d.get('reports', {})
+          errs = d.get('parse_errors', [])
+          required = ('trivy', 'sbom', 'codeql', 'checkov', 'zap')
+          required_errs = [e for e in errs if any(r in e['file'].lower() for r in required)]
+          problems = []
+          if len(reports) == 0:
+              problems.append('zero scanner reports parsed into security-report.json')
+          for e in required_errs:
+              problems.append(f"parse error on required scanner output {e['file']}: {e['error']}")
+          # Write a machine-readable verdict for the step summary / downstream.
+          with open('/tmp/consolidation-problems.txt', 'w', encoding='utf-8') as fh:
+              fh.write('\n'.join(problems))
+          sys.exit(1 if problems else 0)
+          PY
+          GATE_RC=$?
+          set -e
+
+          if [ "${GATE_RC}" -ne 0 ]; then
+            {
+              echo "## Security-report consolidation (T-43)"
+              echo ""
+              echo "Consolidation problems detected:"
+              echo ""
+              echo '```'
+              cat /tmp/consolidation-problems.txt 2>/dev/null || true
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            while IFS= read -r p; do
+              [ -n "${p}" ] && echo "::warning::consolidation: ${p}"
+            done < /tmp/consolidation-problems.txt
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Security-report consolidation has problems — WARN only on PR (dry-run pack still assembled)"
+            else
+              echo "::error::Security-report consolidation failed (zero reports or required-scanner parse error) — fail-closed on non-PR"
+              exit 1
+            fi
+          else
+            echo "Security-report consolidation OK: reports parsed, no required-scanner parse errors."
+          fi
 
       # Rename Trivy SCA for clarity
       - name: Rename dependency review
@@ -178,9 +256,741 @@ jobs:
       - name: Generate data flow diagram
         run: bash scripts/generate-data-flow.sh > evidence/data-flow-diagram.json
 
-      # Compliance matrix
+      # Cosign is needed by the compliance-validate step below to sign-blob the
+      # aggregated compliance-status.json. The PDF-sealing block installs cosign
+      # again later (idempotent); installing it here lets the organizational
+      # compliance verdict be signed BEFORE the matrix/manifest/Merkle seal so the
+      # signed verdict is itself hashed into the pack.
+      - name: Cosign install (compliance gate)
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      # T-30 organizational compliance gate: run the A.1-A.10 validators, aggregate
+      # their uniform T-33 envelopes into ONE signed PASS/FAIL state-of-compliance
+      # report (evidence/compliance-status.json), and cosign sign-blob it. Overall
+      # status is decided by the BLOCKING tier ONLY (EVIDENCE-ONLY measurements are
+      # recorded but never trip the gate); a MISSING required verdict is itself a
+      # FAIL (closes the warn-only hole). aggregate-compliance.py exits non-zero on
+      # FAIL/INDETERMINATE; we capture that rc and (per the degrade-on-PR pattern at
+      # the matrix gate above) BLOCK on non-PR runs, WARN on pull_request so the
+      # dry-run pack still assembles. Honesty: a real BLOCKING fail (stale DPA
+      # register, overdue access review, restore-test not conducted) SHOULD turn
+      # this red on non-PR — do not weaken it to force green.
+      - name: Compliance gate — aggregate A.1-A.10 (signed, blocking on non-PR)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -uo pipefail
+          # 1) Run + aggregate. Capture rc (non-zero = legitimate FAIL/INDET); the
+          #    JSON is ALWAYS written so it can be sealed regardless of verdict.
+          set +e
+          python3 scripts/aggregate-compliance.py evidence/
+          AGG_RC=$?
+          set -e
+          if [ ! -s evidence/compliance-status.json ]; then
+            echo "::error::aggregate-compliance.py produced no compliance-status.json"
+            exit 1
+          fi
+          OVERALL="$(jq -r '.overall_status // "FAIL"' evidence/compliance-status.json)"
+          BLOCKING="$(jq -r '.blocking_failures // 0' evidence/compliance-status.json)"
+          echo "compliance-status overall=${OVERALL} blocking_failures=${BLOCKING} (rc=${AGG_RC})"
+
+          # 2) Sign the verdict with keyless cosign sign-blob (seal-evidence.sh
+          #    retry pattern: Fulcio/Rekor + OIDC token can be cold on the first
+          #    attempt). Success = exit 0 AND a non-empty bundle.
+          COSIGN_OK=0
+          if command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle evidence/compliance-status.cosign.bundle \
+                evidence/compliance-status.json >/dev/null 2>/tmp/cosign-compliance.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s evidence/compliance-status.cosign.bundle ]; then
+                COSIGN_OK=1
+                echo "cosign: signed compliance-status.json -> compliance-status.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign sign-blob attempt ${attempt}/5 for compliance-status.json failed (rc=${rc})"
+              tail -n 3 /tmp/cosign-compliance.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign not available — compliance-status.json left unsigned"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ]; then
+            # Signing is defense-in-depth attribution; the verdict itself is the
+            # gate. On non-PR, a missing signature is a HARD FAIL (the signed
+            # verdict is a DoD artifact); on PR it soft-degrades like the seal.
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::cosign signing of compliance-status.json failed (required on non-PR)"
+              exit 1
+            fi
+            echo "::warning::cosign signing failed — continuing (PR dry-run)"
+          fi
+
+          # 3) Step summary + gate decision (block non-PR, warn PR).
+          {
+            echo "## Compliance Gate (T-30 — organizational A.1-A.10)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Overall | ${OVERALL} |"
+            echo "| Blocking failures | ${BLOCKING} |"
+            echo "| Event | ${{ github.event_name }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '
+            .controls[] | select(.tier == "BLOCKING" and .status != "PASS")
+            | "\(.control) (\(.task)) \(.status): \(.detail)"
+          ' evidence/compliance-status.json | while IFS= read -r row; do
+            [ -n "${row}" ] && echo "::warning::compliance: ${row}"
+          done
+          if [ "${AGG_RC}" -ne 0 ]; then
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Compliance gate (T-30): ${OVERALL} — WARN only on PR (dry-run pack still assembled)"
+              echo "| Verdict | WARN (PR) |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::Compliance gate (T-30) FAILED: overall=${OVERALL}, ${BLOCKING} BLOCKING control(s) not PASS"
+              echo "| Verdict | FAIL |" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "Compliance gate (T-30) PASS: 0 BLOCKING failures"
+            echo "| Verdict | PASS |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Compliance matrix (content-validated, T-12..T-18). The generator EXITS 1
+      # when any BLOCKING row is FAIL/INDETERMINATE, but it prints the canonical
+      # JSON to stdout BEFORE exiting. We wrap it in `set +e` + `|| true` so the
+      # JSON is ALWAYS written and sealed into the pack even on a legitimate
+      # compliance FAIL — an incomplete/failing matrix is still audit evidence.
+      # The PASS/FAIL decision is made by the NAMED gate step below (T-19), not
+      # here, so the matrix is sealed regardless of verdict.
       - name: Generate compliance matrix
-        run: bash scripts/generate-compliance-matrix.sh evidence/ > evidence/compliance-matrix.json
+        run: |
+          set +e
+          bash scripts/generate-compliance-matrix.sh evidence/ > evidence/compliance-matrix.json || true
+          # Defence-in-depth: if the generator produced no/empty output (crash
+          # before the canonical print), synthesize a fail-closed placeholder so
+          # downstream steps (gate, OSCAL, completeness, summary) have valid JSON
+          # AND the gate trips on non-PR rather than skipping a missing matrix.
+          if [ ! -s evidence/compliance-matrix.json ]; then
+            echo "::warning::compliance-matrix.sh produced no output — writing fail-closed placeholder"
+            printf '%s\n' '{"generated_at":"","schema":"cyberforge-compliance-matrix/v2-content-validated","blocking_failures":1,"frameworks":{},"error":"generator produced no output"}' \
+              > evidence/compliance-matrix.json
+          fi
+
+      # T-19 compliance gate: aggregate the content matrix into one PASS/FAIL
+      # verdict. The matrix already aggregates T-13..T-17 content validators and
+      # the A.1-A.10 envelopes into per-row {status,tier,measured}; the canonical
+      # top-level `blocking_failures` counts BLOCKING rows whose status != PASS
+      # (EVIDENCE-ONLY rows never trip the gate). On non-PR runs ANY blocking
+      # failure FAILS the job (fail-closed admission control, spec C.13). On PRs
+      # the same failure is WARN-only so the dry-run pack still assembles and
+      # self-verifies. Honesty: a real BLOCKING fail (e.g. stale DPA register,
+      # restore-test not conducted) SHOULD turn this red on non-PR.
+      - name: Compliance gate (blocking on non-PR)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          BLOCKING="$(jq -r '.blocking_failures // 0' evidence/compliance-matrix.json)"
+          echo "compliance-matrix blocking_failures=${BLOCKING}"
+          {
+            echo "## Compliance Gate (T-19)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Blocking failures | ${BLOCKING} |"
+            echo "| Event | ${{ github.event_name }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if jq -e '.blocking_failures > 0' evidence/compliance-matrix.json >/dev/null; then
+            # Enumerate the failing BLOCKING rows for the auditor / log.
+            jq -r '
+              .frameworks // {} | to_entries[] as $fw | $fw.value[]
+              | select(.tier == "BLOCKING" and .status != "PASS")
+              | "\($fw.key) \(.article // "?"): \(.status) — \(.detail // "")"
+            ' evidence/compliance-matrix.json | while IFS= read -r row; do
+              echo "::warning::compliance: ${row}"
+            done
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Compliance gate: ${BLOCKING} BLOCKING failure(s) — WARN only on PR (dry-run pack still assembled)"
+              echo "| Verdict | WARN (PR) |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::Compliance gate FAILED: ${BLOCKING} BLOCKING compliance row(s) are not PASS"
+              echo "| Verdict | FAIL |" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "Compliance gate PASS: 0 BLOCKING failures"
+            echo "| Verdict | PASS |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # T-30b — produce the spec Part C/D evidence artifacts into evidence/ so they
+      # are leaf-hashed into the RFC-6962 Merkle root and listed in manifest.json
+      # by the seal block below. These are ADDITIONAL audit artifacts (OpenVEX
+      # exploitability triage, ISO SoA maturity, residual-risk statement, and the
+      # machine-validated scope/applicability determination); the A.1-A.10
+      # organizational verdicts + compliance-status.json are already produced by
+      # the "Compliance gate — aggregate A.1-A.10" step above, and the content
+      # matrix by "Generate compliance matrix". Run order matters: SoA maturity
+      # scores against the populated evidence/ dir, so this runs AFTER the matrix
+      # and the aggregate gate but BEFORE the manifest/Merkle seal. Each generator
+      # ALWAYS writes its JSON (so it is sealed even on a FAIL verdict, exactly
+      # like the matrix step); a BLOCKING FAIL is surfaced as an annotation and,
+      # on non-PR runs, blocks the pack (honest fail-closed). VEX is bound to the
+      # released image digest. Their own validator tiers (vex/applicability/
+      # risk_acceptance = BLOCKING; soa_maturity = EVIDENCE-ONLY) are respected.
+      - name: Generate Part C/D evidence (VEX, SoA maturity, residual risk, scope)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+          IMAGE_URI: ${{ inputs.image_uri }}
+        run: |
+          set -uo pipefail
+          BLOCKING_FAIL=0
+
+          # gen_artifact <label> <out-file> <tier> <cmd...>
+          # Runs the generator, ALWAYS keeps whatever JSON it produced (sealed as
+          # evidence regardless of verdict), reads back the {status,tier} envelope,
+          # and on a BLOCKING FAIL/INDETERMINATE flags the pack for the gate below.
+          # (Uses `art_status`, not `status`, to avoid any reserved-name clash.)
+          gen_artifact() {
+            local label="$1" out="$2" tier="$3"; shift 3
+            local rc=0
+            "$@" || rc=$?
+            if [ ! -s "${out}" ]; then
+              echo "::warning::${label}: generator produced no ${out} (rc=${rc})"
+              if [ "${tier}" = "BLOCKING" ]; then BLOCKING_FAIL=1; fi
+              return 0
+            fi
+            local art_status
+            art_status="$(jq -r '.status // (.envelope.status) // "UNKNOWN"' "${out}" 2>/dev/null || echo UNKNOWN)"
+            echo "${label}: status=${art_status} tier=${tier} -> ${out}"
+            if [ "${tier}" = "BLOCKING" ] && [ "${art_status}" != "PASS" ]; then
+              echo "::warning::${label} ${art_status} (BLOCKING): $(jq -r '.detail // .envelope.detail // ""' "${out}" 2>/dev/null)"
+              BLOCKING_FAIL=1
+            fi
+          }
+
+          # (1) OpenVEX exploitability triage document, bound to the released image
+          #     digest. The document itself is an OpenVEX file (NOT a T-33 envelope),
+          #     so it is a presence check here; its PASS/FAIL verdict comes from the
+          #     vex.py validator (1b) -> vex-triage.json. A missing/'N/A' digest makes
+          #     generate-vex.py refuse (exit 2) — recorded as a warning, never blocks,
+          #     because a real release always carries a sha256 digest.
+          vex_rc=0
+          python3 scripts/generate-vex.py \
+            --image-digest "${IMAGE_DIGEST}" --image-uri "${IMAGE_URI}" \
+            --sbom evidence/sbom.cyclonedx.json \
+            --out evidence/vex.openvex.json || vex_rc=$?
+          if [ -s evidence/vex.openvex.json ]; then
+            echo "VEX (OpenVEX): document written -> evidence/vex.openvex.json"
+            # (1b) Validate: digest-bound + every non-affected statement carries a
+            #      CISA-category justification -> triage envelope (BLOCKING tier).
+            gen_artifact "VEX triage" "evidence/vex-triage.json" "BLOCKING" \
+              python3 scripts/validators/vex.py evidence/vex.openvex.json \
+                --out evidence/vex-triage.json
+          else
+            echo "::warning::VEX document not produced (rc=${vex_rc}; image digest '${IMAGE_DIGEST}') — skipping VEX validation"
+          fi
+
+          # (2) ISO 27001 Statement-of-Applicability maturity (scored against the
+          #     populated evidence/ dir). EVIDENCE-ONLY: recorded, never blocks.
+          gen_artifact "SoA maturity" "evidence/soa-maturity.json" "EVIDENCE-ONLY" \
+            python3 scripts/validators/soa_maturity.py \
+              --evidence-dir evidence --out evidence/soa-maturity.json
+
+          # (3) Residual-risk statement from the exception register (named approver
+          #     + future expiry on every open accepted risk). BLOCKING tier.
+          gen_artifact "Residual risk" "evidence/residual-risk.json" "BLOCKING" \
+            python3 scripts/validators/risk_acceptance.py \
+              --out evidence/residual-risk.json
+
+          # (4) Machine-validated scope & applicability determination
+          #     (DORA/NIS2-KSC/CRA/RODO each with rationale + named approver).
+          gen_artifact "Scope determination" "evidence/scope-determination.json" "BLOCKING" \
+            python3 scripts/validators/applicability.py \
+              --out evidence/scope-determination.json
+
+          {
+            echo "## Part C/D Evidence (T-30b)"
+            echo ""
+            echo "| Artifact | Status |"
+            echo "|----------|--------|"
+            for f in vex.openvex.json vex-triage.json soa-maturity.json residual-risk.json scope-determination.json; do
+              if [ -s "evidence/${f}" ]; then
+                st="$(jq -r '.status // .envelope.status // "present"' "evidence/${f}" 2>/dev/null || echo present)"
+                echo "| \`${f}\` | ${st} |"
+              else
+                echo "| \`${f}\` | MISSING |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Block non-PR runs on a BLOCKING FAIL (honest fail-closed); warn on PR
+          # so the dry-run pack still assembles (matches the matrix/aggregate gates).
+          if [ "${BLOCKING_FAIL}" -ne 0 ]; then
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Part C/D evidence has a BLOCKING failure — WARN only on PR"
+            else
+              echo "::error::Part C/D evidence BLOCKING failure (VEX/residual-risk/scope) — fail-closed on non-PR"
+              exit 1
+            fi
+          fi
+
+      # =====================================================================
+      # Supplementary evidence generators (T-18/T-32, T-72, T-119, T-73,
+      # T-102/T-103/T-109). These all run BEFORE the first-pass "Generate
+      # SHA256 manifest" step and the audit-PDF seal block, so every artifact
+      # they emit into evidence/ is leaf-hashed into manifest.json + the
+      # RFC-6962 Merkle root and sealed into the pack. compliance-status.json
+      # (from the aggregate A.1-A.10 step) and compliance-matrix.json (from the
+      # matrix step) already exist at this point; cosign was installed by the
+      # "Cosign install (compliance gate)" step above. All signing is
+      # degrade-honest, mirroring seal-evidence.sh (cosign_sign_retry): sign
+      # only if cosign + OIDC are available; otherwise warn + continue with NO
+      # fake signature — and on non-PR a missing REQUIRED signature/artifact is
+      # a HARD FAIL (matches the established degrade-on-PR pattern in this job).
+      # =====================================================================
+
+      # T-18 / T-32 — measured tool-version inventory. generate-tool-versions.sh
+      # probes each tool's own version subcommand (absent tools recorded
+      # "not-present", never faked) and streams JSON to stdout. Nothing invoked
+      # it before this. Non-PR: the file must be non-empty + valid JSON (hard
+      # fail otherwise); PR: warn-only so the dry-run pack still assembles.
+      - name: Generate measured tool versions (T-18/T-32)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -uo pipefail
+          set +e
+          bash scripts/generate-tool-versions.sh > evidence/tool-versions.json
+          GEN_RC=$?
+          set -e
+          if [ ! -s evidence/tool-versions.json ] || ! jq -e . evidence/tool-versions.json >/dev/null 2>&1; then
+            echo "::warning::generate-tool-versions.sh produced no/invalid evidence/tool-versions.json (rc=${GEN_RC})"
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::tool-versions.json missing or invalid — fail-closed on non-PR"
+              exit 1
+            fi
+            echo "::warning::tool-versions.json missing/invalid — WARN only on PR"
+          else
+            echo "tool-versions.json: $(jq -r '.tools | keys | length' evidence/tool-versions.json) tool(s) measured"
+          fi
+
+      # T-72 — toolchain inventory (measured versions + workflow pin sites),
+      # cosign sign-blob'd DEGRADE-HONEST. generate-toolchain-inventory.py
+      # writes the file when given a positional path. Signing mirrors the
+      # in-job compliance-status signing block (seal-evidence.sh retry pattern).
+      - name: Generate + sign toolchain inventory (T-72)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -uo pipefail
+          set +e
+          python3 scripts/generate-toolchain-inventory.py evidence/toolchain-inventory.json
+          GEN_RC=$?
+          set -e
+          if [ ! -s evidence/toolchain-inventory.json ] || ! jq -e . evidence/toolchain-inventory.json >/dev/null 2>&1; then
+            echo "::warning::generate-toolchain-inventory.py produced no/invalid toolchain-inventory.json (rc=${GEN_RC})"
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::toolchain-inventory.json missing or invalid — fail-closed on non-PR"
+              exit 1
+            fi
+            echo "::warning::toolchain-inventory.json missing/invalid — WARN only on PR"
+          else
+            echo "toolchain-inventory.json: $(jq -r '.tools | length' evidence/toolchain-inventory.json) tool(s) inventoried"
+          fi
+
+          # Sign degrade-honest (mirrors seal-evidence.sh cosign_sign_retry).
+          COSIGN_OK=0
+          if [ -s evidence/toolchain-inventory.json ] && command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle evidence/toolchain-inventory.cosign.bundle \
+                evidence/toolchain-inventory.json >/dev/null 2>/tmp/cosign-toolchain.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s evidence/toolchain-inventory.cosign.bundle ]; then
+                COSIGN_OK=1
+                echo "cosign: signed toolchain-inventory.json -> toolchain-inventory.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign sign-blob attempt ${attempt}/5 for toolchain-inventory.json failed (rc=${rc})"
+              tail -n 3 /tmp/cosign-toolchain.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign not available or inventory missing — toolchain-inventory.json left unsigned (NEEDS-CI)"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ] && [ "${IS_PR}" != "true" ] && [ -s evidence/toolchain-inventory.json ]; then
+            echo "::error::cosign signing of toolchain-inventory.json failed (required on non-PR)"
+            exit 1
+          fi
+
+      # T-119 — live source-control config drift. export-github-security-config.sh
+      # reads the LIVE GitHub config (needs a token: GH_TOKEN/GITHUB_TOKEN);
+      # source_control.py then compares it against the committed desired
+      # branch-protection.json + CODEOWNERS, emitting source-control-evidence.json.
+      # DEGRADE-HONEST: with no token the export degrades (writes {"error":...}
+      # markers) and source_control.py returns INDETERMINATE — never a fake PASS.
+      # An INDETERMINATE here is the correct honest verdict offline (NEEDS-CI for
+      # a live token), so it does NOT fail the job on non-PR; a genuine FAIL
+      # (drift detected) is BLOCKING on non-PR, warn on PR. The signed result is
+      # sealed into the pack regardless of verdict.
+      - name: Generate + sign source-control drift evidence (T-119)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          REPO_FULL: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -uo pipefail
+          ORG="${REPO_FULL%%/*}"
+          REPO="${REPO_FULL##*/}"
+          EXPORT_DIR=evidence/source-control-export
+
+          # 1) Live export. The script self-degrades (exit 0 + {"error":...}
+          #    markers) when gh is unauthenticated/absent, so wrap defensively.
+          set +e
+          bash scripts/export-github-security-config.sh "${ORG}" "${REPO}" "${EXPORT_DIR}" \
+            > /tmp/sc-export.log 2>&1
+          EXPORT_RC=$?
+          set -e
+          tail -n 5 /tmp/sc-export.log 2>/dev/null | sed 's/^/  export: /' || true
+          if [ "${EXPORT_RC}" -ne 0 ]; then
+            echo "::warning::export-github-security-config.sh exited ${EXPORT_RC} (likely no GitHub token) — source_control.py will record INDETERMINATE"
+          fi
+
+          # 2) Validate desired-vs-live drift -> source-control-evidence.json.
+          #    The validator ALWAYS writes its envelope; rc 2 = INDETERMINATE
+          #    (honest no-live-config path), rc 1 = FAIL (BLOCKING drift), 0 = PASS.
+          set +e
+          python3 scripts/validators/source_control.py \
+            --export-dir "${EXPORT_DIR}" \
+            --out evidence/source-control-evidence.json
+          SC_RC=$?
+          set -e
+          if [ ! -s evidence/source-control-evidence.json ]; then
+            echo "::error::source_control.py produced no source-control-evidence.json"
+            if [ "${IS_PR}" != "true" ]; then exit 1; fi
+            echo "::warning::source-control-evidence.json missing — WARN only on PR"
+          else
+            SC_STATUS="$(jq -r '.status // "UNKNOWN"' evidence/source-control-evidence.json)"
+            echo "source-control drift: status=${SC_STATUS} (rc=${SC_RC})"
+            {
+              echo "## Source-Control Drift (T-119)"
+              echo ""
+              echo "| Metric | Value |"
+              echo "|--------|-------|"
+              echo "| Status | ${SC_STATUS} |"
+              echo "| Event | ${{ github.event_name }} |"
+            } >> "$GITHUB_STEP_SUMMARY"
+            # rc 1 = BLOCKING FAIL (real drift). INDETERMINATE (rc 2) is the
+            # honest offline verdict and must NOT fail the job (NEEDS-CI token).
+            if [ "${SC_RC}" -eq 1 ]; then
+              jq -r '.detail // ""' evidence/source-control-evidence.json \
+                | sed 's/^/::warning::source-control: /' || true
+              if [ "${IS_PR}" = "true" ]; then
+                echo "::warning::Source-control drift FAIL — WARN only on PR"
+              else
+                echo "::error::Source-control drift FAIL (BLOCKING) — fail-closed on non-PR"
+                exit 1
+              fi
+            elif [ "${SC_RC}" -eq 2 ]; then
+              echo "::warning::Source-control drift INDETERMINATE (no live GitHub export / token) — honest SKIP, recorded as evidence (NEEDS-CI)"
+            fi
+          fi
+
+          # 3) Sign degrade-honest (mirrors seal-evidence.sh cosign_sign_retry).
+          COSIGN_OK=0
+          if [ -s evidence/source-control-evidence.json ] && command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle evidence/source-control-evidence.cosign.bundle \
+                evidence/source-control-evidence.json >/dev/null 2>/tmp/cosign-sc.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s evidence/source-control-evidence.cosign.bundle ]; then
+                COSIGN_OK=1
+                echo "cosign: signed source-control-evidence.json -> source-control-evidence.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign sign-blob attempt ${attempt}/5 for source-control-evidence.json failed (rc=${rc})"
+              tail -n 3 /tmp/cosign-sc.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign not available or evidence missing — source-control-evidence.json left unsigned (NEEDS-CI)"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ] && [ "${IS_PR}" != "true" ] && [ -s evidence/source-control-evidence.json ]; then
+            echo "::error::cosign signing of source-control-evidence.json failed (required on non-PR)"
+            exit 1
+          fi
+
+      # T-73 — aggregate the compliance gate verdicts available IN THIS JOB into
+      # evidence/policy-results/compliance-gate.json and cosign sign-blob it
+      # degrade-honest. NOTE on honesty: the deployment-gate OPA verdict
+      # (deployment-gate.rego) is evaluated in deploy.yml at deploy time, NOT in
+      # this job — so we DO NOT fabricate it here. We aggregate only the verdicts
+      # that genuinely exist in this evidence/ dir: the organizational compliance
+      # verdict (compliance-status.json), the content matrix
+      # (compliance-matrix.json blocking_failures), and the evidence-completeness
+      # signal derivable here; and we record that the deploy-time deployment-gate
+      # + retention OPA verdicts are captured in deploy.yml (see the T-74 guard
+      # there). No verdict is recomputed or invented.
+      - name: Aggregate compliance-gate results (T-73)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -uo pipefail
+          mkdir -p evidence/policy-results
+          # Build the aggregate purely from artifacts ALREADY produced in this
+          # job. Missing inputs are recorded as null/"absent" — never faked.
+          set +e
+          python3 - <<'PY'
+          import json, os, datetime
+          ev = "evidence"
+
+          def load(path):
+              try:
+                  with open(os.path.join(ev, path), encoding="utf-8") as fh:
+                      return json.load(fh)
+              except Exception as e:
+                  return {"_load_error": str(e)}
+
+          status = load("compliance-status.json")   # org A.1-A.10 verdict
+          matrix = load("compliance-matrix.json")    # content matrix
+
+          def verdict(blocking):
+              if blocking is None:
+                  return "INDETERMINATE"
+              return "PASS" if int(blocking) == 0 else "FAIL"
+
+          status_blocking = status.get("blocking_failures") if isinstance(status, dict) and "_load_error" not in status else None
+          matrix_blocking = matrix.get("blocking_failures") if isinstance(matrix, dict) and "_load_error" not in matrix else None
+
+          gate = {
+              "schema": "cyberforge.compliance-gate/v1",
+              "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "generated_by": "evidence-pack.yml (T-73 aggregate)",
+              "note": (
+                  "Aggregates the compliance-gate verdicts produced IN the evidence "
+                  "job: the organizational A.1-A.10 verdict (compliance-status.json) "
+                  "and the content-validated compliance matrix "
+                  "(compliance-matrix.json). The deploy-time OPA verdicts "
+                  "(deployment-gate.rego + retention-policy.rego) are evaluated in "
+                  "deploy.yml at deploy time (see the T-74 guard there) and are NOT "
+                  "recomputed/fabricated here. evidence-completeness is gated by the "
+                  "OPA step later in this job."
+              ),
+              "gates": {
+                  "organizational_compliance": {
+                      "source": "compliance-status.json",
+                      "overall_status": status.get("overall_status") if isinstance(status, dict) else None,
+                      "blocking_failures": status_blocking,
+                      "verdict": status.get("overall_status") if isinstance(status, dict) and status.get("overall_status") else verdict(status_blocking),
+                  },
+                  "compliance_matrix": {
+                      "source": "compliance-matrix.json",
+                      "blocking_failures": matrix_blocking,
+                      "verdict": verdict(matrix_blocking),
+                  },
+                  "deployment_gate": {
+                      "source": "deploy.yml (deployment-gate.rego, deploy time)",
+                      "verdict": "CAPTURED-IN-DEPLOY",
+                      "note": "Evaluated by deploy.yml at deploy time; not available in this job.",
+                  },
+                  "retention": {
+                      "source": "deploy.yml / infra plan (retention-policy.rego, deploy time)",
+                      "verdict": "CAPTURED-IN-DEPLOY",
+                      "note": "Retention >=1825d WORM gate evaluated against the Terraform plan in deploy.yml.",
+                  },
+                  "evidence_completeness": {
+                      "source": "OPA evidence-completeness step (this job, later)",
+                      "verdict": "EVALUATED-LATER-THIS-JOB",
+                  },
+              },
+          }
+          # Overall = worst of the two verdicts we actually computed here.
+          here = [gate["gates"]["organizational_compliance"]["verdict"],
+                  gate["gates"]["compliance_matrix"]["verdict"]]
+          rank = {"PASS": 0, "INDETERMINATE": 1, "FAIL": 2}
+          worst = max((v for v in here if v in rank), key=lambda v: rank[v], default="INDETERMINATE")
+          gate["overall_local_verdict"] = worst
+
+          out = os.path.join(ev, "policy-results", "compliance-gate.json")
+          with open(out, "w", encoding="utf-8") as fh:
+              json.dump(gate, fh, indent=2)
+          print(f"compliance-gate.json overall_local_verdict={worst}")
+          PY
+          AGG_RC=$?
+          set -e
+          if [ ! -s evidence/policy-results/compliance-gate.json ]; then
+            echo "::warning::compliance-gate.json not produced (rc=${AGG_RC})"
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::compliance-gate.json missing — fail-closed on non-PR"
+              exit 1
+            fi
+            echo "::warning::compliance-gate.json missing — WARN only on PR"
+          fi
+
+          # Sign degrade-honest (mirrors seal-evidence.sh cosign_sign_retry).
+          COSIGN_OK=0
+          if [ -s evidence/policy-results/compliance-gate.json ] && command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle evidence/policy-results/compliance-gate.cosign.bundle \
+                evidence/policy-results/compliance-gate.json >/dev/null 2>/tmp/cosign-gate.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s evidence/policy-results/compliance-gate.cosign.bundle ]; then
+                COSIGN_OK=1
+                echo "cosign: signed compliance-gate.json -> compliance-gate.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign sign-blob attempt ${attempt}/5 for compliance-gate.json failed (rc=${rc})"
+              tail -n 3 /tmp/cosign-gate.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign not available or gate missing — compliance-gate.json left unsigned (NEEDS-CI)"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ] && [ "${IS_PR}" != "true" ] && [ -s evidence/policy-results/compliance-gate.json ]; then
+            echo "::error::cosign signing of compliance-gate.json failed (required on non-PR)"
+            exit 1
+          fi
+
+      # T-102/T-103/T-109 — evidence-DERIVED regulatory crosswalk + machine-readable
+      # gap register + data-residency assertion. derive-crosswalk-and-gaps.py is the
+      # proven emitter: it groups the content-validated compliance-matrix rows + the
+      # A.1-A.10 verdicts (compliance-status.json) of THIS run by evidence artifact
+      # (crosswalk.json) and lists every non-PASS control (gap-register.json). It
+      # NEVER recomputes or invents a verdict. No scripts/ generator exists for these,
+      # so the sample-evidence-pack emitter is invoked pointed at the REAL evidence/
+      # dir. residency.json is built from the §6.4 schema in
+      # docs/poland-residency-summary.pl.md, with the Azure region read from the
+      # applied Terraform output when available (else the var.location default,
+      # recorded honestly as "default" vs "applied"). Non-PR: crosswalk + gaps
+      # required (hard fail if absent); PR: warn-only.
+      - name: Generate crosswalk, gap register, residency assertion (T-102/T-103/T-109)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -uo pipefail
+          # (1) Crosswalk + gap register, DERIVED from this run's verdicts.
+          set +e
+          python3 sample-evidence-pack/derive-crosswalk-and-gaps.py evidence
+          DERIVE_RC=$?
+          set -e
+          for f in crosswalk.json gap-register.json; do
+            if [ ! -s "evidence/${f}" ] || ! jq -e . "evidence/${f}" >/dev/null 2>&1; then
+              echo "::warning::derive-crosswalk-and-gaps.py produced no/invalid evidence/${f} (rc=${DERIVE_RC})"
+              if [ "${IS_PR}" != "true" ]; then
+                echo "::error::evidence/${f} missing or invalid — fail-closed on non-PR"
+                exit 1
+              fi
+              echo "::warning::evidence/${f} missing/invalid — WARN only on PR"
+            fi
+          done
+          [ -s evidence/gap-register.json ] && echo "gap-register: $(jq -r '.total_gaps' evidence/gap-register.json) gap(s)" || true
+
+          # (2) Residency assertion (RODO Ch.V / spec §6.4). The single residency
+          #     control point is var.location; record the APPLIED region from
+          #     terraform output when available, else fall back to the
+          #     infra/variables.tf default, labelling which was used. The
+          #     EVIDENCE-ONLY legal determinations (transfer_basis etc.) carry the
+          #     ⚠️ confirm-before-signoff items verbatim from the doc — never
+          #     auto-decided. Reference: docs/poland-residency-summary.pl.md §1.3.
+          set +e
+          REGION=""
+          REGION_SOURCE="terraform-output"
+          if command -v terraform >/dev/null 2>&1 && [ -d infra ]; then
+            REGION="$(terraform -chdir=infra output -raw location 2>/dev/null || true)"
+          fi
+          if [ -z "${REGION}" ]; then
+            REGION_SOURCE="infra/variables.tf-default"
+            REGION="$(python3 - <<'PY'
+          import re, pathlib, sys
+          # Read the default of var.location from infra/variables.tf (honest: this
+          # is the example default, not a fabricated applied region).
+          for p in (pathlib.Path("infra/variables.tf"),):
+              if p.is_file():
+                  txt = p.read_text(encoding="utf-8", errors="replace")
+                  m = re.search(r'variable\s+"location".*?default\s*=\s*"([^"]+)"', txt, re.S)
+                  if m:
+                      sys.stdout.write(m.group(1)); break
+          PY
+          )"
+          fi
+          set -e
+          [ -n "${REGION}" ] || { REGION="polandcentral"; REGION_SOURCE="doc-default"; }
+          echo "residency: region=${REGION} (source=${REGION_SOURCE})"
+
+          REGION="${REGION}" REGION_SOURCE="${REGION_SOURCE}" python3 - <<'PY'
+          import json, os, datetime
+          region = os.environ.get("REGION", "polandcentral")
+          src = os.environ.get("REGION_SOURCE", "doc-default")
+          intra_eu = region.lower().startswith("poland")
+          doc = {
+              "schema": "cyberforge.residency/v1",
+              "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "generated_by": "evidence-pack.yml (T-109)",
+              "azure_region": region,
+              "azure_region_source": src,  # "applied" terraform output vs default
+              "azure_region_geography": "Poland (Warsaw)" if intra_eu else "see applied region",
+              "data_location": "EU/EEA — Poland" if intra_eu else "EVIDENCE-ONLY — confirm jurisdiction for applied region",
+              "transfer_basis": "intra-EU" if intra_eu else "EVIDENCE-ONLY — confirm",
+              "transfer_mechanism": None,
+              "subprocessors_outside_eea": False,
+              "data_plane_stages": [
+                  "azure-container-registry",
+                  "azure-container-apps",
+                  "azure-key-vault",
+                  "evidence-worm-blob",
+              ],
+              "egress_to_confirm": [
+                  {
+                      "stage": "github-actions-runner",
+                      "reason": "build/scan + security-gate execute on GitHub-hosted runners; commit metadata contains PII",
+                      "status": "confirm-per-engagement",
+                  }
+              ],
+              "retention_days": 1825,
+              "source_of_truth": {
+                  "region": "infra/variables.tf:var.location",
+                  "applied_region": "terraform output / azurerm_resource_group.this.location",
+              },
+              "evidence_only_determinations": [
+                  "transfer_basis", "transfer_mechanism", "subprocessors_outside_eea",
+              ],
+              "confirm_before_signoff": [
+                  "applied region matches azure_region",
+                  "no sub-processor egresses EU/EEA (or transfer_mechanism recorded)",
+                  "GitHub Actions runner residency confirmed or SCCs-covered",
+              ],
+              "reference": "docs/poland-residency-summary.pl.md §1.3 / §6.4",
+              "honesty_note": (
+                  "azure_region is pipeline-verifiable; transfer_basis and the "
+                  "no-egress claim are legal determinations carried EVIDENCE-ONLY "
+                  "and must be locked by legal/compliance before sign-off."
+              ),
+          }
+          with open("evidence/residency.json", "w", encoding="utf-8") as fh:
+              json.dump(doc, fh, indent=2, ensure_ascii=False)
+          print(f"residency.json: region={region} basis={doc['transfer_basis']}")
+          PY
+          if [ ! -s evidence/residency.json ] || ! jq -e . evidence/residency.json >/dev/null 2>&1; then
+            echo "::warning::residency.json not produced/invalid"
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::residency.json missing or invalid — fail-closed on non-PR"
+              exit 1
+            fi
+            echo "::warning::residency.json missing/invalid — WARN only on PR"
+          fi
 
       # Generate human-readable README for auditors
       - name: Generate evidence README
@@ -197,41 +1007,21 @@ jobs:
           | security-report.json | Consolidated SAST + SCA + DAST | ISO 27001 A.8.28, DORA Art.16 |
           | sbom.cyclonedx.json | Software Bill of Materials | NIS2 Art.21.2.d, DORA Art.28 |
           | provenance.intoto.jsonl | Build provenance attestation bundle | NIS2 Art.21.2.d, DORA Art.28, SLSA |
-          | cosign-verification.log | Image signature proof | NIS2 Art.21.2.h, SLSA L3 |
+          | cosign-verification.log | Image signature proof | NIS2 Art.21.2.h, SLSA Build L2 |
+          | cosign-attestation-verification.log | SBOM attestation Rekor transparency-log inclusion proof | NIS2 Art.21.2.d, DORA Art.28, spec §7.2/I.2 |
           | pipeline-run.json | Pipeline metadata & gate results | ISO 27001 A.8.25, SOC 2 CC8.1 |
           | dependency-review.json | SCA results with VEX | DORA Art.16.1.c |
           | zap-report.json | DAST scan results | ISO 27001 A.8.28, NIS2 Art.21.2.e |
           | dpa-compliance-check.json | DPA status for processors | RODO Art.28 |
           | data-flow-diagram.json | PII data flow mapping | RODO Art.25, Art.30 |
           | compliance-matrix.json | Regulation -> evidence mapping | All frameworks |
+          | compliance-status.json | Aggregated A.1-A.10 organizational verdict (signed) | DORA Art.5/28, NIS2 Art.20/21 |
+          | vex.openvex.json | OpenVEX exploitability triage (digest-bound) | CRA vuln-handling, NIS2 Art.21.2 |
+          | soa-maturity.json | ISO 27001 Statement-of-Applicability maturity | ISO 27001 Annex A |
+          | residual-risk.json | Residual-risk statement (accepted-risk register) | ISO 27001 Cl.6, DORA Art.6 |
+          | scope-determination.json | Scope & applicability determination | DORA/NIS2/CRA/RODO scope |
           | manifest.sha256 | SHA256 checksums | SOC 2 CC7.1 |
           EOFREADME
-
-      # Validate completeness BEFORE packaging or archive.
-      # Warns on missing evidence but does NOT block archival — an incomplete
-      # evidence pack is still better than no evidence pack for audit trails.
-      - name: Validate evidence completeness
-        run: |
-          echo "Checking evidence completeness..."
-          python3 - <<'PY'
-          import json, sys
-
-          with open("evidence/compliance-matrix.json") as f:
-              data = json.load(f)
-
-          missing = []
-          for framework, controls in data["frameworks"].items():
-              for c in controls:
-                  if c["status"] != "PASS":
-                      missing.append(f"{framework} {c['article']}: {c['evidence']}")
-
-          if missing:
-              for m in missing:
-                  print(f"::warning::{m}")
-              print(f"::warning::{len(missing)} evidence items missing — pack will be archived as incomplete")
-          else:
-              print(f"All evidence present across {len(data['frameworks'])} frameworks")
-          PY
 
       # Generate HTML report
       - name: Generate HTML evidence report
@@ -241,6 +1031,62 @@ jobs:
       - name: Generate SHA256 manifest
         working-directory: evidence/
         run: find . -type f ! -name 'manifest.sha256' -exec sha256sum {} \; | sort > manifest.sha256
+
+      # T-61 / T-11 — BLOCKING evidence-completeness (replaces the former warn-only
+      # block that let an incomplete pack seal to 5-year WORM). evidence-completeness.rego
+      # denies if any of the 11 required artifacts is absent; this step builds the
+      # real file list from evidence/ (present AND non-empty), evaluates the deny set,
+      # and on non-PR runs `exit 1` BEFORE the seal + WORM upload below. PR runs degrade
+      # to a warning (the established degrade-on-PR pattern) so the dry-run pack still
+      # assembles. Runs AFTER the first-pass manifest.sha256 exists so manifest.sha256
+      # is itself in the required set. Honesty: a genuinely incomplete pack SHOULD fail
+      # here on non-PR — do not weaken it to force green.
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.17.1
+
+      - name: OPA evidence completeness (blocking on non-PR)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          # Build the input file list: basename of every present, NON-EMPTY file in
+          # evidence/ (maxdepth 2 captures provenance/, coverage/, codeql/ children).
+          # Non-empty matters: a 0-byte sbom.cyclonedx.json is not real evidence.
+          FILES_JSON="$(cd evidence && find . -maxdepth 2 -type f ! -empty -printf '%f\n' \
+            | jq -R . | jq -cs 'unique')"
+          echo "{\"files\": ${FILES_JSON}}" > /tmp/ev-input.json
+          echo "evidence-completeness input (file count: $(echo "${FILES_JSON}" | jq 'length')):"
+          jq -c . /tmp/ev-input.json
+
+          DENY="$(opa eval -d policies/evidence-completeness.rego -i /tmp/ev-input.json 'data.compliance.evidence.deny' --format raw)"
+          DENY_COUNT="$(echo "${DENY}" | jq 'length')"
+          {
+            echo "## Evidence Completeness Gate (T-61)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Missing required artifacts | ${DENY_COUNT} |"
+            echo "| Event | ${{ github.event_name }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          if [ "${DENY_COUNT}" -gt 0 ]; then
+            echo "${DENY}" | jq -r '.[]' | while IFS= read -r m; do
+              echo "::warning::completeness: ${m}"
+            done
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Evidence pack incomplete (${DENY_COUNT} missing) — WARN only on PR (dry-run pack still assembled)"
+              echo "| Verdict | WARN (PR) |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::Evidence pack incomplete — missing required artifact(s): ${DENY}"
+              echo "| Verdict | FAIL |" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "Evidence completeness PASS: all required artifacts present and non-empty."
+            echo "| Verdict | PASS |" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # ---------------------------------------------------------------------
       # Audit-grade PDF evidence (component 8).
@@ -387,6 +1233,40 @@ jobs:
           echo "Sealed audit PDF + manifest regenerated:"
           ls -la evidence/
 
+      - name: Assert Merkle-root cosign bundle (anti-regression, non-PR)
+        # The pack's headline cryptographic claim is keyless identity attribution
+        # over the Merkle root. §6.2-A was a silent ordering bug where this bundle
+        # was never produced yet the seal exited 0. On production (non-PR) runs the
+        # bundle MUST exist and be non-empty — fail the job hard if it is missing.
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          if [ ! -s evidence/merkle-root.cosign.bundle ]; then
+            echo "::error::merkle-root.cosign.bundle missing or empty — Merkle signing failed (§6.2-A anti-regression)"
+            exit 1
+          fi
+          echo "merkle-root.cosign.bundle present and non-empty ($(wc -c < evidence/merkle-root.cosign.bundle) bytes)"
+
+      # T-58/T-42 — sealing-artifact completeness self-test (BLOCKING on non-PR).
+      # The Merkle-root assertion above only checks ONE bundle; this asserts the
+      # COMPLETE integrity-chain artifact set (manifest.json+merkle_root,
+      # merkle-root.txt, both *.cosign.bundles, verapdf-report.json,
+      # oscal-assessment-results.json, sbom.cyclonedx.json, provenance.intoto.jsonl,
+      # >=1 *.tsr) deterministically landed — closing the §6.2-A-class regression
+      # where a sealed pack is silently missing an integrity output yet exits 0.
+      # Runs AFTER "Build audit-grade PDF evidence" (the seal) and BEFORE every
+      # upload/WORM step, so an incomplete pack is never archived to 5-year WORM.
+      # EVIDENCE_ALLOW_DEGRADE inherits the SAME conditional as the seal step
+      # (set to '1' on pull_request, UNSET on non-PR): on PR a missing artifact is
+      # a WARN (exit 0) so the dry-run pack still assembles; on non-PR a missing /
+      # zero-byte / structurally-invalid required artifact is a HARD FAIL (exit 1).
+      # Honesty: a genuinely incomplete sealed pack SHOULD fail here on non-PR —
+      # do not weaken it to force green.
+      - name: Sealing completeness self-test (blocking on non-PR)
+        env:
+          EVIDENCE_ALLOW_DEGRADE: ${{ github.event_name == 'pull_request' && '1' || '' }}
+        run: bash scripts/check-sealing-completeness.sh evidence
+
       - name: Upload audit PDF and sealing artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -400,7 +1280,10 @@ jobs:
             evidence/*.bundle
             evidence/*.tsr
           retention-days: 90
-          if-no-files-found: warn
+          # T-42: the sealed audit PDF + integrity bundles/TSRs are the headline
+          # deliverable. A non-PR run that produced none of these is a broken pack,
+          # not a warning — fail the upload (error) instead of silently warning.
+          if-no-files-found: error
 
       - name: Package evidence pack
         env:
@@ -472,6 +1355,7 @@ jobs:
               "sbom.cyclonedx.json": "Software Bill of Materials (CycloneDX)",
               "provenance.intoto.jsonl": "Build provenance attestation",
               "cosign-verification.log": "Image signature verification proof",
+              "cosign-attestation-verification.log": "SBOM attestation Rekor transparency-log inclusion proof (T-51)",
               "pipeline-run.json": "Pipeline metadata and gate results",
               "dependency-review.json": "SCA results (Trivy)",
               "zap-report.json": "DAST scan results (ZAP)",
@@ -479,6 +1363,11 @@ jobs:
               "dpa-compliance-check.json": "DPA compliance status",
               "data-flow-diagram.json": "PII data flow mapping",
               "compliance-matrix.json": "Regulation to evidence mapping",
+              "compliance-status.json": "Aggregated A.1-A.10 organizational verdict (signed)",
+              "vex.openvex.json": "OpenVEX exploitability triage (digest-bound)",
+              "soa-maturity.json": "ISO 27001 SoA maturity scoring",
+              "residual-risk.json": "Residual-risk statement (accepted-risk register)",
+              "scope-determination.json": "Scope & applicability determination",
               "manifest.sha256": "SHA256 checksums",
               "evidence-report.html": "Human-readable HTML report",
               "README.md": "Evidence pack documentation",

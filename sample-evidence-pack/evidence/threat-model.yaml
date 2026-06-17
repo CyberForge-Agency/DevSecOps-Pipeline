@@ -1,0 +1,589 @@
+# Threat Model (structured, machine-validatable) — CyberForge DevSecOps Pipeline & Demo App
+#
+# T-115. This YAML is DERIVED from the prose model in docs/security/threat-model.md
+# (the single source of truth). Every threat below is ported verbatim-in-substance
+# from that file's STRIDE tables (§3 demo app F1-F4, §4 supply chain P1-P6) and gap
+# register (§5). No threat is invented here that is not supported by the .md.
+#
+# Validated by scripts/validators/threat_model.py (schema completeness, STRIDE
+# coverage, version + reviewed_date freshness). Signing + Merkle/in-pack binding is
+# a later wave; this artifact is validate-only for now.
+#
+# Honesty: the SCHEMA (every entry carries the required fields, with an explicit
+# `status`/`residual` and a control_ref OR gap_ref) is machine-checkable. That each
+# control *actually and fully* mitigates the threat in production is a human-reviewed
+# assertion, not something the pipeline proves (mirrors threat-model.md §"Honesty
+# caveat"). GAP rows are target-state, never claimed as achieved.
+
+# --- Top-level metadata (kept in lock-step with threat-model.md §"Field | Value") ---
+version: "1.0.0"            # == model_version in threat-model.md
+reviewed_date: "2026-06-16" # == last_reviewed in threat-model.md
+review_window_days: 180     # re-review on arch change or at least every 6 months
+methodology: "STRIDE-per-element (per critical feature / data-flow element)"
+source_document: "docs/security/threat-model.md"
+scope: >-
+  Demo app (Pipeline/app/src) + CI/CD supply chain (Pipeline/.github/workflows) +
+  Azure runtime + evidence integrity chain.
+out_of_scope: >-
+  Azure platform security (cloud provider control plane), GitHub platform security,
+  physical security of GitHub/Azure data centres.
+
+# STRIDE category vocabulary used by every threat entry's `stride` field.
+stride_categories:
+  S: "Spoofing"
+  T: "Tampering"
+  R: "Repudiation"
+  I: "Information disclosure"
+  D: "Denial of service"
+  E: "Elevation of privilege"
+
+# Trust boundaries (threat-model.md §1). Reference data for auditors; the validator
+# does not require these but they keep the YAML self-describing.
+trust_boundaries:
+  - id: TB-1
+    crosses: "anonymous Internet -> demo app"
+    why: "Untrusted external input reaches the app process"
+  - id: TB-2
+    crosses: "ACR -> Container Apps runtime"
+    why: "Artifact moves from registry into the running trust zone (admission point)"
+  - id: TB-3
+    crosses: "ephemeral CI runner -> Azure (ACR/Container Apps/Terraform)"
+    why: "Build identity gains write access to cloud resources"
+  - id: TB-4
+    crosses: "developer -> source repository"
+    why: "Human-authored change enters the trusted build input"
+  - id: TB-5
+    crosses: "pipeline -> immutable evidence store / public transparency log"
+    why: "Evidence crosses from mutable CI into a non-repudiation/WORM zone"
+
+# --- Threats ---------------------------------------------------------------------
+# Per entry (required by the validator):
+#   id        — stable identifier (T-<element>-<STRIDE>)
+#   stride    — one of S/T/R/I/D/E
+#   component — asset / data-flow element the threat applies to
+#   threat    — the threat statement (ported from the .md)
+#   mitigation— mitigating control text (ported from the .md)
+#   status    — MITIGATED | PARTIAL | GAP  (GAP == target-state, not achieved)
+#   residual  — residual-risk note after the stated mitigation
+# Optional traceability: control_ref (path:line of the control) OR gap_ref (G-NN).
+threats:
+  # ===== §3 Demo application =====================================================
+  # --- F1 Items API (app/src/routes/items.ts) ---
+  - id: T-F1-S
+    stride: S
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "Anonymous caller acts as a legitimate user (no authentication on /api/items)."
+    mitigation: >-
+      Demo API is intentionally unauthenticated; items are non-persistent (in-process
+      Map, items.ts:10) and carry no PII (data-flow.yaml:66-70). Target-state: add
+      authn/authz before any real-data use.
+    status: GAP
+    residual: "Unauthenticated write/read; acceptable only because no PII and ephemeral store."
+    gap_ref: G-01
+  - id: T-F1-T
+    stride: T
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "Malicious payload alters server state or injects via `name`."
+    mitigation: >-
+      Input validated at the boundary: name required + type-checked (items.ts:18-22);
+      IDs are server-generated crypto.randomUUID() (items.ts:25), not client-supplied;
+      JSON body size/shape constrained by express.json() (app.ts:45).
+    status: MITIGATED
+    residual: "Low; no client-controlled identifiers, body bounded by express defaults."
+    control_ref: "app/src/routes/items.ts:18-25"
+  - id: T-F1-R
+    stride: R
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "A mutating call (POST/DELETE) cannot later be attributed."
+    mitigation: >-
+      App-level requests are stateless/ephemeral; pipeline-level non-repudiation of the
+      deployed code is covered by signed provenance (sign-and-attest.yml:45-56) + Rekor.
+      No per-request audit log in the demo app.
+    status: GAP
+    residual: "No per-request audit trail; acceptable for in-memory demo, target for prod."
+    gap_ref: G-02
+  - id: T-F1-I
+    stride: I
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "Listing/reading items leaks data."
+    mitigation: >-
+      No PII or secrets stored (data-flow.yaml:66-70); items hold only a client-supplied
+      name + generated id/timestamp (items.ts:4-8); responses contain no server internals.
+    status: MITIGATED
+    residual: "Minimal; only client-supplied non-sensitive name echoed back."
+    control_ref: "app/src/routes/items.ts:4-8"
+  - id: T-F1-D
+    stride: D
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "Unbounded item creation exhausts memory; large request bodies."
+    mitigation: >-
+      Partial: express.json() enforces a default body-size limit (app.ts:45); platform
+      autoscaling/replica limits at Container Apps level. No application-level rate
+      limiting or items-map cap.
+    status: PARTIAL
+    residual: "Memory-exhaustion possible without an in-process cap or rate limiter."
+    gap_ref: G-03
+  - id: T-F1-E
+    stride: E
+    component: "F1 Items API (app/src/routes/items.ts)"
+    threat: "Caller escalates to admin/host."
+    mitigation: >-
+      API exposes no admin surface; runs as non-root uid 65532 in a hardened Chainguard
+      image (app/Dockerfile:48,:59); CSP via Helmet restricts script/style origins
+      (app.ts:32-44).
+    status: MITIGATED
+    residual: "Low; no admin path, non-root runtime."
+    control_ref: "app/Dockerfile:59"
+
+  # --- F2 Build-info endpoint (app/src/app.ts:88-139) ---
+  - id: T-F2-S
+    stride: S
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "A forged deployment claims another repo's identity."
+    mitigation: >-
+      Values baked from the real build (build-info.json at Docker build, Dockerfile:23)
+      and runtime env set by deploy.yml:165-170; printed cosign verify command binds to
+      --certificate-identity-regexp for the repo (app.ts:110) so a verifier detects a
+      spoofed image (deploy.yml:61-65).
+    status: MITIGATED
+    residual: "Low; independent verification of identity is possible by any consumer."
+    control_ref: "app/src/app.ts:110"
+  - id: T-F2-T
+    stride: T
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "Metadata altered to hide provenance."
+    mitigation: >-
+      Endpoint is read-only; underlying image is signed (sign-and-attest.yml:45-56) and
+      admission-gated at deploy (deploy.yml:55-65), so a tampered image cannot reach the
+      runtime serving this endpoint.
+    status: MITIGATED
+    residual: "Low; tamper requires defeating the signing + admission gate."
+    control_ref: "deploy.yml:55-65"
+  - id: T-F2-R
+    stride: R
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "We can't prove which build is running."
+    mitigation: >-
+      This endpoint IS the repudiation control: it surfaces image digest, run URL and a
+      paste-ready Rekor search URL (app.ts:101-106) tying the running artifact to the
+      public transparency log.
+    status: MITIGATED
+    residual: "Low; running artifact is tied to the transparency log."
+    control_ref: "app/src/app.ts:101-106"
+  - id: T-F2-I
+    stride: I
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "Endpoint leaks sensitive internals."
+    mitigation: >-
+      Only non-secret build metadata exposed (digest, repo, run id, public verify
+      commands); no tokens/keys. OIDC issuer + cert pattern are public verification data,
+      not secrets (app.ts:98-99). Reviewed: no env secret echoed.
+    status: MITIGATED
+    residual: "Low; exposed data is public verification material by design."
+    control_ref: "app/src/app.ts:98-99"
+  - id: T-F2-D
+    stride: D
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "Endpoint abused for load."
+    mitigation: >-
+      readBuildInfo() reads a tiny file once at startup (app.ts:51-69); the handler does
+      only string formatting (no per-request I/O). Same platform-level scaling caveat as
+      F1 (G-03).
+    status: PARTIAL
+    residual: "Bounded per-request cost; platform-scaling/rate-limit caveat shared with F1."
+    gap_ref: G-03
+  - id: T-F2-E
+    stride: E
+    component: "F2 Build-info endpoint (app/src/app.ts:88-139)"
+    threat: "Privileged action via build-info endpoint."
+    mitigation: >-
+      Read-only: no state change, no shell-out, no file write. Runs non-root
+      (Dockerfile:59).
+    status: MITIGATED
+    residual: "Negligible; no privileged path exists."
+    control_ref: "app/Dockerfile:59"
+
+  # --- F3 Health endpoint (app/src/app.ts:71-77) ---
+  - id: T-F3-I
+    stride: I
+    component: "F3 Health endpoint (app/src/app.ts:71-77)"
+    threat: "Health probe leaks version/internal state."
+    mitigation: >-
+      Returns only status, ISO timestamp and a package version string (app.ts:72-76) —
+      no internal topology, stack traces or secrets.
+    status: MITIGATED
+    residual: "Low; version string only, no topology disclosure."
+    control_ref: "app/src/app.ts:72-76"
+  - id: T-F3-D
+    stride: D
+    component: "F3 Health endpoint (app/src/app.ts:71-77)"
+    threat: "Probe endpoint hammered."
+    mitigation: >-
+      Constant-time JSON response, no I/O; used as the deploy smoke test (deploy.yml:194)
+      so its availability is itself monitored. Platform scaling caveat (G-03).
+    status: PARTIAL
+    residual: "Bounded per-request cost; shares the platform rate-limit caveat (G-03)."
+    gap_ref: G-03
+
+  # --- F4 Static showcase page (app/src/public/index.html, served app/src/app.ts:48) ---
+  - id: T-F4-T
+    stride: T
+    component: "F4 Static showcase page (app/src/public/index.html)"
+    threat: "Injected/defaced static content."
+    mitigation: >-
+      Content is baked into the image at build (Dockerfile:8 copies src/public) and
+      served from an admission-gated signed image (deploy.yml:55-65); the runtime
+      filesystem is the immutable container image.
+    status: MITIGATED
+    residual: "Low; static content is immutable in a signed, admission-gated image."
+    control_ref: "deploy.yml:55-65"
+  - id: T-F4-I
+    stride: I
+    component: "F4 Static showcase page (app/src/public/index.html)"
+    threat: "Inline scripts or third-party content execute in the user's browser (XSS)."
+    mitigation: >-
+      Helmet Content-Security-Policy restricts defaultSrc/scriptSrc/styleSrc/fontSrc/
+      imgSrc to 'self' + named origins (app.ts:34-41). CSP still allows 'unsafe-inline'
+      for scripts/styles (app.ts:37,:39); target-state is nonce/hash-based CSP.
+    status: PARTIAL
+    residual: "'unsafe-inline' remains in CSP; residual XSS risk until nonce/hash CSP lands."
+    gap_ref: G-04
+
+  # ===== §4 Pipeline / supply chain =============================================
+  # --- P1 / TB-4 Source control (developer -> repo) ---
+  - id: T-P1-S
+    stride: S
+    component: "P1 Source control (security-gate.yml / build-and-scan.yml triggers)"
+    threat: "Attacker pushes as a trusted committer."
+    mitigation: >-
+      Branch protection enforced via scripts/apply-branch-protection.sh (required
+      reviews / no direct prod push — SLSA Source intent, spec §4 :188).
+    status: MITIGATED
+    residual: "Low; depends on branch-protection settings being applied in the org."
+    control_ref: "scripts/apply-branch-protection.sh"
+  - id: T-P1-T
+    stride: T
+    component: "P1 Source control"
+    threat: "Malicious code merged or history rewritten (force-push)."
+    mitigation: >-
+      Required pull-request review + branch protection (apply-branch-protection.sh);
+      SAST (CodeQL build-and-scan.yml:166-208) and secret scan (security-gate.yml:33-87)
+      run on the change before it can be built.
+    status: MITIGATED
+    residual: "Low; review + pre-build scans gate the change."
+    control_ref: "build-and-scan.yml:166-208"
+  - id: T-P1-R
+    stride: R
+    component: "P1 Source control"
+    threat: "Author of a change denied (repudiation)."
+    mitigation: >-
+      Git commit metadata retained as audit trail (data-flow.yaml:34-40). Signed-commit
+      enforcement (SLSA Source L4) is target-state, not enforced today.
+    status: GAP
+    residual: "No cryptographic commit attribution; commit metadata only."
+    gap_ref: G-05
+  - id: T-P1-I
+    stride: I
+    component: "P1 Source control"
+    threat: "Token leak / credential committed at source; CI starvation; runner-priv escalation."
+    mitigation: >-
+      Secret detection blocks credentials at source (security-gate.yml:44-46); CI identity
+      scoping handled at TB-3 (OIDC short-lived tokens).
+    status: PARTIAL
+    residual: "Pre-commit-history leaks rely on scanner coverage; CI scoping covered at P4."
+    control_ref: "security-gate.yml:44-46"
+
+  # --- P2 Security gate (security-gate.yml) ---
+  - id: T-P2-I
+    stride: I
+    component: "P2 Security gate (security-gate.yml)"
+    threat: "Secret committed into code/history reaches the image."
+    mitigation: >-
+      TruffleHog secret detection runs as Phase 1 gate (security-gate.yml:44-46), output
+      captured as evidence (:52-64).
+    status: MITIGATED
+    residual: "Low; entropy/regex detection has inherent false-negative bound."
+    control_ref: "security-gate.yml:44-46"
+  - id: T-P2-T
+    stride: T
+    component: "P2 Security gate (security-gate.yml)"
+    threat: "Insecure IaC ships a misconfigured cloud."
+    mitigation: >-
+      Checkov IaC scan with set -o pipefail so a policy failure is not masked by tee
+      (security-gate.yml:104-116) — fails the gate on misconfig; SARIF uploaded (:134-138).
+    status: MITIGATED
+    residual: "Low; pre-deploy IaC misconfig is gated (pre-deploy, not runtime drift)."
+    control_ref: "security-gate.yml:104-116"
+  - id: T-P2-R
+    stride: R
+    component: "P2 Security gate (security-gate.yml)"
+    threat: "Scan didn't really run (repudiation of the gate)."
+    mitigation: >-
+      Per-run logs + SARIF uploaded as artifacts (security-gate.yml:82-87,:134-138);
+      rolled into the signed evidence pack (P6).
+    status: MITIGATED
+    residual: "Low; gate execution is itself evidenced."
+    control_ref: "security-gate.yml:82-87"
+
+  # --- P3 Build & scan (build-and-scan.yml) ---
+  - id: T-P3-T
+    stride: T
+    component: "P3 Build & scan (build-and-scan.yml)"
+    threat: "Vulnerable dependency / code-level vuln enters the artifact."
+    mitigation: >-
+      Trivy SCA filesystem scan (build-and-scan.yml:53-66) + CodeQL SAST (:166-208) run
+      per build; SARIF uploaded to Code Scanning (:203-208).
+    status: MITIGATED
+    residual: "Bounded by scanner CVE/database coverage; zero-day deps not detectable."
+    control_ref: "build-and-scan.yml:53-66"
+  - id: T-P3-I
+    stride: I
+    component: "P3 Build & scan (build-and-scan.yml)"
+    threat: "Unknown components hide CVEs."
+    mitigation: >-
+      SBOM (CycloneDX) generated and later signed/attested (P4); SCA + SBOM is the spec's
+      transparency control (evidence-pack-specification.md:138).
+    status: MITIGATED
+    residual: "Low; component inventory is transparent and attested."
+    control_ref: "build-and-scan.yml:53-66"
+  - id: T-P3-R
+    stride: R
+    component: "P3 Build & scan (build-and-scan.yml)"
+    threat: "Scan results disputed (repudiation)."
+    mitigation: >-
+      Tool version + scan metadata recorded into summaries (build-and-scan.yml:74-106);
+      artifacts uploaded (:110-116).
+    status: MITIGATED
+    residual: "Low; tool versions + metadata recorded for each run."
+    control_ref: "build-and-scan.yml:74-106"
+  - id: T-P3-D
+    stride: D
+    component: "P3 Build & scan (build-and-scan.yml)"
+    threat: "Poisoned dependency in build."
+    mitigation: >-
+      Trivy SCA flags known-vulnerable deps before build promotion (build-and-scan.yml:
+      53-66); npm ci --ignore-scripts blocks install-time script execution
+      (Dockerfile:5,:38).
+    status: MITIGATED
+    residual: "Install-time script execution blocked; unknown-malice deps bounded by SCA."
+    control_ref: "app/Dockerfile:5"
+
+  # --- P4 / TB-3 Sign & attest (sign-and-attest.yml) ---
+  - id: T-P4-S
+    stride: S
+    component: "P4 Sign & attest (sign-and-attest.yml)"
+    threat: "Attacker signs an image as our pipeline."
+    mitigation: >-
+      Cosign keyless OIDC signing (sign-and-attest.yml:45-56) binds the signature to the
+      workflow's GitHub OIDC identity via Fulcio — no long-lived key to steal.
+    status: MITIGATED
+    residual: "Low; no static signing key; identity is OIDC-bound and publicly verifiable."
+    control_ref: "sign-and-attest.yml:45-56"
+  - id: T-P4-T
+    stride: T
+    component: "P4 Sign & attest (sign-and-attest.yml)"
+    threat: "Artifact swapped after build."
+    mitigation: >-
+      SLSA/in-toto provenance binds artifact-by-digest to builder+inputs (sign-and-attest.
+      yml:79-101); fallback provenance is JSONL-validated so a corrupt attestation is
+      never published (:102-107); SBOM attached as a signed attestation (:64-70).
+    status: MITIGATED
+    residual: "Low; digest-bound provenance + signed SBOM attestation."
+    control_ref: "sign-and-attest.yml:79-101"
+  - id: T-P4-R
+    stride: R
+    component: "P4 Sign & attest (sign-and-attest.yml)"
+    threat: "We never signed/built this (repudiation)."
+    mitigation: >-
+      Signing event is recorded in the Rekor public transparency log (Sigstore keyless
+      flow, sign-and-attest.yml:45-56); the demo app surfaces the Rekor search URL
+      (app.ts:106).
+    status: MITIGATED
+    residual: "Low; transparency-log entry makes the signing event non-repudiable."
+    control_ref: "sign-and-attest.yml:45-56"
+  - id: T-P4-I
+    stride: I
+    component: "P4 Sign & attest (sign-and-attest.yml)"
+    threat: "Signing key exfiltration."
+    mitigation: >-
+      No persistent signing key exists (keyless), so there is no key material to disclose
+      (sign-and-attest.yml:33,:45-48).
+    status: MITIGATED
+    residual: "Negligible; no key material at rest."
+    control_ref: "sign-and-attest.yml:45-48"
+  - id: T-P4-E
+    stride: E
+    component: "P4 Sign & attest (sign-and-attest.yml)"
+    threat: "Over-broad CI token."
+    mitigation: >-
+      Workflow permissions scoped (sign-and-attest.yml:17-19 attestations: write); OIDC
+      short-lived tokens, no static cloud secrets (consistent with deploy.yml:42-43).
+    status: MITIGATED
+    residual: "Low; least-privilege scoped, short-lived tokens."
+    control_ref: "sign-and-attest.yml:17-19"
+
+  # --- P5 / TB-2 Deploy (deploy.yml) ---
+  - id: T-P5-S
+    stride: S
+    component: "P5 Deploy (deploy.yml)"
+    threat: "Unsigned / foreign image deployed."
+    mitigation: >-
+      Admission gate: cosign verify with --certificate-identity-regexp +
+      --certificate-oidc-issuer before deploy, with set -o pipefail so a failed verify
+      cannot be masked by tee (deploy.yml:55-65).
+    status: MITIGATED
+    residual: "CI-side admission only (see G-06 for in-cluster controller target-state)."
+    control_ref: "deploy.yml:55-65"
+  - id: T-P5-T
+    stride: T
+    component: "P5 Deploy (deploy.yml)"
+    threat: "Tampered image or infra drift applied."
+    mitigation: >-
+      Image is digest-pinned and verified (deploy.yml:55-65); infra applied only via
+      Terraform in-pipeline (:118-125), not manual kubectl/portal edits (spec §4 reject
+      :199).
+    status: MITIGATED
+    residual: "Pre-deploy drift gated; runtime drift detection is CSPM target-state."
+    control_ref: "deploy.yml:118-125"
+  - id: T-P5-R
+    stride: R
+    component: "P5 Deploy (deploy.yml)"
+    threat: "Who deployed what (repudiation)."
+    mitigation: >-
+      Run summary records environment, image, OIDC auth (deploy.yml:216-241); deploy is
+      part of the sealed evidence pack (P6).
+    status: MITIGATED
+    residual: "Low; deploy event recorded and sealed."
+    control_ref: "deploy.yml:216-241"
+  - id: T-P5-I
+    stride: I
+    component: "P5 Deploy (deploy.yml)"
+    threat: "Static cloud credentials leak."
+    mitigation: >-
+      Zero static secrets — Azure login is OIDC federation (deploy.yml:42-43,:79
+      ARM_USE_OIDC).
+    status: MITIGATED
+    residual: "Negligible; no static cloud secret to leak."
+    control_ref: "deploy.yml:42-43"
+  - id: T-P5-E
+    stride: E
+    component: "P5 Deploy (deploy.yml)"
+    threat: "Pipeline gains excessive cloud rights."
+    mitigation: >-
+      OIDC-scoped identity per environment (deploy.yml:33 environment); RBAC exportable
+      for review (scripts/export-azure-rbac.sh). Runtime admission policy-as-code
+      (OPA/Kyverno verifyImages) is spec C.13 target-state — current admission is the
+      CI-side cosign-verify gate, not an in-cluster controller.
+    status: PARTIAL
+    residual: "No in-cluster admission controller; CI-side verify gate only."
+    gap_ref: G-06
+
+  # --- P6 / TB-5 Evidence pack & seal (evidence-pack.yml, scripts/seal-evidence.sh) ---
+  - id: T-P6-T
+    stride: T
+    component: "P6 Evidence pack & seal (evidence-pack.yml, scripts/seal-evidence.sh)"
+    threat: "Evidence altered after the fact."
+    mitigation: >-
+      Per-file manifest + Merkle root over the pack, then RFC-3161 timestamp and WORM
+      archive (scripts/seal-evidence.sh); this threat model file is hashed into that
+      Merkle root once T-115 wiring lands.
+    status: MITIGATED
+    residual: "Low; tamper-evident via Merkle root + timestamp once this file is sealed."
+    control_ref: "scripts/seal-evidence.sh"
+  - id: T-P6-R
+    stride: R
+    component: "P6 Evidence pack & seal"
+    threat: "Evidence was back-dated / fabricated (repudiation)."
+    mitigation: >-
+      RFC-3161 timestamp + (target) qualified eIDAS QTS provides non-repudiation. Default
+      TSA is freetsa (non-qualified) — qualified QTS is target-state (T-53, manifest must
+      label qualified=false honestly).
+    status: PARTIAL
+    residual: "Timestamp is non-qualified (freetsa) until qualified eIDAS QTS is wired."
+    gap_ref: G-07
+  - id: T-P6-I
+    stride: I
+    component: "P6 Evidence pack & seal"
+    threat: "Pipeline logs leak PII/secrets into evidence."
+    mitigation: >-
+      Log sanitisation step (scripts/sanitize-logs.sh); evidence archive PII minimised +
+      access-restricted (data-flow.yaml:72-78).
+    status: MITIGATED
+    residual: "Low; sanitisation + access restriction reduce leak surface."
+    control_ref: "scripts/sanitize-logs.sh"
+  - id: T-P6-D
+    stride: D
+    component: "P6 Evidence pack & seal"
+    threat: "Evidence destroyed to break audit."
+    mitigation: >-
+      WORM immutability + retention (5y DORA) on the archive (data-flow.yaml:78).
+      Lifecycle-delete vs WORM footgun is target-state fix (T-52).
+    status: PARTIAL
+    residual: "WORM protects against deletion; lifecycle-delete-vs-WORM footgun open (T-52)."
+    gap_ref: G-08
+  - id: T-P6-S
+    stride: S
+    component: "P6 Evidence pack & seal"
+    threat: "Forged seal identity."
+    mitigation: >-
+      Seal runs under the same OIDC-scoped CI identity (no static secret); transparency
+      log makes a forged seal externally detectable.
+    status: MITIGATED
+    residual: "Low; OIDC-scoped identity + externally-detectable transparency log."
+    control_ref: "scripts/seal-evidence.sh"
+  - id: T-P6-E
+    stride: E
+    component: "P6 Evidence pack & seal"
+    threat: "Over-privileged seal identity."
+    mitigation: >-
+      Seal runs under the same OIDC-scoped CI identity (no static secret), least-privilege
+      scoped to the seal step.
+    status: MITIGATED
+    residual: "Low; least-privilege OIDC identity."
+    control_ref: "scripts/seal-evidence.sh"
+
+# --- Gap register (threat-model.md §5 — target-state, NOT achieved) --------------
+# Mirrored here so the validator can confirm every gap_ref above resolves and no GAP
+# is silently claimed as a control. These are target-state; none is an implemented
+# control.
+gaps:
+  - id: G-01
+    element: "F1 Items API"
+    stride: S
+    action: "Add authn/authz before any real-data use"
+    tracking: "Demo limitation (no PII today)"
+  - id: G-02
+    element: "F1 Items API"
+    stride: R
+    action: "Structured request audit log for mutating calls"
+    tracking: "Production-readiness"
+  - id: G-03
+    element: "F1/F2/F3"
+    stride: D
+    action: "Rate-limit endpoints; bound the in-memory store"
+    tracking: "Production-readiness"
+  - id: G-04
+    element: "F4 showcase"
+    stride: I
+    action: "Nonce/hash-based CSP, drop 'unsafe-inline'"
+    tracking: "Hardening (app.ts:37,:39)"
+  - id: G-05
+    element: "P1 source"
+    stride: R
+    action: "Enforce commit signing (SLSA Source L4)"
+    tracking: "Spec §4 :188"
+  - id: G-06
+    element: "P5 deploy"
+    stride: E
+    action: "OPA/Kyverno verifyImages policy gate"
+    tracking: "Spec C.13; runtime task"
+  - id: G-07
+    element: "P6 seal"
+    stride: R
+    action: "Wire qualified eIDAS QTS; label honestly"
+    tracking: "T-53"
+  - id: G-08
+    element: "P6 seal"
+    stride: D
+    action: "Tie delete action after immutability period"
+    tracking: "T-52"

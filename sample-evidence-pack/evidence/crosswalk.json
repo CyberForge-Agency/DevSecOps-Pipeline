@@ -1,0 +1,474 @@
+{
+  "schema": "cyberforge-regulatory-crosswalk/v1",
+  "generated_at": "2026-06-17T14:57:49Z",
+  "description": "Multi-framework crosswalk (spec 5.2 / struktura D.2): one evidence item -> many framework clauses. Derived by grouping the content-validated compliance matrix rows + the A.1-A.10 organizational-control verdicts by evidence artifact. A clause is 'satisfied' only when present AND PASS; no verdicts are recomputed here.",
+  "source": {
+    "matrix": "compliance-matrix.json",
+    "org_status": "compliance-status.json"
+  },
+  "frameworks_covered": [
+    "DORA",
+    "ISO",
+    "ISO27001",
+    "NIS2",
+    "RODO",
+    "SOC2"
+  ],
+  "rows": [
+    {
+      "evidence": "pipeline-run.json",
+      "clauses": [
+        {
+          "label": "DORA Art.16.1.d",
+          "framework": "DORA",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "NIS2 Art.21.2.e",
+          "framework": "NIS2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "ISO27001 A.8.4",
+          "framework": "ISO27001",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "ISO27001 A.8.9",
+          "framework": "ISO27001",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "ISO27001 A.8.25",
+          "framework": "ISO27001",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "SOC2 CC6.1",
+          "framework": "SOC2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "SOC2 CC8.1",
+          "framework": "SOC2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "RODO Art.30",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "ISO27001",
+        "NIS2",
+        "RODO",
+        "SOC2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 8
+    },
+    {
+      "evidence": "access-review.json",
+      "clauses": [
+        {
+          "label": "NIS2 Art.21(2)(i)",
+          "framework": "NIS2",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "ISO 27001 A.5.18",
+          "framework": "ISO",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "SOC2 CC6.2",
+          "framework": "SOC2",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "ISO",
+        "NIS2",
+        "SOC2"
+      ],
+      "satisfied_count": 3,
+      "total_count": 3
+    },
+    {
+      "evidence": "crypto-posture.json",
+      "clauses": [
+        {
+          "label": "NIS2 Art.21(2)(h)",
+          "framework": "NIS2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "RODO Art.32",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "DORA Art.9",
+          "framework": "DORA",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "NIS2",
+        "RODO"
+      ],
+      "satisfied_count": 0,
+      "total_count": 3
+    },
+    {
+      "evidence": "governance-evidence.json",
+      "clauses": [
+        {
+          "label": "DORA Art.5",
+          "framework": "DORA",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "NIS2 Art.20",
+          "framework": "NIS2",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "ISO 27001 A.5.1",
+          "framework": "ISO",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "ISO",
+        "NIS2"
+      ],
+      "satisfied_count": 3,
+      "total_count": 3
+    },
+    {
+      "evidence": "incident-readiness.json",
+      "clauses": [
+        {
+          "label": "DORA Art.17",
+          "framework": "DORA",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "NIS2 Art.23",
+          "framework": "NIS2",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "RODO Art.33",
+          "framework": "RODO",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "NIS2",
+        "RODO"
+      ],
+      "satisfied_count": 3,
+      "total_count": 3
+    },
+    {
+      "evidence": "restore-test.json",
+      "clauses": [
+        {
+          "label": "DORA Art.11-12",
+          "framework": "DORA",
+          "status": "FAIL",
+          "satisfied": false
+        },
+        {
+          "label": "NIS2 Art.21(2)(c)",
+          "framework": "NIS2",
+          "status": "FAIL",
+          "satisfied": false
+        },
+        {
+          "label": "ISO 27001 A.8.13",
+          "framework": "ISO",
+          "status": "FAIL",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "ISO",
+        "NIS2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 3
+    },
+    {
+      "evidence": "dpa-compliance-check.json",
+      "clauses": [
+        {
+          "label": "RODO Art.5.1.c",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "RODO Art.5.1.e",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "RODO Art.28",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "DORA Art.30",
+          "framework": "DORA",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "RODO"
+      ],
+      "satisfied_count": 1,
+      "total_count": 4
+    },
+    {
+      "evidence": "ropa-completeness.json",
+      "clauses": [
+        {
+          "label": "RODO Art.30",
+          "framework": "RODO",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "RODO Art.35",
+          "framework": "RODO",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "ISO 27001 A.5.34",
+          "framework": "ISO",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "ISO",
+        "RODO"
+      ],
+      "satisfied_count": 3,
+      "total_count": 3
+    },
+    {
+      "evidence": "cosign-verification.log",
+      "clauses": [
+        {
+          "label": "NIS2 Art.21.2.h",
+          "framework": "NIS2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "SOC2 CC7.1",
+          "framework": "SOC2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "NIS2",
+        "SOC2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 2
+    },
+    {
+      "evidence": "roi-validation.json",
+      "clauses": [
+        {
+          "label": "DORA Art.28(3)",
+          "framework": "DORA",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "ISO 27001 A.5.19",
+          "framework": "ISO",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "ISO"
+      ],
+      "satisfied_count": 2,
+      "total_count": 2
+    },
+    {
+      "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl",
+      "clauses": [
+        {
+          "label": "DORA Art.28",
+          "framework": "DORA",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "NIS2 Art.21.2.d",
+          "framework": "NIS2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "NIS2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 2
+    },
+    {
+      "evidence": "security-report.json",
+      "clauses": [
+        {
+          "label": "ISO27001 A.8.28",
+          "framework": "ISO27001",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        },
+        {
+          "label": "SOC2 PI1.1",
+          "framework": "SOC2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "ISO27001",
+        "SOC2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 2
+    },
+    {
+      "evidence": "tpp-clauses.json",
+      "clauses": [
+        {
+          "label": "DORA Art.30(2)-(3)",
+          "framework": "DORA",
+          "status": "PASS",
+          "satisfied": true
+        },
+        {
+          "label": "NIS2 Art.21(2)(d)",
+          "framework": "NIS2",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "DORA",
+        "NIS2"
+      ],
+      "satisfied_count": 2,
+      "total_count": 2
+    },
+    {
+      "evidence": "data-flow-diagram.json",
+      "clauses": [
+        {
+          "label": "RODO Art.25",
+          "framework": "RODO",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "RODO"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "security-report.json (+embedded Trivy Results)",
+      "clauses": [
+        {
+          "label": "DORA Art.16.1.a",
+          "framework": "DORA",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "trivy-sca-summary.json + dependency-review.json",
+      "clauses": [
+        {
+          "label": "DORA Art.16.1.c",
+          "framework": "DORA",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "DORA"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "zap-report.json",
+      "clauses": [
+        {
+          "label": "NIS2 Art.21.2.b",
+          "framework": "NIS2",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "NIS2"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    }
+  ]
+}

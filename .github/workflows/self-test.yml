@@ -1,0 +1,119 @@
+# Self-test — the pipeline's own quality gate (T-83; wires T-71 pin-audit + T-81 bats).
+#
+# Why this exists
+#   The validators, sealing/verification scripts and OPA policies that the whole
+#   evidence pack rests on had NO workflow running their tests — `opa test`,
+#   `pytest tests/compliance`, the T-71 action-pin audit and the T-81 bats suite
+#   were all green-by-absence. A broken validator or a re-introduced unpinned
+#   action could ship without anything turning red. This job runs all four,
+#   fail-on-error, on BOTH push and pull_request so the pipeline self-tests for
+#   real, and is exposed via `workflow_call` so the orchestrator (pipeline.yml)
+#   invokes it as an early gating phase that later phases cannot depend-around.
+#
+# Pin-cleanliness: this workflow is audited by its own `check-action-pins.sh`
+#   step. Every `uses:` here is SHA-pinned (40-hex) — the SHAs are the exact pins
+#   already used across the other workflows (actions/checkout, actions/setup-python,
+#   open-policy-agent/setup-opa, step-security/harden-runner). No tag-pinned action.
+
+name: "Self-Test (pipeline quality gate)"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+  # Reusable: pipeline.yml calls this as an early gating phase.
+  workflow_call:
+
+# Least privilege: the quality gate only reads the repo. The action-pin audit and
+# pytest/opa/bats all write to GITHUB_STEP_SUMMARY, which needs no extra scope.
+permissions:
+  contents: read
+
+concurrency:
+  group: self-test-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  self-test:
+    name: "opa test + pin-audit + pytest + bats"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # The CI repo root is the Pipeline tree itself (policies/, scripts/, tests/ at
+    # root), so every step runs from the default checkout cwd — same as
+    # policy-test.yml's `opa test policies/`.
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.17.1
+
+      - name: Install Python test deps
+        run: |
+          set -euo pipefail
+          python3 -m pip install --upgrade pip
+          # pytest-cov backs the optional --cov-fail-under gate below; pyyaml +
+          # jsonschema are required by the YAML/schema validators under test (a
+          # missing one surfaces as a test FAILURE, never a silent skip).
+          python3 -m pip install pytest pytest-cov pyyaml jsonschema
+
+      - name: Install bats (T-81 shell sub-suite)
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y bats
+          bats --version
+
+      # (a) OPA policy tests — BLOCKING: a broken `test_*` rule turns this red.
+      - name: opa test policies/
+        run: opa test policies/ -v
+
+      # (b) Action-pin audit (T-71) — BLOCKING: a re-introduced @v4/@main/short-SHA
+      #     ref (incl. in this very workflow) fails the gate. Audits .github/workflows/.
+      - name: Action-pin audit (T-71)
+        run: bash scripts/check-action-pins.sh
+
+      # (c) Python validator/script tests — BLOCKING: any failed assertion turns
+      #     this red. The --cov gate is a nice-to-have and does not block the wave;
+      #     it warns on a coverage shortfall but never fails the step (|| true).
+      - name: pytest tests/compliance
+        run: python3 -m pytest tests/compliance -q
+
+      - name: pytest coverage floor (advisory, non-blocking)
+        run: |
+          set -uo pipefail
+          # Advisory: surfaces the coverage number without gating the wave. Flip the
+          # `|| true` off to make the 80% floor blocking once coverage is dialed in.
+          python3 -m pytest tests/compliance \
+            --cov=scripts --cov-report=term-missing --cov-fail-under=80 \
+            || echo "::warning::pytest coverage below 80% floor (advisory — not blocking T-83)"
+
+      # (d) Shell-script tests (T-81) — bats is installed and INVOKED above. When
+      #     the T-81 suite has landed (tests/bats/*.bats), a failed `@test` turns
+      #     this red. Until those files exist this prints an honest "suite not yet
+      #     present" message rather than a silent skip or a fake pass — it never
+      #     manufactures a green result.
+      - name: bats tests/bats (T-81)
+        run: |
+          set -euo pipefail
+          if [ -d tests/bats ] && compgen -G 'tests/bats/*.bats' > /dev/null; then
+            bats tests/bats
+          else
+            echo "::warning::T-81 bats suite (tests/bats/*.bats) not present yet — bats installed and verified, no test files to run."
+          fi

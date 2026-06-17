@@ -1,0 +1,24 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "entry_count": 2,
+    "violations": 0
+  },
+  "threshold": "schema-valid register with all 4 clock fields populated per entry",
+  "detail": "2 incident(s); all entries carry classification + 4 reporting-clock fields",
+  "tool_version": null,
+  "validator": "check-incident-register",
+  "checked_at": "2026-06-17T14:57:47Z",
+  "register": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/governance/incident-register.yaml",
+  "schema": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/schemas/incident-register.schema.json",
+  "errors": [],
+  "evidence_only": {
+    "tier": "EVIDENCE-ONLY",
+    "entry_count": 2,
+    "github_issue_cross_check": {
+      "open_security_incident_issues": 0,
+      "without_matching_register_entry": 0
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "format_version": "1.0",
+  "terraform_version": "1.15.2",
+  "values": {
+    "root_module": {
+      "child_modules": [
+        {
+          "address": "module.storage",
+          "resources": [
+            {
+              "address": "module.storage.azurerm_storage_account.this",
+              "type": "azurerm_storage_account",
+              "name": "this",
+              "values": {
+                "name": "cyberforgeprodevidence",
+                "min_tls_version": "TLS1_2",
+                "infrastructure_encryption_enabled": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

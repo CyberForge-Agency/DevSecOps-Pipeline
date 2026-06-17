@@ -9,13 +9,19 @@
 #   1. sha256sum -c the legacy manifest.sha256
 #   2. recompute the RFC-6962 Merkle root and compare to manifest.merkle_root
 #   3. cosign verify-blob (identity-pinned) if cosign + a .bundle are present
+#   3b. Rekor transparency-log INCLUSION proof per cosign bundle (spec §7.2/I.2)
 #   4. openssl ts -verify if a .tsr token is present
 #   5. verapdf --flavour 3b if verapdf + the PDF are present
 #   6. pdfsig whole-document-coverage if pdfsig + the PDF are present
+#   7. sealing-artifact completeness self-test (all 8 integrity outputs +
+#      >=1 RFC-3161 token landed) via check-sealing-completeness.sh (spec §12).
 #
 # Exit policy: exit 0 only if NO check FAILs. SKIP (absent tool / absent input)
 # is allowed and does not fail the run. A locally-sealed (degraded) pack — where
-# only sha256 + Merkle can be checked — therefore exits 0.
+# only sha256 + Merkle can be checked — therefore exits 0. The §7 completeness
+# self-test honours the same EVIDENCE_ALLOW_DEGRADE contract: in degrade mode a
+# missing sealing artifact is reported but does not fail; in fail-closed CI mode
+# a missing required artifact FAILs the runbook (matching seal-evidence.sh).
 #
 set -euo pipefail
 
@@ -29,6 +35,7 @@ EVIDENCE_DIR="$1"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 MANIFEST_PY="${SCRIPT_DIR}/generate-evidence-manifest.py"
+COMPLETENESS_SH="${SCRIPT_DIR}/check-sealing-completeness.sh"
 MANIFEST_JSON="${EVIDENCE_DIR}/manifest.json"
 LEGACY_MANIFEST="${EVIDENCE_DIR}/manifest.sha256"
 
@@ -203,6 +210,12 @@ if have cosign; then
     else
       fail "cosign verify-blob merkle-root.txt failed"
     fi
+  elif [ -f "${MERKLE_FILE}" ]; then
+    # A Merkle root exists to sign but its cosign bundle is absent: the pack's
+    # headline cryptographic claim is missing. This is the §6.2-A regression
+    # surface — fail explicitly rather than silently skip (anti-regression).
+    COSIGN_CHECKED=1
+    fail "cosign verify-blob merkle-root — merkle-root.cosign.bundle missing while merkle-root.txt present (§6.2-A)"
   fi
   PDF_BUNDLE="${EVIDENCE_DIR}/pdf-sha256.cosign.bundle"
   PDF_HASH_FILE="${EVIDENCE_DIR}/pdf.sha256"
@@ -221,6 +234,136 @@ if have cosign; then
   fi
 else
   skip "cosign verify-blob (cosign absent)"
+fi
+
+# ---------------------------------------------------------------------------
+# 3b. Rekor transparency-log INCLUSION verification (spec §7.2 #2 / Part I.2).
+#
+# The §3 cosign verify-blob above does cryptographically check the embedded
+# Rekor SET as part of its default tlog verification — but it emits no explicit
+# Rekor line, so the "Rekor-verifiable" / "signatures recorded in an append-only
+# log" claim is never *proven in the deliverable*. Worse, CVE-2022-36056
+# (GHSA-8gw7-4j42-w388) showed a crafted bundle could pass verify-blob while its
+# rekorBundle did not actually reference the signature. So we assert Rekor
+# inclusion in TWO independent ways and emit one PASS/FAIL line per bundle:
+#
+#   (a) STRUCTURAL — parse the bundle JSON and confirm it carries a real Rekor
+#       transparency-log entry (a logIndex AND integratedTime). Handles BOTH the
+#       legacy cosign-v2 `rekorBundle.Payload{logIndex,integratedTime,logID}`
+#       shape AND the cosign-v3 sigstore-bundle `verificationMaterial.
+#       tlogEntries[]{logIndex,integratedTime,inclusionPromise|inclusionProof}`
+#       shape (the two formats seal-evidence.sh's Step-3 comment calls out).
+#       A bundle with NO tlog entry (e.g. tampered, or signed with
+#       --no-tlog-upload) FAILS here — that is the tampered-bundle acceptance
+#       case.
+#   (b) CRYPTOGRAPHIC — when identity+issuer are pinned, re-run cosign
+#       verify-blob with tlog verification explicitly REQUIRED
+#       (--insecure-ignore-tlog=false). This validates the Rekor SET/inclusion
+#       against the log's public key (offline via the stapled proof, or against
+#       --rekor-url when reachable). If cosign supports an --offline flag we add
+#       it so the assertion does not silently fall back to a network query.
+#
+# We FAIL the Rekor line only when a bundle exists but cannot be shown to be in
+# Rekor; absence of any bundle (degrade-mode pack) is a SKIP, matching §3.
+# ---------------------------------------------------------------------------
+
+# rekor_entry_present <bundle.json> : exit 0 iff the bundle carries a Rekor tlog
+# entry with both a logIndex and an integratedTime (>0). Prints "<logIndex>" on
+# success for the human-readable line. Pure stdlib; tolerant of both formats.
+rekor_entry_present() {
+  python3 - "$1" <<'PY' 2>/dev/null
+import json, sys
+try:
+    b = json.load(open(sys.argv[1], encoding="utf-8"))
+except Exception:
+    sys.exit(2)
+
+def _int(v):
+    try:
+        return int(str(v))
+    except (TypeError, ValueError):
+        return None
+
+# (1) legacy cosign-v2 bundle: top-level rekorBundle.Payload{logIndex,integratedTime}
+rb = b.get("rekorBundle") if isinstance(b, dict) else None
+if isinstance(rb, dict):
+    p = rb.get("Payload", rb.get("payload", {}))
+    if isinstance(p, dict):
+        li, it = _int(p.get("logIndex")), _int(p.get("integratedTime"))
+        if li is not None and li >= 0 and it is not None and it > 0:
+            sys.stdout.write(str(li)); sys.exit(0)
+
+# (2) new sigstore bundle: verificationMaterial.tlogEntries[]{logIndex,integratedTime}
+vm = b.get("verificationMaterial") if isinstance(b, dict) else None
+if isinstance(vm, dict):
+    for e in (vm.get("tlogEntries") or []):
+        if not isinstance(e, dict):
+            continue
+        li, it = _int(e.get("logIndex")), _int(e.get("integratedTime"))
+        has_proof = bool(e.get("inclusionProof") or e.get("inclusionPromise"))
+        if li is not None and li >= 0 and it is not None and it > 0 and has_proof:
+            sys.stdout.write(str(li)); sys.exit(0)
+
+sys.exit(1)
+PY
+}
+
+# cosign_rekor_verify <bundle> <data> : cryptographic tlog-required re-verify.
+# Returns 0 on success. tlog verification is cosign's default, but we make it
+# explicit and refuse the network fallback so a missing Rekor entry cannot be
+# masked by an online query that silently succeeds.
+COSIGN_HAS_OFFLINE=0
+if have cosign && cosign verify-blob --help 2>&1 | grep -q -- '--offline'; then
+  COSIGN_HAS_OFFLINE=1
+fi
+cosign_rekor_verify() {
+  local bundle="$1" data="$2"
+  local args=(verify-blob --bundle "${bundle}" --insecure-ignore-tlog=false)
+  [ "${COSIGN_HAS_OFFLINE}" -eq 1 ] && args+=(--offline=true)
+  [ -n "${COSIGN_IDENTITY}" ] && args+=(--certificate-identity "${COSIGN_IDENTITY}")
+  [ -n "${COSIGN_ISSUER}" ]   && args+=(--certificate-oidc-issuer "${COSIGN_ISSUER}")
+  args+=("${data}")
+  COSIGN_EXPERIMENTAL=1 cosign "${args[@]}" >/dev/null 2>&1
+}
+
+# rekor_check <label> <bundle> <data> : emit one PASS/FAIL line per bundle.
+rekor_check() {
+  local label="$1" bundle="$2" data="$3"
+  [ -f "${bundle}" ] || return 0   # absent bundle handled by §3 skip logic
+  REKOR_ANY=1
+  if ! have python3; then
+    skip "Rekor inclusion ${label} (python3 absent — cannot parse bundle)"
+    return 0
+  fi
+  local logidx
+  if ! logidx="$(rekor_entry_present "${bundle}")"; then
+    fail "Rekor inclusion ${label} — bundle carries NO transparency-log entry (not Rekor-logged / tampered)"
+    return 0
+  fi
+  # Structural proof present. Add the cryptographic re-verify when we can pin
+  # identity AND have the signed data file (offline stapled-proof validation).
+  if have cosign && [ -f "${data}" ] && [ -n "${COSIGN_IDENTITY}" ] && [ -n "${COSIGN_ISSUER}" ]; then
+    if cosign_rekor_verify "${bundle}" "${data}"; then
+      pass "Rekor inclusion ${label} verified (logIndex=${logidx}; SET/inclusion-proof cryptographically validated)"
+    else
+      fail "Rekor inclusion ${label} — bundle has a tlog entry (logIndex=${logidx}) but cosign tlog verification FAILED"
+    fi
+  else
+    # No identity pinning or cosign absent: the structural inclusion proof still
+    # demonstrates the signature was logged to Rekor; flag the weaker assurance.
+    pass "Rekor inclusion ${label} present (logIndex=${logidx}; structural — pin COSIGN_IDENTITY/ISSUER + cosign for crypto re-verify)"
+  fi
+}
+
+REKOR_ANY=0
+if have python3 || have cosign; then
+  rekor_check "merkle-root" "${EVIDENCE_DIR}/merkle-root.cosign.bundle" "${EVIDENCE_DIR}/merkle-root.txt"
+  rekor_check "pdf-sha256"  "${EVIDENCE_DIR}/pdf-sha256.cosign.bundle"  "${EVIDENCE_DIR}/pdf.sha256"
+  if [ "${REKOR_ANY}" -eq 0 ]; then
+    skip "Rekor inclusion verify (no *.cosign.bundle present — pack signed in degrade mode)"
+  fi
+else
+  skip "Rekor inclusion verify (python3 and cosign both absent)"
 fi
 
 # ---------------------------------------------------------------------------
@@ -257,11 +400,14 @@ if have openssl; then
           fail "openssl ts -verify ${label} failed against TSA CA"
         fi
       else
-        # Parse-only sanity check (no CA chain shipped).
-        if openssl ts -reply -in "${tsr}" -text >/dev/null 2>&1; then
-          skip "openssl ts -verify ${label} (token parses; tsa-ca.pem absent for full verify)"
+        # Parse-only sanity check (no CA chain shipped). Beyond "does it DER-
+        # decode", confirm the TSA GRANTED the token — a rejection or a non-token
+        # body that somehow landed as .tsr must FAIL, not pass as "parses".
+        # (Mirrors seal-evidence.sh's tsr_is_valid_token granted-status gate.)
+        if openssl ts -reply -in "${tsr}" -text 2>/dev/null | grep -qi 'Status: *Granted'; then
+          skip "openssl ts -verify ${label} (token parses + granted; tsa-ca.pem absent for full verify)"
         else
-          fail "RFC-3161 token ${label} is malformed"
+          fail "RFC-3161 token ${label} is malformed or not granted"
         fi
       fi
     fi
@@ -313,6 +459,29 @@ if [ -n "${PDF_FILE}" ] && [ -f "${PDF_FILE}" ]; then
 else
   skip "verapdf PDF/A validation (no PDF in pack — render degraded)"
   skip "pdfsig coverage (no PDF in pack — render degraded)"
+fi
+
+# ---------------------------------------------------------------------------
+# 7. Sealing-artifact completeness self-test (spec §12; T-58).
+#
+# The §1-6 checks each verify ONE integrity property of whatever artifacts
+# happen to be present — they say nothing about whether the FULL integrity-chain
+# artifact set was actually emitted. §6.2-A was exactly a "silently absent
+# artifact" bug. So we delegate to check-sealing-completeness.sh, which asserts
+# all 8 sealing outputs (+ >=1 RFC-3161 .tsr) exist, are non-empty, and parse.
+# It honours EVIDENCE_ALLOW_DEGRADE itself (degrade -> exit 0 with WARNs;
+# fail-closed CI -> exit 1 on any missing required artifact), so we simply
+# surface its result as one PASS/SKIP/FAIL line, preserving this runbook's
+# "degraded local pack still exits 0" contract.
+# ---------------------------------------------------------------------------
+if [ -x "${COMPLETENESS_SH}" ] || [ -f "${COMPLETENESS_SH}" ]; then
+  if bash "${COMPLETENESS_SH}" "${EVIDENCE_DIR}" >/dev/null 2>&1; then
+    pass "sealing-artifact completeness (all required integrity outputs present, or degrade-tolerated)"
+  else
+    fail "sealing-artifact completeness — a required integrity output is missing/invalid (run check-sealing-completeness.sh for detail)"
+  fi
+else
+  skip "sealing-artifact completeness self-test (check-sealing-completeness.sh not found alongside this runbook)"
 fi
 
 # ---------------------------------------------------------------------------

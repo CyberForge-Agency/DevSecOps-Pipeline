@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "max_days_overdue": 0,
+    "overdue_count": 0,
+    "in_cycle_count": 7,
+    "total_rows": 7,
+    "overdue": [],
+    "unparseable": []
+  },
+  "threshold": {
+    "rule": "every 'Next Due' >= today (no overdue access review)",
+    "max_days_overdue": 0
+  },
+  "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 90d out)",
+  "tool_version": null,
+  "validator": "check-access-reviews",
+  "checked_at": "2026-06-17T14:57:48Z"
+}

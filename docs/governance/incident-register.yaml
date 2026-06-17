@@ -1,0 +1,61 @@
+# ICT Incident Register -- CyberForge
+#
+# Compliance basis:
+#   - DORA Art.17-19 (ICT-related incident management + 3-phase major-incident reporting)
+#   - NIS2 Art.23     (24h early warning / 72h notification / 1-month final report)
+#   - RODO/GDPR Art.33 (personal-data-breach notification, 72h) where data integrity affected
+#
+# This register is validated by scripts/validators/check-incident-register.py (task T-23)
+# against schemas/incident-register.schema.json. Every entry MUST carry a classification
+# (severity + major_bool + classification_ts) and ALL FOUR reporting-clock fields populated.
+#
+# Clock semantics are sourced verbatim from docs/runbooks/incident-response.md §2-3:
+#   initial_4h        -> DORA Art.19 initial notification, within 4h of classifying as major
+#   early_warning_24h -> NIS2 Art.23 early warning, within 24h of awareness
+#   intermediate_72h  -> DORA Art.19 intermediate report, within 72h of initial notification
+#   final_1mo         -> DORA Art.19 / NIS2 final report, within 1 month of intermediate
+#
+# HONESTY NOTE: the validator checks reporting *readiness* (that the clock fields are
+# recorded and fillable), NOT that a report was actually filed with KNF/CSIRT. Filing is a
+# human act (struktura §14, blueprint/04 §9) and is out of scope for pipeline verification.
+#
+# Allowed clock-field values: a UTC ISO-8601 timestamp (when that report stage was sent),
+# or the controlled markers 'N/A' (stage does not apply -- non-major incident) or
+# 'PENDING' (stage is due/in-window but not yet completed). null / empty is a schema FAIL.
+
+meta:
+  owner: "CISO / Security Lead"
+  last_reviewed: "2026-06-09"
+  review_cadence: "Quarterly or after any major incident"
+
+incidents:
+  # --- Worked example: a MAJOR incident with the full three-phase clock recorded. ---
+  - id: "INC-2026-001"
+    title: "Unauthorized access attempt against ACR registry (contained)"
+    detection_ts: "2026-03-02T08:12:00Z"
+    classification_ts: "2026-03-02T09:40:00Z"   # classified as major 88 min after detection
+    severity: "SEV-1"
+    major_bool: true
+    clock:
+      # Initial notification sent 2h20m after classification -> within the 4h DORA window.
+      initial_4h: "2026-03-02T12:00:00Z"
+      # NIS2 early warning sent ~16h after awareness -> within the 24h window.
+      early_warning_24h: "2026-03-03T00:30:00Z"
+      # Intermediate report sent ~70h after the initial notification -> within 72h.
+      intermediate_72h: "2026-03-05T10:00:00Z"
+      # Final report sent ~26 days after the intermediate report -> within 1 month.
+      final_1mo: "2026-03-31T14:00:00Z"
+
+  # --- Non-major incident: statutory external reporting does not apply, but the clock
+  #     fields are still explicitly recorded as N/A so the register schema stays complete. ---
+  - id: "INC-2026-002"
+    title: "Non-critical CVE detected in build dependency (patched same day)"
+    detection_ts: "2026-04-18T11:05:00Z"
+    classification_ts: "2026-04-18T11:50:00Z"
+    severity: "SEV-3"
+    major_bool: false
+    clock:
+      initial_4h: "N/A"
+      early_warning_24h: "N/A"
+      intermediate_72h: "N/A"
+      final_1mo: "N/A"

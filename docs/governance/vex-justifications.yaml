@@ -1,0 +1,132 @@
+# VEX justifications — maintained source of truth for per-CVE exploitability triage.
+#
+# Spec mapping: evidence-pack-specification.md:145 (Part C.11 "VEX — Exploitability
+# triage · CycloneDX/CSAF 2.0/OpenVEX · CRA vuln-handling · `not_affected` claims
+# justified (CISA categories); kept current · sign; per-release; life+") and §8
+# anti-pattern "no VEX, so every CVE looks unhandled" (evidence-pack-specification.md:285).
+#
+# WHY THIS FILE EXISTS (honesty constraint, task T-116 implementation notes)
+# --------------------------------------------------------------------------
+# `scripts/generate-vex.py` NEVER invents a justification. It reads the triaged CVEs
+# out of the Trivy scan results and, for any CVE a human has decided is `not_affected`
+# or `fixed`, it looks the CVE up in THIS file to attach the analyst-authored
+# CISA-category justification. A CVE that Trivy still reports and that is NOT listed
+# here is emitted as `under_investigation` (an honest "we have not triaged this yet"),
+# NEVER as a silent `not_affected`. The validator (`scripts/validators/vex.py`) FAILs
+# any `not_affected`/`fixed` statement that lacks a justification, so an un-triaged CVE
+# can never masquerade as handled.
+#
+# CISA `not_affected` justification labels (the only values accepted by `justification:`)
+# Source: CISA "VEX Status Justifications" (Jun 2022),
+#   https://www.cisa.gov/sites/default/files/publications/VEX_Status_Justification_Jun22.pdf
+# Mirrored as the OpenVEX `justification` enum,
+#   https://github.com/openvex/spec/blob/main/OPENVEX-SPEC.md
+#   - component_not_present
+#   - vulnerable_code_not_present
+#   - vulnerable_code_not_in_execute_path
+#   - vulnerable_code_cannot_be_controlled_by_adversary
+#   - inline_mitigations_already_exist
+#
+# Allowed `status:` values (OpenVEX): not_affected | affected | fixed | under_investigation
+#   - `not_affected` REQUIRES a `justification` (CISA label above) and SHOULD carry an
+#     `impact_statement` (free-form analyst note).
+#   - `affected` REQUIRES an `action_statement` (what the consumer must do).
+#   - `fixed` REQUIRES a justification-style note explaining HOW it was fixed (we record
+#     a CISA-style label + impact_statement so the generator/validator treat it uniformly).
+#   - `under_investigation` needs nothing and is the default for un-triaged Trivy findings.
+#
+# CURRENT STATE OF THIS IMAGE (2026-06-16)
+# ----------------------------------------
+# The runtime base was switched to cgr.dev/chainguard/node (Wolfi-based); per
+# app/.trivyignore the scan reports 0 HIGH/CRITICAL and there are NO active
+# suppressions. The four previously-blocking OpenSSL CVEs (CVE-2026-31789,
+# CVE-2026-28387, CVE-2026-28388, CVE-2026-28389) and the two prior base-image
+# waivers (CVE-2026-0861 glibc, CVE-2026-28390 openssl) are RESOLVED by the base-image
+# change, not suppressed (app/.trivyignore:11-17). They are recorded below as `fixed`
+# so a release built on the OLD base, or a consumer correlating against historical
+# advisories, still gets an authoritative, signed statement instead of an open finding.
+#
+# HOW TO ADD AN ENTRY (process, not auto-generation)
+# --------------------------------------------------
+# 1. A new CVE appears in trivy-image-results.json / trivy-sca-results.json.
+# 2. An analyst triages it and decides the status + (for not_affected) the CISA label.
+# 3. Add a block here keyed by the CVE ID. Until then the generator emits
+#    `under_investigation` for that CVE (visible, honest, non-passing).
+
+# Document-author identity stamped into the OpenVEX `author` field.
+author: "CyberForge Security Team <security@cyberforge.agency>"
+# Author role (OpenVEX optional `role`): who is making these exploitability claims.
+role: "Product Security / Vulnerability Management"
+
+# Per-CVE triage records. Key = CVE ID exactly as Trivy reports it (VulnerabilityID).
+statements:
+
+  CVE-2026-31789:
+    status: fixed
+    justification: vulnerable_code_not_present
+    impact_statement: >-
+      OpenSSL libssl3 advisory present only in the legacy
+      gcr.io/distroless/nodejs20-debian12 base. The runtime base was migrated to
+      cgr.dev/chainguard/node (Wolfi), which ships the patched OpenSSL package; the
+      vulnerable code is no longer present in the released image.
+    references:
+      - app/.trivyignore:16
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"
+
+  CVE-2026-28387:
+    status: fixed
+    justification: vulnerable_code_not_present
+    impact_statement: >-
+      OpenSSL libssl3 advisory resolved by the base-image migration to
+      cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL). Not a suppression — the
+      vulnerable package version is absent from the released image.
+    references:
+      - app/.trivyignore:16
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"
+
+  CVE-2026-28388:
+    status: fixed
+    justification: vulnerable_code_not_present
+    impact_statement: >-
+      OpenSSL libssl3 advisory resolved by the base-image migration to
+      cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).
+    references:
+      - app/.trivyignore:16
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"
+
+  CVE-2026-28389:
+    status: fixed
+    justification: vulnerable_code_not_present
+    impact_statement: >-
+      OpenSSL libssl3 advisory resolved by the base-image migration to
+      cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).
+    references:
+      - app/.trivyignore:17
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"
+
+  CVE-2026-0861:
+    status: fixed
+    justification: component_not_present
+    impact_statement: >-
+      glibc advisory applied to the old Debian-based distroless base. The Wolfi-based
+      cgr.dev/chainguard/node image uses musl/Wolfi packaging and does not ship the
+      affected glibc component, so the vulnerable component is not present.
+    references:
+      - app/.trivyignore:11
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"
+
+  CVE-2026-28390:
+    status: fixed
+    justification: vulnerable_code_not_present
+    impact_statement: >-
+      OpenSSL advisory previously waived on the Debian-based distroless base; resolved
+      by the migration to cgr.dev/chainguard/node which ships fixed OpenSSL.
+    references:
+      - app/.trivyignore:11
+    triaged_by: "CyberForge Security Team"
+    triaged_on: "2026-06-01"

@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://cyberforge.dev/schemas/incident-register.schema.json",
+  "title": "ICT Incident Register (DORA Art.17-19 / NIS2 Art.23 / RODO Art.33)",
+  "description": "Schema for the CyberForge incident register. Each entry records an ICT-related incident with its classification and the statutory reporting-clock fields. The clock semantics are sourced verbatim from docs/runbooks/incident-response.md §2-3: DORA Art.19 initial notification within 4h of classifying the incident as major, NIS2 Art.23 early warning within 24h of awareness, DORA intermediate report within 72h of the initial notification, and the final report within 1 month. The validator (check-incident-register.py, task T-23) asserts this schema and that every entry carries a classification plus all four reporting-clock fields populated. NOTE: the validator checks reporting *readiness* (that the clock is recorded), not that a report was actually filed with KNF/CSIRT — the act of filing is a human act (struktura §14) and is EVIDENCE-ONLY at most.",
+  "type": "object",
+  "required": ["incidents"],
+  "additionalProperties": true,
+  "properties": {
+    "meta": {
+      "type": "object",
+      "description": "Optional document metadata (owner, last-reviewed, etc.).",
+      "additionalProperties": true
+    },
+    "incidents": {
+      "type": "array",
+      "description": "The list of incident-register entries. May be empty (no incidents in the period); emptiness is an EVIDENCE-ONLY count, never a schema FAIL.",
+      "items": { "$ref": "#/definitions/incident" }
+    }
+  },
+  "definitions": {
+    "incident": {
+      "type": "object",
+      "required": [
+        "id",
+        "detection_ts",
+        "classification_ts",
+        "severity",
+        "major_bool",
+        "clock"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique incident identifier, e.g. INC-2026-001.",
+          "pattern": "^INC-[0-9]{4}-[0-9]{3,}$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Short human-readable incident title."
+        },
+        "detection_ts": {
+          "type": "string",
+          "description": "UTC ISO-8601 timestamp when the incident was first detected/became known.",
+          "format": "date-time"
+        },
+        "classification_ts": {
+          "type": "string",
+          "description": "UTC ISO-8601 timestamp when the incident was classified (severity + major/non-major decision made). Drives the DORA Art.19 4h initial-notification clock.",
+          "format": "date-time"
+        },
+        "severity": {
+          "type": "string",
+          "description": "Severity level per incident-response.md §3.2.",
+          "enum": ["SEV-1", "SEV-2", "SEV-3", "SEV-4"]
+        },
+        "major_bool": {
+          "type": "boolean",
+          "description": "True if the incident meets the DORA Art.18 'major' threshold (≥2 criteria). Major incidents trigger the statutory reporting clock."
+        },
+        "clock": { "$ref": "#/definitions/reporting_clock" }
+      }
+    },
+    "reporting_clock": {
+      "type": "object",
+      "description": "The statutory reporting-clock fields. All four MUST be present and populated (non-null). Each is a UTC ISO-8601 timestamp recording when that report stage was sent, OR one of the controlled non-applicable / pending markers ('N/A' when the incident is not major and the stage does not apply, 'PENDING' when the stage is due but not yet completed). A null/missing field is a schema FAIL — that is the readiness gap the validator catches.",
+      "required": [
+        "initial_4h",
+        "early_warning_24h",
+        "intermediate_72h",
+        "final_1mo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "initial_4h": {
+          "$ref": "#/definitions/clock_field",
+          "description": "DORA Art.19 initial notification — due within 4h of classifying the incident as major (and no later than 24h after detection)."
+        },
+        "early_warning_24h": {
+          "$ref": "#/definitions/clock_field",
+          "description": "NIS2 Art.23 early warning — due within 24h of becoming aware."
+        },
+        "intermediate_72h": {
+          "$ref": "#/definitions/clock_field",
+          "description": "DORA Art.19 intermediate report — due within 72h of the initial notification (NIS2 incident notification also within 72h)."
+        },
+        "final_1mo": {
+          "$ref": "#/definitions/clock_field",
+          "description": "DORA Art.19 / NIS2 Art.23 final report — due within 1 month of the intermediate report."
+        }
+      }
+    },
+    "clock_field": {
+      "description": "A reporting-clock field: a UTC ISO-8601 date/date-time, or a controlled marker. Empty string and null are NOT valid — the field must be explicitly filled.",
+      "type": "string",
+      "minLength": 3
+    }
+  }
+}

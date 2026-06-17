@@ -1,0 +1,269 @@
+{
+  "schema": "cyberforge-gap-register/v1",
+  "generated_at": "2026-06-17T14:57:49Z",
+  "description": "Machine-readable gap register (spec 5.3 / struktura Part J): control -> gap -> severity -> root cause. Derived from the live A.1-A.10 verdicts and the content-validated matrix of THIS run. Narrative register: gap-register.md.",
+  "note": "Most INDETERMINATE rows are honest 'evidence not produced offline' gaps: the live-CI / cloud-only artifacts (security-report.json, trivy-sca-summary.json, pipeline-run.json, provenance.intoto.jsonl, zap-report.json, codeql SARIF, image scan, oscal) are produced by the production CI run on the CyberForge Azure subscription, which is PENDING for this pack.",
+  "total_gaps": 23,
+  "by_severity": {
+    "HIGH": 1,
+    "MEDIUM": 17,
+    "LOW": 5
+  },
+  "gaps": [
+    {
+      "id": "GAP-A.9",
+      "control": "A.9",
+      "task": "T-28",
+      "label": "Crypto posture vs IaC (NIS2 21(2)(h)/RODO 32)",
+      "gap": "not evaluated in evidence-pack context (no Terraform plan); enforced at deploy time against `terraform show -json`.",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "MEDIUM",
+      "source_file": "crypto-posture.json",
+      "root_cause": "evidence not yet produced/remediated (offline demo run)"
+    },
+    {
+      "id": "GAP-A.10",
+      "control": "A.10",
+      "task": "T-29",
+      "label": "Restore-test proof + freshness (DORA Art.11-12)",
+      "gap": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "severity": "HIGH",
+      "source_file": "restore-test.json",
+      "root_cause": "control measured FAIL on sample evidence"
+    },
+    {
+      "id": "GAP-DORA-Art.16.1.a",
+      "control": "DORA Art.16.1.a",
+      "label": "ICT risk management",
+      "gap": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "security-report.json (+embedded Trivy Results)",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-DORA-Art.16.1.c",
+      "control": "DORA Art.16.1.c",
+      "label": "Updated systems",
+      "gap": "SCA evidence: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/trivy-sca-summary.json: file not found; /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/dependency-review.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "trivy-sca-summary.json + dependency-review.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-DORA-Art.16.1.d",
+      "control": "DORA Art.16.1.d",
+      "label": "Anomaly detection",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "LOW",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-DORA-Art.28",
+      "control": "DORA Art.28",
+      "label": "Supply chain risk",
+      "gap": "NIS2 21.2.d unmeasured: attestation binding unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-attestation-verification.log: not present (cannot confirm binding)",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-NIS2-Art.21.2.b",
+      "control": "NIS2 Art.21.2.b",
+      "label": "Incident handling",
+      "gap": "zap-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/zap-report.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "zap-report.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-NIS2-Art.21.2.d",
+      "control": "NIS2 Art.21.2.d",
+      "label": "Supply chain security",
+      "gap": "NIS2 21.2.d unmeasured: attestation binding unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-attestation-verification.log: not present (cannot confirm binding)",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-NIS2-Art.21.2.e",
+      "control": "NIS2 Art.21.2.e",
+      "label": "Secure development",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-NIS2-Art.21.2.h",
+      "control": "NIS2 Art.21.2.h",
+      "label": "Cryptography",
+      "gap": "NIS2 21.2.h unmeasured: signature verification unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-verification.log: not present (cannot confirm signature)",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "cosign-verification.log",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-ISO27001-A.8.4",
+      "control": "ISO27001 A.8.4",
+      "label": "Access to source code",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-ISO27001-A.8.9",
+      "control": "ISO27001 A.8.9",
+      "label": "Configuration management",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-ISO27001-A.8.25",
+      "control": "ISO27001 A.8.25",
+      "label": "Secure SDLC",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-ISO27001-A.8.28",
+      "control": "ISO27001 A.8.28",
+      "label": "Secure coding",
+      "gap": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "security-report.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-SOC2-CC6.1",
+      "control": "SOC2 CC6.1",
+      "label": "Logical access",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-SOC2-CC7.1",
+      "control": "SOC2 CC7.1",
+      "label": "System operations",
+      "gap": "NIS2 21.2.h unmeasured: signature verification unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-verification.log: not present (cannot confirm signature)",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "cosign-verification.log",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-SOC2-CC8.1",
+      "control": "SOC2 CC8.1",
+      "label": "Change management",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-SOC2-PI1.1",
+      "control": "SOC2 PI1.1",
+      "label": "Processing integrity",
+      "gap": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "security-report.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-RODO-Art.5.1.c",
+      "control": "RODO Art.5.1.c",
+      "label": "Data minimization",
+      "gap": "dpa-compliance-check.json parsed but no vendor records found",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "LOW",
+      "evidence": "dpa-compliance-check.json",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-RODO-Art.5.1.e",
+      "control": "RODO Art.5.1.e",
+      "label": "Storage limitation",
+      "gap": "dpa-compliance-check.json parsed but no vendor records found",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "LOW",
+      "evidence": "dpa-compliance-check.json",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-RODO-Art.25",
+      "control": "RODO Art.25",
+      "label": "Data protection by design",
+      "gap": "data-flow-diagram.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/data-flow-diagram.json: file not found",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "LOW",
+      "evidence": "data-flow-diagram.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    },
+    {
+      "id": "GAP-RODO-Art.28",
+      "control": "RODO Art.28",
+      "label": "Processor agreements",
+      "gap": "dpa-compliance-check.json parsed but no vendor records found",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "severity": "LOW",
+      "evidence": "dpa-compliance-check.json",
+      "root_cause": "content verdict not PASS"
+    },
+    {
+      "id": "GAP-RODO-Art.30",
+      "control": "RODO Art.30",
+      "label": "Records of processing",
+      "gap": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "severity": "MEDIUM",
+      "evidence": "pipeline-run.json",
+      "root_cause": "live-CI / cloud-only evidence artifact absent in offline demo run (pending production CI on CyberForge Azure)"
+    }
+  ]
+}

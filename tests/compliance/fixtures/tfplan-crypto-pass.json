@@ -1,0 +1,58 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.15.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [
+        {
+          "address": "azurerm_resource_group.this",
+          "type": "azurerm_resource_group",
+          "name": "this",
+          "values": { "name": "cyberforge-prod-rg" }
+        }
+      ],
+      "child_modules": [
+        {
+          "address": "module.storage",
+          "resources": [
+            {
+              "address": "module.storage.azurerm_storage_account.this",
+              "type": "azurerm_storage_account",
+              "name": "this",
+              "values": {
+                "name": "cyberforgeprodevidence",
+                "account_tier": "Standard",
+                "min_tls_version": "TLS1_2",
+                "infrastructure_encryption_enabled": false,
+                "allow_nested_items_to_be_public": false
+              }
+            },
+            {
+              "address": "module.storage.azurerm_storage_container.evidence",
+              "type": "azurerm_storage_container",
+              "name": "evidence",
+              "values": { "name": "evidence-packs" }
+            }
+          ]
+        },
+        {
+          "address": "module.keyvault",
+          "resources": [
+            {
+              "address": "module.keyvault.azurerm_key_vault.this",
+              "type": "azurerm_key_vault",
+              "name": "this",
+              "values": {
+                "name": "cyberforge-prod-kv",
+                "sku_name": "standard",
+                "min_tls_version": "TLS1_2",
+                "purge_protection_enabled": true,
+                "rbac_authorization_enabled": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

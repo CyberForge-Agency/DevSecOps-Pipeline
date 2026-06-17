@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "runs_as_non_root": true,
+    "user": "65532",
+    "privileged": false,
+    "ingress_ports": [
+      3000
+    ],
+    "ingress_external": true,
+    "resource_limits": {
+      "cpu": "0.25",
+      "memory": "0.5Gi",
+      "max_replicas": 3
+    },
+    "managed_identity": "SystemAssigned",
+    "read_only_rootfs": "platform-managed",
+    "seccomp_runtime_default": "platform-managed",
+    "controls": {
+      "run_as_non_root": "MET",
+      "seccomp_runtime_default": "INDETERMINATE",
+      "read_only_rootfs": "INDETERMINATE",
+      "privileged_false": "MET",
+      "no_host_namespaces": "MET",
+      "no_host_path_volume": "MET",
+      "resource_limits_set": "MET",
+      "least_privilege_ingress": "MET",
+      "managed_identity": "MET"
+    },
+    "iac_parse_error": null,
+    "platform": "Azure Container Apps (not Kubernetes; no PSS/securityContext)"
+  },
+  "threshold": {
+    "runs_as_non_root": true,
+    "non_root_user": "non-zero/non-root UID"
+  },
+  "detail": "runtime hardening posture consistent with IaC: non-root USER 65532 (BLOCKING invariant MET); ingress ports [3000]; identity SystemAssigned; platform-managed/not-IaC-expressible (INDETERMINATE, NOT fabricated): ['read_only_rootfs', 'seccomp_runtime_default']. NOTE: declared posture only \u2014 a live runtime scan + continuous drift alerting are TARGET-STATE (runtime-hardening.md \u00a76).",
+  "tool_version": "python 3.14.5",
+  "validator": "runtime_hardening",
+  "checked_at": "2026-06-17T14:57:49Z"
+}

@@ -1,9 +1,14 @@
-# Each ignored CVE MUST have a VEX justification comment above it.
-# Format: # VEX: <status> - <justification>
+# Each ignored CVE MUST have a VEX justification comment on the line directly
+# above it. The policy is ENFORCED in CI by scripts/lint-trivyignore.py
+# (build-and-scan.yml "Validate .trivyignore policy" pre-scan gate): an entry
+# whose preceding line is missing, malformed, or carries an expired/absent
+# expires= date fails the job.
+# Format: # VEX: <status> - <justification> expires=YYYY-MM-DD
 # Allowed statuses: not_affected, false_positive, will_not_fix
+# expires= is mandatory and must be a future date (>= today, UTC).
 #
 # Example:
-# VEX: not_affected - This component is not reachable in our configuration
+# VEX: not_affected - This component is not reachable in our configuration expires=2026-12-31
 # CVE-2024-XXXXX
 
 # No active suppressions.

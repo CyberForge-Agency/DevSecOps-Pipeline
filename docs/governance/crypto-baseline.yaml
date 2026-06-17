@@ -1,0 +1,66 @@
+# Cryptographic posture baseline (A.9) — assert-crypto.py threshold source-of-truth
+#
+# Task T-28 (struktura §6 A.9 = crypto+threshold). This file is the *stated threshold*
+# the validator asserts the infrastructure-as-code against. It is read, not hardcoded,
+# so the minimum can be raised in one place without touching the validator.
+#
+# Maps to: NIS2 Art.21(2)(h) (cryptography & encryption), RODO/GDPR Art.32(1)(a)
+# (encryption of personal data), DORA Art.30(2) point 3 (data integrity/confidentiality),
+# struktura §6 A.9, spec H.4, blueprint/02 Art.30(2)#3.
+#
+# Honesty boundary (blueprint/04 §2):
+#   * TLS minimum version + at-rest-encryption flag + key-management presence are
+#     parsed from `terraform show -json` and asserted against the values below ->
+#     BLOCKING (deterministic, false-positive-safe, regression-catching).
+#   * Cipher-suite enforcement is NOT expressible in the Azure storage/key-vault
+#     Terraform schema (the platform negotiates ciphers for the enforced TLS floor);
+#     we therefore record the *required floor* as EVIDENCE-ONLY context rather than
+#     asserting an unverifiable cipher list. Claiming a cipher-suite gate the IaC
+#     cannot express would be an overclaim.
+
+# --- BLOCKING: in-transit TLS floor -----------------------------------------
+# Ordered enum used by the validator: TLS1_0 < TLS1_1 < TLS1_2 < TLS1_3.
+# Every resource that exposes `min_tls_version` must be >= this value.
+min_tls_version: "TLS1_2"
+
+# Resource types whose `min_tls_version` is asserted against the floor above.
+tls_resource_types:
+  - azurerm_storage_account
+  - azurerm_key_vault
+
+# --- BLOCKING: at-rest encryption -------------------------------------------
+# Azure Storage applies service-side encryption (SSE) at rest unconditionally, so
+# the *presence* of an encrypted storage resource is the assertable signal. The
+# validator requires at least this many encrypted-at-rest data stores.
+at_rest:
+  # Resource types that hold data at rest and must be present + encrypted.
+  required_resource_types:
+    - azurerm_storage_account
+  min_encrypted_stores: 1
+  # Advisory hardening flag recorded in `detail` (EVIDENCE-ONLY; double-encryption
+  # is optional and not all SKUs support it, so its absence does not fail the gate).
+  prefer_infrastructure_encryption: true
+
+# --- BLOCKING: key management ------------------------------------------------
+# A key-management resource (Key Vault / Managed HSM) must be present so that keys
+# and secrets are not embedded in code or app config (NIS2 21(2)(h), Art.32).
+key_management:
+  required_resource_types:
+    - azurerm_key_vault
+    - azurerm_key_vault_managed_hardware_security_module
+  min_key_managers: 1
+  # Advisory key-vault hardening recorded in `detail` (EVIDENCE-ONLY).
+  prefer_purge_protection: true
+
+# --- EVIDENCE-ONLY: cipher floor (not IaC-assertable) -----------------------
+# Documented for the evidence pack; the platform negotiates the suite for the
+# enforced TLS floor. Recorded as context, never asserted as a gate.
+cipher_floor_evidence:
+  note: >-
+    Cipher suites are negotiated by the Azure platform for the enforced TLS floor
+    and are not expressed in the storage/key-vault Terraform schema. Treat as
+    evidence context, not a pipeline-verifiable assertion.
+  expected_suites:
+    - TLS_AES_256_GCM_SHA384
+    - TLS_AES_128_GCM_SHA256
+    - TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384

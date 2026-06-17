@@ -1,0 +1,267 @@
+# =============================================================================
+# Scope & Applicability Determination — Evidence Pack Part B / Part 0.4
+#   "Oświadczenie o stosowalności" (which regulatory modules apply, and why)
+# =============================================================================
+#
+# Purpose (evidence-pack-specification.md:61-64 PART B; struktura §2 Part 0.4;
+# struktura B.1-B.3):
+#   This is the single source of truth for the entity-classification and
+#   regulatory-applicability determination. It records, PER REGIME, whether the
+#   regime applies to CyberForge and the documented rationale + clause basis.
+#   It exists to close spec §8 anti-pattern #10 ("Scope hand-waving — no
+#   documented rationale for why DORA/NIS2/CRA do or don't apply"), which is an
+#   explicit auditor REJECTION TRIGGER (evidence-pack-specification.md:282).
+#
+# Consumed by:
+#   scripts/validators/applicability.py — schema- + field-validates this file and
+#   emits evidence/scope-determination.json. The validator FAILs (BLOCKING) if
+#   ANY regime lacks `applies` or a non-empty `rationale` (T-120 DoD). Edit the
+#   determination HERE (not the script or the rendered pack).
+#
+# HONESTY / TIERING NOTE (poland-appendix.md:46-49):
+#   The *applicability determination itself* (whether a regime applies) is a
+#   LEGAL / COMPLIANCE judgement, NOT a pipeline-provable fact. The validator
+#   enforces that the determination is STRUCTURALLY COMPLETE (every regime has a
+#   recorded `applies` + non-empty `rationale` + clause basis + named approver) —
+#   that completeness is BLOCKING. The CORRESPONDENCE of the determination to the
+#   entity's real legal position is EVIDENCE-ONLY: a human (the accountable
+#   officer named below) attests it, dated, and ⚠️ confirm before sign-off.
+#   The pack records each regime as "determined and documented by [approver],
+#   dated" — never as "compliance achieved".
+#
+# Regulatory dates/clauses below were verified against primary sources
+# (EUR-Lex / ec.europa.eu / EBA-ESA / Dz.U.); see `verification` per regime.
+# Lock the Poland-specific pin-cites (Dz.U. acts, KNF channels) before the
+# binder is signed (evidence-pack-specification.md:14,226).
+
+schema_version: "1.0"
+
+# --- B.1 Entity classification (the subject of the determination) -------------
+entity:
+  legal_name: "CyberForge Sp. z o.o."
+  registered_office: "Poland"
+  # ⚠️ KRS/NIP/REGON to be inserted from the registration record before sign-off.
+  identifiers:
+    krs: "PENDING-CONFIRM"
+    nip: "PENDING-CONFIRM"
+    lei: "PENDING-NOT-YET-ISSUED"     # consistent with register-of-information.yaml
+  size_class: "micro-enterprise"       # < 10 employees (isms-scope.md §2)
+  sector: "Information Technology — DevSecOps services / CI-CD hardening"
+  role_in_supply_chain: >-
+    ICT third-party service provider (software-delivery automation and
+    evidence-generation tooling) to financial-sector and critical-infrastructure
+    clients in Poland/EU. CyberForge is NOT itself a regulated financial entity;
+    its regulatory exposure is (a) direct, as a provider/manufacturer of products
+    with digital elements, and (b) flow-down, via client contracts that pass
+    DORA/NIS2 obligations to the provider.
+  primary_markets:
+    - "Polish financial sector"
+    - "Polish critical-infrastructure / NIS2-in-scope entities"
+    - "EU technology sector"
+
+# --- Determination metadata ---------------------------------------------------
+determination:
+  # The accountable officer who OWNS this scoping decision (DORA 5(2)/(3),
+  # NIS2 Art.20 "kierownik podmiotu"). EVIDENCE-ONLY human attestation.
+  approved_by: "Szymon Mytych"
+  approver_role: "Kierownik podmiotu / Accountable officer (CyberForge Sp. z o.o.)"
+  determination_date: "2026-06-16"
+  review_cadence_days: 365             # annually, or on material change of context
+  next_review_due: "2027-06-16"
+  status: "DETERMINED-PENDING-LEGAL-CONFIRMATION"
+  note: >-
+    ⚠️ This determination is authored from baseline regulatory knowledge and the
+    company's current operating model. Confirm entity classification (DORA Art.2
+    scope; NIS2-KSC kluczowy/ważny thresholds; CRA manufacturer status) with
+    qualified legal counsel before the pack is signed for an external audit.
+
+# --- B.3 Regulatory applicability matrix (one block per regime) ---------------
+# Each regime MUST carry: applies (bool), rationale (non-empty), clause_basis,
+# legal_basis, and (for an honest pack) the obligations that flow from it.
+regimes:
+
+  DORA:
+    name: "Digital Operational Resilience Act"
+    applies: false
+    applies_as: "ICT third-party service provider (flow-down), NOT a financial entity"
+    rationale: >-
+      DORA (Reg. (EU) 2022/2554) binds "financial entities" enumerated in
+      Art. 2(1)(a)-(t) (credit/payment/e-money institutions, investment firms,
+      CASPs, insurers, etc.). CyberForge is a software-tooling boutique and is
+      NOT a financial entity, so DORA does not apply to it DIRECTLY. DORA reaches
+      CyberForge in two indirect ways: (1) as an ICT third-party service provider
+      to in-scope financial entities, its clients must register it in their
+      Register of Information (Art. 28(3)) and impose Art. 30 contractual terms
+      (audit/access rights, sub-outsourcing, exit, incident cooperation) that
+      flow down to CyberForge; (2) CyberForge could in principle be designated a
+      Critical ICT Third-Party Provider (CTPP) under Art. 31 and fall under ESA
+      oversight — but the first CTPP list (Nov 2025, 19 providers) is limited to
+      systemic hyperscale/core-banking providers, so this is NOT applicable at
+      CyberForge's scale. DORA is lex specialis: a DORA-covered client is carved
+      out of much of the Polish KSC Act, which is why the boundary to NIS2 must
+      be documented (see boundary_notes).
+    clause_basis:
+      - "DORA Art. 2(1) — definition of financial entity (scope test: not met)"
+      - "DORA Art. 28(3) + ITS (EU) 2024/2956 — Register of Information (flow-down to client)"
+      - "DORA Art. 30 — contractual provisions on ICT services (flow-down)"
+      - "DORA Art. 31 — CTPP designation criteria (not met at this scale)"
+    legal_basis:
+      - "Regulation (EU) 2022/2554 (DORA), applicable from 17 January 2025"
+      - "Commission Implementing Regulation (EU) 2024/2956 (ITS — Register of Information)"
+      - "Polish operational act: Dz.U. 2025 poz. 1069 (in force 7 August 2025)"
+    competent_authority: "KNF (Komisja Nadzoru Finansowego) — for in-scope financial-entity clients"
+    obligations_when_applicable: >-
+      Even though DORA does not bind CyberForge directly, the pipeline produces
+      the flow-down evidence a DORA-covered client needs: a machine-readable
+      Register of Information seed (docs/governance/register-of-information.yaml),
+      Art. 30 contract-clause checks (ict-third-party-contract-controls.md), and
+      an exit plan — so the provider can satisfy its clients' DORA duties.
+    verification: >-
+      VERIFIED — DORA scope/dates against EUR-Lex (Reg. 2022/2554, applicable
+      2025-01-17), ESA CTPP first-list publication (Nov 2025, 19 providers), and
+      spec/struktura (Dz.U. 2025 poz. 1069). ⚠️ confirm client carve-out boundary
+      and that no client contract designates CyberForge as a sub-critical CTPP.
+
+  NIS2-KSC:
+    name: "NIS2 Directive, transposed by the Polish Krajowy System Cyberbezpieczeństwa (KSC) amendment"
+    applies: false
+    applies_as: "Supplier to NIS2 essential/important entities; below own size+sector threshold"
+    rationale: >-
+      NIS2 (Dir. (EU) 2022/2555) applies, via the Polish KSC amendment, to
+      "podmioty kluczowe" (essential) and "podmioty ważne" (important) entities
+      that operate in an Annex I/II sector AND meet the size threshold (generally
+      medium-sized: ≥ 50 employees OR > €10m turnover/balance sheet). CyberForge
+      is a micro-enterprise (< 10 employees) and "ICT service management
+      (B2B)" / "digital providers" is an Annex sector, but CyberForge does NOT
+      meet the size threshold and is not a special-case in-scope entity (it is
+      not a DNS/TLD/registrar, trust-service, or public-electronic-comms
+      provider that is in scope regardless of size). Therefore CyberForge is NOT
+      directly a kluczowy/ważny entity under KSC. NIS2 reaches CyberForge as a
+      SUPPLIER: NIS2 essential/important clients must manage supply-chain
+      security (Art. 21(2)(d)) and will impose NIS2-derived security
+      requirements contractually. The KSC transition windows are still open, so
+      do not penalise against a not-yet-effective obligation (spec §8 #11).
+    clause_basis:
+      - "NIS2 Art. 2 + Art. 3 — scope, essential vs important classification (size+sector test: not met)"
+      - "NIS2 Art. 21(2)(d) — supply-chain security (flow-down to CyberForge as supplier)"
+      - "KSC: podmiot kluczowy vs ważny classification; registration in the wykaz"
+    legal_basis:
+      - "Directive (EU) 2022/2555 (NIS2)"
+      - "Polish KSC amendment: Dz.U. 2026 poz. 252, in force 3 April 2026"
+      - "Commission Implementing Regulation (EU) 2024/2690 (CIR — incident parameters)"
+    competent_authority: >-
+      Competent CSIRT (NASK default; sectoral CSIRT under KNF for finance once
+      live). Registration via the wykaz (System S46 / wykaz-ksc.gov.pl).
+    transition_notes: >-
+      KSC in force 3 April 2026; registration in the wykaz by ~3 October 2026;
+      full technical compliance ~3 April 2027; penalties enforceable ~April 2028.
+      Re-run this determination if CyberForge crosses the size threshold or takes
+      on a special-case in-scope service.
+    verification: >-
+      VERIFIED — KSC date (Dz.U. 2026 poz. 252, 2026-04-03) and CIR 2024/2690
+      against spec/struktura primary-source note. ⚠️ confirm Annex sector mapping
+      and that no special-case (size-independent) limb applies to CyberForge.
+
+  CRA:
+    name: "Cyber Resilience Act"
+    applies: true
+    applies_as: "Manufacturer of a product with digital elements (the pipeline/tooling) placed on the EU market"
+    rationale: >-
+      The CRA (Reg. (EU) 2024/2847) binds manufacturers, importers and
+      distributors of "products with digital elements" (PDE) made available on
+      the EU market. CyberForge develops and ships software tooling (the
+      DevSecOps pipeline platform and the demo container) intended for the EU
+      market, so it falls within the manufacturer obligations: secure-by-design
+      (Annex I Part I), a coordinated vulnerability-handling process (Annex I
+      Part II), an SBOM, and — from 11 September 2026 — mandatory reporting of
+      actively-exploited vulnerabilities and severe incidents (24h early warning
+      / 72h notification / 14d final report) via the CRA Single Reporting
+      Platform to the CSIRT of main establishment and ENISA. APPLIES, with the
+      reporting limb effective 11 Sep 2026 and full conformity (CE marking)
+      required from 11 December 2027. The pipeline already produces the core CRA
+      technical evidence (SBOM, SCA/VEX-track, signing, provenance), so CRA is
+      the regime where CyberForge's own output is closest to compliant.
+    clause_basis:
+      - "CRA Annex I Part I — essential cybersecurity requirements (secure-by-design)"
+      - "CRA Annex I Part II — vulnerability-handling requirements (SBOM, coordinated disclosure)"
+      - "CRA Art. 14 — reporting of actively-exploited vulnerabilities and severe incidents"
+    legal_basis:
+      - "Regulation (EU) 2024/2847 (Cyber Resilience Act)"
+      - "Reporting obligations apply from 11 September 2026; full application from 11 December 2027"
+    competent_authority: >-
+      Market-surveillance authority + CSIRT of main establishment (PL: NASK CSIRT)
+      via the CRA Single Reporting Platform (SRP); ENISA notified in parallel.
+    transition_notes: >-
+      Vulnerability/incident reporting effective 2026-09-11; CE-mark conformity
+      from 2027-12-11. Author/maintain a coordinated-vulnerability-disclosure
+      process (docs/governance/vulnerability-disclosure-policy.md) and an SBOM
+      per release ahead of the reporting date.
+    verification: >-
+      VERIFIED — CRA reporting date 2026-09-11 and full-application 2027-12-11
+      against ec.europa.eu (digital-strategy CRA reporting/summary) and
+      EUR-Lex Reg. 2024/2847. ⚠️ confirm the product is classed as a PDE and
+      whether any Annex III "important"/"critical" class raises conformity duties.
+
+  RODO:
+    name: "RODO / GDPR (General Data Protection Regulation)"
+    applies: true
+    applies_as: "Controller (own developer/HR PII) and processor (client data under DPA)"
+    rationale: >-
+      RODO (Reg. (EU) 2016/679) applies to any controller/processor established
+      in the EU that processes personal data. CyberForge processes personal data
+      directly: the pipeline's data-flow record (docs/governance/data-flow.yaml)
+      shows developer names/emails in commits and names in pipeline logs are
+      retained for the audit trail, and the company processes HR/employee data.
+      As a service provider it may also act as a PROCESSOR of client personal
+      data under a DPA (Art. 28). RODO therefore APPLIES unconditionally. The
+      Polish national overlay is the Ustawa o ochronie danych osobowych
+      (10 May 2018). The pipeline maintains a RoPA (Art. 30) and the data-flow
+      map (Art. 25 data-protection-by-design), with breach notification to UODO
+      within 72h (Art. 33).
+    clause_basis:
+      - "RODO Art. 4 + Art. 3 — territorial/material scope (EU controller: met)"
+      - "RODO Art. 30 — records of processing activities (RoPA)"
+      - "RODO Art. 25 — data protection by design (data-flow map)"
+      - "RODO Art. 28 — processor obligations (client DPA)"
+      - "RODO Art. 33/34 — breach notification (72h to UODO)"
+    legal_basis:
+      - "Regulation (EU) 2016/679 (RODO/GDPR)"
+      - "Polish Ustawa o ochronie danych osobowych (10 May 2018) — national overlay"
+    competent_authority: "UODO (Prezes Urzędu Ochrony Danych Osobowych)"
+    obligations_when_applicable: >-
+      Maintain RoPA (docs/governance/ropa.yaml — validated by validate-ropa.py),
+      data-flow/residency map (data-flow.yaml), DPIA determination, lawful-basis
+      register, 72h breach procedure, and DPAs with sub-processors.
+    verification: >-
+      VERIFIED — applies by inspection of docs/governance/data-flow.yaml (PII
+      present at Source-Code and Evidence-Pack-Archive stages) and the existing
+      RoPA artifact. National overlay (UODO Act 2018-05-10) per spec §6.3.
+
+# --- B.2 Data residency map (cross-reference, not duplication) -----------------
+# The system & data inventory and data-flow/residency map (Part B.2) is the
+# T-31 data-flow record — single source of truth, not copied here.
+data_flow_residency_ref:
+  source: "docs/governance/data-flow.yaml"
+  rendered_artifact: "evidence/data-flow-diagram.json"
+  residency_summary: >-
+    All processing/storage stages are in Azure Poland Central (EU); source
+    control is GitHub (provider attestations carved out — see isms-scope.md).
+    Lawful-transfer mechanism to be documented for any non-EU sub-processor
+    (⚠️ confirm none in the current data-flow).
+  note: >-
+    The data-flow.yaml records pii_present + pii_justification + retention per
+    stage; the residency determination for Part B.2 reads from there so there is
+    one maintained map, not two divergent copies.
+
+# --- Cross-regime boundary notes (spec: "both can apply — document the boundary")
+boundary_notes: >-
+  CyberForge is not directly DORA- or NIS2-bound, so there is no intra-entity
+  DORA-vs-KSC lex-specialis carve-out to resolve for CyberForge itself. The
+  boundary that DOES matter is the FLOW-DOWN boundary: a DORA-covered client is
+  carved out of much of the KSC Act, so the contractual requirements that reach
+  CyberForge differ by client type (DORA Art. 30 terms for financial clients;
+  NIS2 Art. 21(2)(d) supply-chain terms for NIS2 clients). The two regimes
+  CyberForge IS directly subject to — CRA (as manufacturer) and RODO (as
+  controller/processor) — are complementary, not mutually exclusive: CRA governs
+  product cybersecurity, RODO governs personal-data processing; both apply at
+  once and neither carves out the other.

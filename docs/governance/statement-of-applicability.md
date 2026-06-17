@@ -60,7 +60,7 @@ This SoA applies to the ISMS scope as defined in [isms-scope.md](isms-scope.md):
 | A.5.19 | Information security in supplier relationships | Yes | Required to manage ICT supply chain risk (DORA Art.28) | Implemented | `docs/governance/vendor-risk-register.md`, `docs/governance/vendor-due-diligence-checklist.md` |
 | A.5.20 | Addressing information security within supplier agreements | Yes | Required to establish security obligations in contracts | Implemented | `docs/governance/ict-third-party-contract-controls.md` |
 | A.5.21 | Managing information security in the ICT supply chain | Yes | Required to manage supply chain risks across the chain | Implemented | `docs/governance/vendor-risk-register.md`, SHA-pinned Actions, SBOM generation, Cosign signing |
-| A.5.22 | Monitoring, review and change management of supplier services | Yes | Required to monitor supplier performance and changes | Implemented | `docs/governance/vendor-risk-register.md` (quarterly review), Renovate automated update monitoring |
+| A.5.22 | Monitoring, review and change management of supplier services | Yes | Required to monitor supplier performance and changes | Partially Implemented | `docs/governance/vendor-risk-register.md` (quarterly review) is the active control; `renovate.json` config present; Renovate App activation pending |
 | A.5.23 | Information security for use of cloud services | Yes | Core to CyberForge operations (Azure, GitHub) | Implemented | `docs/governance/vendor-risk-register.md`, Azure OIDC federation, `docs/governance/iam-governance.md` |
 | A.5.24 | Information security incident management planning and preparation | Yes | Required to prepare for security incidents | Implemented | `docs/governance/crisis-management-plan.md`, `docs/governance/vulnerability-management-policy.md` |
 | A.5.25 | Assessment and decision on information security events | Yes | Required to assess and classify security events | Implemented | `docs/governance/vulnerability-management-policy.md` (severity classification) |
@@ -154,11 +154,11 @@ This SoA applies to the ISMS scope as defined in [isms-scope.md](isms-scope.md):
 
 | Theme | Total Controls | Applicable | Not Applicable | Implemented | Partially Implemented | Planned |
 |---|---|---|---|---|---|---|
-| A.5 Organizational | 37 | 37 | 0 | 28 | 7 | 2 |
+| A.5 Organizational | 37 | 37 | 0 | 27 | 8 | 2 |
 | A.6 People | 8 | 8 | 0 | 6 | 2 | 0 |
 | A.7 Physical | 14 | 4 | 10 | 2 | 2 | 0 |
 | A.8 Technological | 34 | 34 | 0 | 25 | 7 | 2 |
-| **Total** | **93** | **83** | **10** | **61** | **18** | **4** |
+| **Total** | **93** | **83** | **10** | **60** | **19** | **4** |
 
 ---
 

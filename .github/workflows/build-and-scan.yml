@@ -20,6 +20,24 @@ on:
       image_digest:
         description: "Image digest (sha256)"
         value: ${{ jobs.docker-build.outputs.image_digest }}
+      critical_cves:
+        description: >-
+          Measured count of CRITICAL vulnerabilities in the built image (Trivy
+          image scan, post-.trivyignore). Parsed from real scan JSON, not
+          hardcoded. Consumed by the OPA deployment gate (deploy.yml) so it
+          admits on measured truth instead of self-measuring (T-03).
+        value: ${{ jobs.docker-build.outputs.critical_cves }}
+      high_cves:
+        description: >-
+          Measured count of HIGH vulnerabilities in the built image (Trivy image
+          scan, post-.trivyignore). Parsed from real scan JSON.
+        value: ${{ jobs.docker-build.outputs.high_cves }}
+      coverage_pct:
+        description: >-
+          Minimum of line/branch/function/statement coverage percentages from
+          the unit-tests job — the same value the existing 80% gate enforces.
+          Parsed from coverage/coverage-summary.json, not hardcoded (T-03).
+        value: ${{ jobs.unit-tests.outputs.coverage_pct }}
 
 permissions:
   contents: read
@@ -49,6 +67,16 @@ jobs:
           wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
           echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
           sudo apt-get update && sudo apt-get install -y trivy
+
+      - name: Validate .trivyignore policy
+        run: |
+          # Pre-scan gate (T-02): every active suppression in app/.trivyignore
+          # MUST carry a '# VEX: <status> - <reason> expires=YYYY-MM-DD' line and
+          # be unexpired. This keeps the strong Trivy fs+image gates honest — a
+          # silently-added or stale suppression fails the job here, BEFORE the
+          # scan can be weakened. The linter exits 1 on any unjustified/expired
+          # entry, 2 if the file is missing.
+          python3 scripts/lint-trivyignore.py app/.trivyignore
 
       - name: Run Trivy filesystem scan
         run: |
@@ -200,6 +228,156 @@ jobs:
           output: codeql-results
           upload: false
 
+      # T-125 (SARIF conformance) — assert the CodeQL artifact is a conformant
+      # SARIF 2.1.0 doc (version=="2.1.0" + top-level $schema + tool.driver shape)
+      # BEFORE the content gate below parses it. CodeQL is the one scanner stage
+      # here that emits SARIF natively; the Trivy stages emit native JSON (asserted
+      # by their own Trivy gates), so T-125 is NOT wired there to avoid mislabelling
+      # a non-SARIF artifact. Fail-closed: the validator maps PASS->0, FAIL->1
+      # (e.g. wrong version / missing $schema), INDETERMINATE->2 (unreadable /
+      # not-SARIF); any non-zero fails this job so a non-conformant SARIF can never
+      # silently feed the downstream high-severity gate or the Code Scanning upload.
+      - name: Assert CodeQL SARIF conformance (T-125, fail-closed)
+        run: |
+          set -euo pipefail
+          python3 scripts/validators/sarif_conformance.py \
+            codeql-results/javascript.sarif \
+            --stage codeql \
+            --out /tmp/sarif-conformance-codeql.json
+
+      # Fail-closed SAST gate. This step runs BEFORE the code-scanning upload and
+      # does NOT use `if: always()`, so a non-zero exit fails the whole job. The
+      # gate parses the SARIF locally and must not depend on the upload (which is
+      # continue-on-error: it is for the UI only, not enforcement).
+      #
+      # A finding blocks the build when its `level == "error"` OR its rule's
+      # `security-severity` (a CVSS-style 0.0-10.0 score CodeQL writes onto the
+      # rule metadata, not the result) is >= 7.0 (CVSS "high"). security-severity
+      # lives on the rule object in tool.driver.rules or tool.extensions[].rules,
+      # so results are resolved to their rule via ruleIndex/ruleId before scoring.
+      #
+      # Suppressions live in app/.codeqlignore (mirrors the .trivyignore policy):
+      # one ruleId per line, each requiring an inline justification AND a future
+      # `expires=YYYY-MM-DD`. Expired or unjustified entries are ignored, so the
+      # finding still gates.
+      - name: Enforce CodeQL high-severity gate (fail-closed)
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, datetime
+
+          SARIF = "codeql-results/javascript.sarif"
+          IGNORE = "app/.codeqlignore"
+          THRESHOLD = 7.0
+          today = datetime.date.today()
+
+          # Parse app/.codeqlignore. A ruleId is suppressed ONLY when its line
+          # carries a justification (free text after the id) AND a non-expired
+          # `expires=YYYY-MM-DD`. Anything malformed/expired is dropped so the
+          # finding keeps gating (fail-safe).
+          suppressed = {}
+          if os.path.exists(IGNORE):
+              for raw in open(IGNORE):
+                  line = raw.strip()
+                  if not line or line.startswith("#"):
+                      continue
+                  parts = line.split(None, 1)
+                  rule_id = parts[0]
+                  rest = parts[1] if len(parts) > 1 else ""
+                  exp = None
+                  for tok in rest.replace(",", " ").split():
+                      if tok.startswith("expires="):
+                          try:
+                              exp = datetime.date.fromisoformat(tok.split("=", 1)[1])
+                          except ValueError:
+                              exp = None
+                  justification = rest
+                  for tok in rest.split():
+                      if tok.startswith("expires="):
+                          justification = justification.replace(tok, "")
+                  justification = justification.strip()
+                  if not justification:
+                      print(f"::warning::.codeqlignore '{rule_id}' has no justification -- ignored (still gating)")
+                      continue
+                  if exp is None:
+                      print(f"::warning::.codeqlignore '{rule_id}' has no valid expires=YYYY-MM-DD -- ignored (still gating)")
+                      continue
+                  if exp < today:
+                      print(f"::warning::.codeqlignore '{rule_id}' expired {exp} -- ignored (still gating)")
+                      continue
+                  suppressed[rule_id] = exp
+
+          try:
+              with open(SARIF) as f:
+                  sarif = json.load(f)
+          except (OSError, json.JSONDecodeError) as e:
+              # Missing/unreadable SARIF is a gate failure: never silently pass.
+              print(f"::error::CodeQL SARIF unreadable ({SARIF}): {e} -- failing closed")
+              sys.exit(1)
+
+          def rule_severity_map(run):
+              # security-severity is stored on the RULE, in tool.driver.rules and
+              # tool.extensions[].rules. Build {ruleId: float(security-severity)}.
+              m = {}
+              tool = run.get("tool", {})
+              components = [tool.get("driver", {})] + list(tool.get("extensions", []))
+              for comp in components:
+                  for rule in comp.get("rules", []):
+                      rid = rule.get("id")
+                      sev = rule.get("properties", {}).get("security-severity")
+                      if rid is not None and sev is not None:
+                          try:
+                              m[rid] = float(sev)
+                          except (TypeError, ValueError):
+                              pass
+              return m
+
+          def rule_list(run):
+              tool = run.get("tool", {})
+              comps = [tool.get("driver", {})] + list(tool.get("extensions", []))
+              # rules per component, used to resolve ruleIndex within a component
+              return comps
+
+          blocking = []
+          for run in sarif.get("runs", []):
+              sevmap = rule_severity_map(run)
+              comps = rule_list(run)
+              for r in run.get("results", []):
+                  # Resolve the rule id: prefer ruleId, then result.rule.id, then
+                  # ruleIndex into the rule's tool component.
+                  rid = r.get("ruleId") or r.get("rule", {}).get("id")
+                  if rid is None:
+                      idx = r.get("ruleIndex", r.get("rule", {}).get("index"))
+                      ti = r.get("rule", {}).get("toolComponent", {}).get("index")
+                      comp = comps[ti] if isinstance(ti, int) and 0 <= ti < len(comps) else comps[0]
+                      rules = comp.get("rules", [])
+                      if isinstance(idx, int) and 0 <= idx < len(rules):
+                          rid = rules[idx].get("id")
+                  sev = sevmap.get(rid, 0.0)
+                  level = r.get("level", "warning")
+                  is_high = level == "error" or sev >= THRESHOLD
+                  if not is_high:
+                      continue
+                  if rid in suppressed:
+                      print(f"::notice::CodeQL '{rid}' suppressed until {suppressed[rid]} (level={level}, security-severity={sev})")
+                      continue
+                  loc = ""
+                  locs = r.get("locations", [])
+                  if locs:
+                      pl = locs[0].get("physicalLocation", {})
+                      uri = pl.get("artifactLocation", {}).get("uri", "")
+                      line = pl.get("region", {}).get("startLine", "")
+                      loc = f" {uri}:{line}" if uri else ""
+                  blocking.append((rid, level, sev, loc))
+
+          if blocking:
+              for rid, level, sev, loc in blocking:
+                  print(f"::error::CodeQL high-severity finding {rid} (level={level}, security-severity={sev}){loc}")
+              print(f"::error::CodeQL gate FAILED: {len(blocking)} high-severity finding(s) (level==error or security-severity>={THRESHOLD})")
+              sys.exit(1)
+
+          print(f"CodeQL gate PASSED: 0 blocking findings (threshold security-severity>={THRESHOLD}, level==error).")
+          PY
+
       - name: Upload CodeQL SARIF to Code Scanning
         uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
         if: always()
@@ -266,6 +444,7 @@ jobs:
           |--------|-------|
           | Language | JavaScript / TypeScript |
           | Query suite | security-extended |
+          | Gate | Fail-closed: blocks on level==error OR security-severity >= 7.0 (suppressions: app/.codeqlignore) |
           EOF
           if [ -f codeql-results/javascript.sarif ]; then
             python3 - <<'PY'
@@ -298,6 +477,12 @@ jobs:
     name: "Unit Tests + Coverage"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      # coverage_pct is the SAME value enforced by the 80% gate below — the min
+      # of line/branch/function/statement pct, parsed from coverage-summary.json.
+      # Surfaced as a workflow output so the OPA deployment gate consumes the
+      # measured number instead of re-reading the artifact itself (T-03).
+      coverage_pct: ${{ steps.coverage-gate.outputs.coverage_pct }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -321,10 +506,18 @@ jobs:
         run: cd app && npm run test:ci
 
       - name: Check coverage threshold (>=80%)
+        id: coverage-gate
         run: |
           COVERAGE=$(cd app && cat coverage/coverage-summary.json | \
             python3 -c "import sys,json; d=json.load(sys.stdin)['total']; print(min(d['lines']['pct'],d['branches']['pct'],d['functions']['pct'],d['statements']['pct']))")
           echo "Minimum coverage: ${COVERAGE}%"
+          # Surface the measured minimum as a step output BEFORE the gate check, so
+          # downstream jobs (OPA deployment gate) consume this exact value. The
+          # value is written even though the gate may fail below — that is fine:
+          # GITHUB_OUTPUT is committed when the step ends, and a failed gate fails
+          # the job so no downstream job runs anyway. This is the single source of
+          # truth for coverage_pct (T-03).
+          echo "coverage_pct=${COVERAGE}" >> "$GITHUB_OUTPUT"
           python3 - "$COVERAGE" <<'PY'
           import sys
           cov = float(sys.argv[1])
@@ -356,7 +549,7 @@ jobs:
           test_errors = 0
           try:
               import xml.etree.ElementTree as ET
-              for junit_file in glob.glob("app/test-results/*.xml") + glob.glob("app/junit.xml"):
+              for junit_file in glob.glob("app/test-results/*.xml"):
                   tree = ET.parse(junit_file)
                   root = tree.getroot()
                   for ts in root.iter("testsuite"):
@@ -365,6 +558,10 @@ jobs:
                       test_errors += int(ts.get("errors", 0))
           except Exception:
               pass
+
+          if test_count == 0:
+              print("::error::No JUnit test results parsed (test_count == 0)")
+              raise SystemExit(1)
 
           # Parse coverage
           lines_pct = branches_pct = functions_pct = statements_pct = "N/A"
@@ -405,6 +602,11 @@ jobs:
     outputs:
       image_uri: ${{ steps.meta.outputs.image_uri }}
       image_digest: ${{ steps.build.outputs.digest }}
+      # Measured CRITICAL/HIGH image-CVE counts from the Trivy image scan, parsed
+      # from real scan JSON (post-.trivyignore). Surfaced so the OPA deployment
+      # gate admits on the measured count rather than recomputing it (T-03).
+      critical_cves: ${{ steps.image-scan-metadata.outputs.critical_cves }}
+      high_cves: ${{ steps.image-scan-metadata.outputs.high_cves }}
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -535,10 +737,11 @@ jobs:
             2>&1 | tee /tmp/trivy-image-console.txt
 
       - name: Generate Trivy image scan metadata
+        id: image-scan-metadata
         if: always()
         run: |
           python3 - <<'PY'
-          import json, subprocess
+          import json, os, subprocess
 
           trivy_version = subprocess.run(["trivy", "--version"], capture_output=True, text=True).stdout.strip()
 
@@ -553,11 +756,16 @@ jobs:
               "timestamp": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%SZ"], capture_output=True, text=True).stdout.strip(),
           }
 
+          # Default to fail-closed counts: if the scan JSON is missing/unparseable
+          # we surface critical_cves=1 so the downstream OPA deployment gate denies
+          # rather than admitting on a silent 0 (T-03). parse_ok flips to True only
+          # on a successful parse of real results.
+          severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
+          parse_ok = False
           try:
               with open("trivy-image-results.json") as f:
                   data = json.load(f)
               total_vulns = 0
-              severity_counts = {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0}
               for r in data.get("Results", []):
                   for v in r.get("Vulnerabilities", []):
                       sev = v.get("Severity", "").upper()
@@ -566,11 +774,23 @@ jobs:
                           severity_counts[sev] += 1
               metadata["total_findings"] = total_vulns
               metadata["severity_breakdown"] = severity_counts
+              parse_ok = True
           except Exception as e:
               metadata["parse_error"] = str(e)
 
           with open("trivy-image-scan-metadata.json", "w") as f:
               json.dump(metadata, f, indent=2)
+
+          # Surface measured CRITICAL/HIGH counts as step outputs for the workflow
+          # output -> OPA deployment gate. Fail closed (critical=1) if parsing the
+          # real scan JSON failed, so the gate can never admit on a phantom 0.
+          critical = severity_counts["CRITICAL"] if parse_ok else 1
+          high = severity_counts["HIGH"] if parse_ok else 0
+          gho = os.environ.get("GITHUB_OUTPUT")
+          if gho:
+              with open(gho, "a") as fh:
+                  fh.write(f"critical_cves={critical}\n")
+                  fh.write(f"high_cves={high}\n")
           PY
 
       - name: Generate SBOM with Syft

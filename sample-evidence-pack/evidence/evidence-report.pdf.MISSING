@@ -1,0 +1,5 @@
+EVIDENCE PDF NOT RENDERED (degraded run)
+reason: weasyprint import failed: ModuleNotFoundError("No module named 'weasyprint'")
+EVIDENCE_ALLOW_DEGRADE=1 was set, so this placeholder marker was
+written and the chain continues. In CI (fail-closed) this is an
+error: install weasyprint + system libs (see requirements-pdf.txt).

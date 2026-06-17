@@ -1,0 +1,216 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://cyberforge.agency/vex/sha256-20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+  "author": "CyberForge Security Team <security@cyberforge.agency>",
+  "timestamp": "2026-06-17T14:57:50Z",
+  "version": 1,
+  "tooling": "cyberforge/generate-vex 1.0 (OpenVEX 0.2.0)",
+  "statements": [
+    {
+      "vulnerability": {
+        "name": "CVE-2026-0861"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "component_not_present",
+      "impact_statement": "glibc advisory applied to the old Debian-based distroless base. The Wolfi-based cgr.dev/chainguard/node image uses musl/Wolfi packaging and does not ship the affected glibc component, so the vulnerable component is not present.",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-28387"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL). Not a suppression \u2014 the vulnerable package version is absent from the released image.",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-28388"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-28389"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-28390"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "OpenSSL advisory previously waived on the Debian-based distroless base; resolved by the migration to cgr.dev/chainguard/node which ships fixed OpenSSL.",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-31789"
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "fixed",
+      "justification": "vulnerable_code_not_present",
+      "impact_statement": "OpenSSL libssl3 advisory present only in the legacy gcr.io/distroless/nodejs20-debian12 base. The runtime base was migrated to cgr.dev/chainguard/node (Wolfi), which ships the patched OpenSSL package; the vulnerable code is no longer present in the released image.",
+      "status_notes": "Triaged by CyberForge Security Team on 2026-06-01."
+    },
+    {
+      "vulnerability": {
+        "name": "CVE-2026-8723",
+        "description": "### Summary    `qs.stringify` throws `TypeError` when called with `arr ..."
+      },
+      "products": [
+        {
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "identifiers": {
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "hashes": {
+            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+          },
+          "subcomponents": [
+            {
+              "@id": "pkg:npm/qs@6.14.2"
+            },
+            {
+              "@id": "sbom:sbom.cyclonedx.json",
+              "identifiers": {
+                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+              }
+            }
+          ]
+        }
+      ],
+      "timestamp": "2026-06-17T14:57:50Z",
+      "status": "under_investigation",
+      "status_notes": "Reported by the scanner; not yet triaged in docs/governance/vex-justifications.yaml."
+    }
+  ],
+  "role": "Product Security / Vulnerability Management"
+}

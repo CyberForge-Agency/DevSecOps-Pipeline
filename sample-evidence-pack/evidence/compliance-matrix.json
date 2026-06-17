@@ -1,0 +1,407 @@
+{
+  "generated_at": "2026-06-17T14:57:48Z",
+  "schema": "cyberforge-compliance-matrix/v2-content-validated",
+  "blocking_failures": 16,
+  "frameworks": {
+    "DORA": [
+      {
+        "article": "Art.16.1.a",
+        "requirement": "ICT risk management",
+        "evidence": "security-report.json (+embedded Trivy Results)",
+        "validator": "vuln-scan",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": null,
+        "threshold": {
+          "critical": 0
+        },
+        "detail": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.16.1.c",
+        "requirement": "Updated systems",
+        "evidence": "trivy-sca-summary.json + dependency-review.json",
+        "validator": "sca-scan",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": null,
+        "threshold": {
+          "severity_filter": [
+            "CRITICAL",
+            "HIGH"
+          ],
+          "dependency_review_is_report": true,
+          "unjustified_suppressions": 0
+        },
+        "detail": "SCA evidence: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/trivy-sca-summary.json: file not found; /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/dependency-review.json: file not found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.16.1.d",
+        "requirement": "Anomaly detection",
+        "evidence": "pipeline-run.json",
+        "validator": "anomaly-detection",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": null,
+        "threshold": {
+          "run_record": "present"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.28",
+        "requirement": "Supply chain risk",
+        "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl",
+        "validator": "sbom-supply-chain",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "1.7",
+          "version": 1,
+          "components": 70,
+          "attestation": {
+            "status": "INDETERMINATE",
+            "method": "none",
+            "image_ref": null
+          }
+        },
+        "threshold": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "present",
+          "components": ">0",
+          "attestation_verifies_to_digest": true
+        },
+        "detail": "NIS2 21.2.d unmeasured: attestation binding unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-attestation-verification.log: not present (cannot confirm binding)",
+        "tool_version": "cosign: A tool for Container Signing, Verification and Storage in an OCI registry."
+      }
+    ],
+    "NIS2": [
+      {
+        "article": "Art.21.2.b",
+        "requirement": "Incident handling",
+        "evidence": "zap-report.json",
+        "validator": "dast-findings",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": null,
+        "threshold": {
+          "high_or_critical": 0
+        },
+        "detail": "zap-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/zap-report.json: file not found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.21.2.d",
+        "requirement": "Supply chain security",
+        "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl",
+        "validator": "sbom-supply-chain",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "1.7",
+          "version": 1,
+          "components": 70,
+          "attestation": {
+            "status": "INDETERMINATE",
+            "method": "none",
+            "image_ref": null
+          }
+        },
+        "threshold": {
+          "bomFormat": "CycloneDX",
+          "specVersion": "present",
+          "components": ">0",
+          "attestation_verifies_to_digest": true
+        },
+        "detail": "NIS2 21.2.d unmeasured: attestation binding unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-attestation-verification.log: not present (cannot confirm binding)",
+        "tool_version": "cosign: A tool for Container Signing, Verification and Storage in an OCI registry."
+      },
+      {
+        "article": "Art.21.2.e",
+        "requirement": "Secure development",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "Art.21.2.h",
+        "requirement": "Cryptography",
+        "evidence": "cosign-verification.log",
+        "validator": "crypto-signing",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "verification": "INDETERMINATE",
+          "method": "none",
+          "image_ref": null,
+          "rekor_log_index": null,
+          "cert_identity": null,
+          "cert_issuer": null
+        },
+        "threshold": {
+          "signature_verifies_to_digest": true,
+          "identity_regexp": "https://github.com/[^/]+/[^/]+/\\.github/workflows/sign-and-attest\\.yml@refs/heads/main",
+          "oidc_issuer": "https://token.actions.githubusercontent.com"
+        },
+        "detail": "NIS2 21.2.h unmeasured: signature verification unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-verification.log: not present (cannot confirm signature)",
+        "tool_version": "cosign: A tool for Container Signing, Verification and Storage in an OCI registry."
+      }
+    ],
+    "ISO27001": [
+      {
+        "article": "A.8.4",
+        "requirement": "Access to source code",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "A.8.9",
+        "requirement": "Configuration management",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "A.8.25",
+        "requirement": "Secure SDLC",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "A.8.28",
+        "requirement": "Secure coding",
+        "evidence": "security-report.json",
+        "validator": "vuln-scan",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": null,
+        "threshold": {
+          "critical": 0
+        },
+        "detail": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+        "tool_version": null
+      }
+    ],
+    "SOC2": [
+      {
+        "article": "CC6.1",
+        "requirement": "Logical access",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "CC7.1",
+        "requirement": "System operations",
+        "evidence": "cosign-verification.log",
+        "validator": "crypto-signing",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "verification": "INDETERMINATE",
+          "method": "none",
+          "image_ref": null,
+          "rekor_log_index": null,
+          "cert_identity": null,
+          "cert_issuer": null
+        },
+        "threshold": {
+          "signature_verifies_to_digest": true,
+          "identity_regexp": "https://github.com/[^/]+/[^/]+/\\.github/workflows/sign-and-attest\\.yml@refs/heads/main",
+          "oidc_issuer": "https://token.actions.githubusercontent.com"
+        },
+        "detail": "NIS2 21.2.h unmeasured: signature verification unmeasurable: no image_uri@image_digest known (env/pipeline-run.json); cosign-verification.log: not present (cannot confirm signature)",
+        "tool_version": "cosign: A tool for Container Signing, Verification and Storage in an OCI registry."
+      },
+      {
+        "article": "CC8.1",
+        "requirement": "Change management",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      },
+      {
+        "article": "PI1.1",
+        "requirement": "Processing integrity",
+        "evidence": "security-report.json",
+        "validator": "vuln-scan",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": null,
+        "threshold": {
+          "critical": 0
+        },
+        "detail": "security-report.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/security-report.json: file not found",
+        "tool_version": null
+      }
+    ],
+    "RODO": [
+      {
+        "article": "Art.5.1.c",
+        "requirement": "Data minimization",
+        "evidence": "dpa-compliance-check.json",
+        "validator": "dpa-register",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": null,
+        "threshold": {
+          "register": "operated"
+        },
+        "detail": "dpa-compliance-check.json parsed but no vendor records found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.5.1.e",
+        "requirement": "Storage limitation",
+        "evidence": "dpa-compliance-check.json",
+        "validator": "dpa-register",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": null,
+        "threshold": {
+          "register": "operated"
+        },
+        "detail": "dpa-compliance-check.json parsed but no vendor records found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.25",
+        "requirement": "Data protection by design",
+        "evidence": "data-flow-diagram.json",
+        "validator": "data-flow",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": null,
+        "threshold": {
+          "stages": ">0"
+        },
+        "detail": "data-flow-diagram.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/data-flow-diagram.json: file not found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.28",
+        "requirement": "Processor agreements",
+        "evidence": "dpa-compliance-check.json",
+        "validator": "dpa-register",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": null,
+        "threshold": {
+          "register": "operated"
+        },
+        "detail": "dpa-compliance-check.json parsed but no vendor records found",
+        "tool_version": null
+      },
+      {
+        "article": "Art.30",
+        "requirement": "Records of processing",
+        "evidence": "pipeline-run.json",
+        "validator": "pipeline-gates",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "sha_binding": {
+            "status": "INDETERMINATE",
+            "run_sha": null,
+            "provenance_commit": null
+          }
+        },
+        "threshold": {
+          "all_gates": "success"
+        },
+        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      }
+    ]
+  },
+  "tool_versions": {
+    "source_file": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/tool-versions.json",
+    "status": "missing",
+    "measured_versions": {}
+  }
+}
