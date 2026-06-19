@@ -1,12 +1,12 @@
 {
   "schema": "cyberforge-evidence-manifest/v1",
-  "report_id": "",
-  "generated_at": "1970-01-01T00:00:00Z",
+  "report_id": "cyberforge-demo-20260618",
+  "generated_at": "2026-06-18T10:41:41Z",
   "git_sha": "",
   "image_digest": "",
   "period": {
-    "start": "",
-    "end": ""
+    "start": "2026-05-19T10:41:41Z",
+    "end": "2026-06-18T10:41:41Z"
   },
   "artifacts": [
     {
@@ -35,8 +35,8 @@
     },
     {
       "path": "audit-document.html",
-      "sha256": "e187848fe2098970cddb18a6d4eed428d6b414ee9f3887fee5b6876e9f55fe43",
-      "size": 131608,
+      "sha256": "a3215bed8e0406825fdfd9ee19eb1ffe435b7bd58c0aa7faed0d7176071bd333",
+      "size": 138068,
       "mime": "text/html",
       "source": "asserted-document",
       "provenance": "static"
@@ -83,8 +83,8 @@
     },
     {
       "path": "evidence-report.html",
-      "sha256": "2407171176bd9fd73cdf8958d35ffe919c3eb7171654779f89ea9c36a2219a2a",
-      "size": 91535,
+      "sha256": "44a4572302f17bc5e5003b68bb92dc8b9f9faf424a2f5b782e932fa23f98327b",
+      "size": 93122,
       "mime": "text/html",
       "source": "asserted-document",
       "provenance": "static"
@@ -298,7 +298,7 @@
       "provenance": "live"
     }
   ],
-  "merkle_root": "66caf002d58f2506cfb9411ed7340e89a4a7e7a283eee6a6cb37470f9d398b15",
+  "merkle_root": "483f6d10a764bc4a819be65250f331dfce784e67bedbca1ba60cdaa0ea484db2",
   "merkle_algorithm": "RFC6962-SHA256",
   "tooling": {},
   "worm_state": "pending",

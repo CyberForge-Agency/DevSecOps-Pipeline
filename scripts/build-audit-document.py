@@ -48,48 +48,51 @@ from typing import Any, Dict, List, Optional, Tuple
 # --------------------------------------------------------------------------------------------------
 
 SCHEMA_EXPECTED = "cyberforge-evidence-manifest/v1"
-DOC_CLASSIFICATION = "CONFIDENTIAL — AUDIT USE"
-DOC_TITLE = "CyberForge DevSecOps Pipeline — Audit-Grade Evidence Report"
+DOC_CLASSIFICATION = "POUFNE — DO UŻYTKU AUDYTOWEGO"
+DOC_TITLE = "Pipeline DevSecOps CyberForge — Raport Dowodowy Klasy Audytowej"
 DOC_VERSION_FALLBACK = "1.0"
 
 # Honesty banner lines printed on the cover and in the claims register. These are deliberate,
 # non-overclaiming statements — not measured values.
 HONESTY_BANNER = [
-    "SLSA Build L2 achieved — L3 is NOT claimed (provenance generation is best-effort and not "
-    "demonstrably isolated from the build job).",
-    "Immutability is DESIGNED, not yet locked — the live WORM/object-lock state shown in this "
-    "document is read from the manifest's worm_state field, never hardcoded.",
-    "This report attests DESIGN effectiveness only — there is no operating track record yet; "
-    "registers and sign-off cadences are pre-Stage-2 / pre-Type-II.",
-    "Tamper-evidence holds once anchored (cosign/Rekor + RFC-3161 + PAdES); runner clock times are "
-    "informational while TSA/Rekor times are trusted.",
-    "This generated report is evidentiary; the showcase index.html is illustrative cover-stock only.",
+    "Osiągnięto SLSA Build L2 — poziom L3 NIE jest deklarowany (generowanie proweniencji jest "
+    "najlepszym możliwym staraniem i nie jest dowodliwie odizolowane od zadania budowy).",
+    "Niezmienność jest ZAPROJEKTOWANA, lecz jeszcze niezablokowana — bieżący stan WORM/blokady "
+    "obiektu przedstawiony w tym dokumencie jest odczytywany z pola worm_state w manifeście, "
+    "nigdy zakodowany na stałe.",
+    "Niniejszy raport poświadcza wyłącznie skuteczność PROJEKTOWĄ — brak jeszcze udokumentowanej "
+    "historii operacyjnej; rejestry i kadencje zatwierdzeń są przed Etapem 2 / przed Typem II.",
+    "Odporność na manipulację obowiązuje po zakotwiczeniu (cosign/Rekor + RFC-3161 + PAdES); czasy "
+    "zegara runnera mają charakter informacyjny, podczas gdy czasy TSA/Rekor są zaufane.",
+    "Niniejszy wygenerowany raport ma charakter dowodowy; witryna pokazowa index.html jest "
+    "wyłącznie ilustracyjną oprawą.",
 ]
 
 # Provenance-flag legend printed on the cover.
 PROVENANCE_LEGEND = {
-    "live": "live / measured — produced by a scanner, build, or signing tool during this run.",
-    "static": "static / asserted — a human-authored statement (DPA register, data-flow, cost "
-    "tables, README) included for completeness, not machine-measured.",
+    "live": "na żywo / zmierzone — wytworzone przez skaner, budowę lub narzędzie podpisujące "
+    "w trakcie tego uruchomienia.",
+    "static": "statyczne / deklarowane — oświadczenie sporządzone przez człowieka (rejestr DPA, "
+    "przepływ danych, tabele kosztów, README) dołączone dla kompletności, niemierzone maszynowo.",
 }
 
 # Tamper-evidence / verification commands shown in the appendix (illustrative, identity-pinned).
 VERIFY_COMMANDS = [
-    ("Recompute & compare the Merkle root",
+    ("Przelicz ponownie i porównaj korzeń Merkle",
      "python3 scripts/generate-evidence-manifest.py <evidence_dir> --verify"),
-    ("Verify every artifact hash (legacy manifest)",
+    ("Zweryfikuj skrót każdego artefaktu (manifest starszego typu)",
      "sha256sum -c manifest.sha256"),
-    ("Verify the cosign sign-blob bundle (identity-pinned)",
+    ("Zweryfikuj pakiet cosign sign-blob (powiązany z tożsamością)",
      "cosign verify-blob --bundle manifest.json.bundle "
      "--certificate-identity \"$COSIGN_IDENTITY\" "
      "--certificate-oidc-issuer \"$COSIGN_ISSUER\" manifest.json"),
-    ("Verify the RFC-3161 timestamp token",
+    ("Zweryfikuj token znacznika czasu RFC-3161",
      "openssl ts -verify -in merkle_root.tsr -data merkle_root.txt -CAfile tsa-chain.pem"),
-    ("Validate PDF/A-3b conformance",
+    ("Sprawdź zgodność z PDF/A-3b",
      "verapdf --flavour 3b --format json evidence-report.pdf"),
-    ("Check whole-document signature coverage",
+    ("Sprawdź pokrycie podpisem całego dokumentu",
      "pdfsig evidence-report.pdf"),
-    ("Run the full bundled verify runbook",
+    ("Uruchom pełną dołączoną procedurę weryfikacji",
      "bash scripts/verify-evidence-pack.sh <evidence_dir>"),
 ]
 
@@ -98,35 +101,35 @@ GENERATED_AT_FALLBACK = "1970-01-01T00:00:00Z"
 # Ordered document structure (mirrors design spec document_structure_ordered). Each tuple is
 # (section_id, human title). Used to build the TOC and to assert ordering in tests.
 SECTION_ORDER: List[Tuple[str, str]] = [
-    ("cover", "Cover / Title Page"),
-    ("doc-control", "Document Control"),
-    ("toc", "Table of Contents"),
-    ("authority", "Statement of Authority & Document Relationship"),
-    ("exec-summary", "Executive Assurance Summary"),
-    ("compliance-as-code", "Compliance-as-Code — Organizational-Control Verdicts (Part A)"),
-    ("soa-maturity", "Statement of Applicability + Maturity Scores (Part D.3 / §9)"),
-    ("scope-applicability", "Scope & Regulatory-Applicability Determination (Part B)"),
-    ("scope", "Scope, Boundaries, Subservice Carve-Outs & CUECs"),
-    ("threat-model", "Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)"),
-    ("attestation", "Management Attestation of Accuracy & Completeness"),
-    ("ipe", "Methodology, Sampling & Population Statement (IPE)"),
-    ("control-matrix", "Control-to-Evidence Cross-Reference Matrix"),
-    ("crosswalk", "Auto-Generated Regulatory Crosswalk (one evidence → many clauses)"),
-    ("provenance-sbom", "Verified Provenance & SBOM Attestation"),
-    ("evidence-detail", "Per-Control Evidence Detail"),
-    ("vuln-mgmt", "Vulnerability Management"),
-    ("vex", "Vulnerability-Exploitability Exchange (VEX) Summary"),
-    ("runtime-hardening", "Runtime-Hardening Posture (Part C.15)"),
-    ("change-approval", "Change & Approval Records"),
-    ("exceptions", "Exceptions / Deviation Register"),
-    ("residual-risk", "Risk-Acceptance & Residual-Risk Statement (Part J.2 / D.4)"),
-    ("break-glass", "Emergency-Change / Break-Glass Disclosure"),
-    ("kpi-trends", "DORA & Security-KPI Trends"),
-    ("retention", "Retention & Records-Management Metadata"),
-    ("glossary", "Glossary / Framework-Clause Appendix"),
-    ("tamper-evidence", "Tamper-Evidence Appendix"),
-    ("self-seal", "Document Self-Seal / Manifest Page"),
-    ("claims-register", "Claims Register Appendix"),
+    ("cover", "Okładka / Strona Tytułowa"),
+    ("doc-control", "Kontrola Dokumentu"),
+    ("toc", "Spis Treści"),
+    ("authority", "Oświadczenie o Umocowaniu i Relacji Dokumentu"),
+    ("exec-summary", "Streszczenie Zarządcze Zapewnienia"),
+    ("compliance-as-code", "Zgodność jako Kod — Werdykty Kontroli Organizacyjnych (Część A)"),
+    ("soa-maturity", "Deklaracja Stosowalności + Oceny Dojrzałości (Część D.3 / §9)"),
+    ("scope-applicability", "Określenie Zakresu i Stosowalności Regulacyjnej (Część B)"),
+    ("scope", "Zakres, Granice, Wyłączenia Podusług i CUEC"),
+    ("threat-model", "Model Zagrożeń (STRIDE) — Dowód Bezpiecznego Projektowania (Część C.1)"),
+    ("attestation", "Atestacja Zarządu o Rzetelności i Kompletności"),
+    ("ipe", "Metodyka, Dobór Próby i Oświadczenie o Populacji (IPE)"),
+    ("control-matrix", "Macierz Odniesień Kontrola-Dowód"),
+    ("crosswalk", "Automatycznie Generowana Tablica Korelacji Regulacyjnej (jeden dowód → wiele klauzul)"),
+    ("provenance-sbom", "Zweryfikowana Proweniencja i Atestacja SBOM"),
+    ("evidence-detail", "Szczegóły Dowodów dla Poszczególnych Kontroli"),
+    ("vuln-mgmt", "Zarządzanie Podatnościami"),
+    ("vex", "Podsumowanie Wymiany Eksploatowalności Podatności (VEX)"),
+    ("runtime-hardening", "Stan Utwardzenia Środowiska Uruchomieniowego (Część C.15)"),
+    ("change-approval", "Rejestry Zmian i Zatwierdzeń"),
+    ("exceptions", "Rejestr Wyjątków / Odstępstw"),
+    ("residual-risk", "Oświadczenie o Akceptacji Ryzyka i Ryzyku Szczątkowym (Część J.2 / D.4)"),
+    ("break-glass", "Ujawnienie Zmian Awaryjnych / Procedury Break-Glass"),
+    ("kpi-trends", "Trendy DORA i Wskaźników Bezpieczeństwa"),
+    ("retention", "Metadane Retencji i Zarządzania Rekordami"),
+    ("glossary", "Słownik / Załącznik z Klauzulami Ram Regulacyjnych"),
+    ("tamper-evidence", "Załącznik o Odporności na Manipulację"),
+    ("self-seal", "Strona Samozaplombowania / Manifestu Dokumentu"),
+    ("claims-register", "Załącznik z Rejestrem Twierdzeń"),
 ]
 
 
@@ -470,22 +473,22 @@ def build_crosswalk(controls: List[Dict[str, Any]],
 REGULATORY_REQUIRED_ROWS = [
     {
         "id": "UKSC Art.8",
-        "description": "Polish National Cybersecurity System Act (UKSC) Art. 8 — risk management "
-        "and security measures for key/important service operators.",
+        "description": "Ustawa o krajowym systemie cyberbezpieczeństwa (UKSC) Art. 8 — zarządzanie "
+        "ryzykiem i środki bezpieczeństwa dla operatorów usług kluczowych/istotnych.",
         "framework": "UKSC (PL)",
         "status": "NA",
         "evidence": None,
-        "test": "Mapping asserted; operating evidence pending.",
+        "test": "Mapowanie zadeklarowane; dowód operacyjny oczekuje.",
         "_synthetic": True,
     },
     {
         "id": "CRA Art.13",
-        "description": "EU Cyber Resilience Act Art. 13 — manufacturer obligations: secure-by-design, "
-        "vulnerability handling, SBOM, and coordinated disclosure.",
+        "description": "Akt UE w sprawie cyberodporności Art. 13 — obowiązki producenta: bezpieczeństwo "
+        "w fazie projektowania, obsługa podatności, SBOM oraz skoordynowane ujawnianie.",
         "framework": "CRA (EU)",
         "status": "NA",
         "evidence": None,
-        "test": "Mapping asserted; operating evidence pending.",
+        "test": "Mapowanie zadeklarowane; dowód operacyjny oczekuje.",
         "_synthetic": True,
     },
 ]
@@ -510,10 +513,10 @@ def ensure_regulatory_rows(controls: List[Dict[str, Any]]) -> List[Dict[str, Any
 
 # SSDF practice families for the dedicated sub-matrix (PO/PS/PW/RV).
 SSDF_FAMILIES = [
-    ("PO", "Prepare the Organization"),
-    ("PS", "Protect the Software"),
-    ("PW", "Produce Well-Secured Software"),
-    ("RV", "Respond to Vulnerabilities"),
+    ("PO", "Przygotuj Organizację"),
+    ("PS", "Chroń Oprogramowanie"),
+    ("PW", "Wytwarzaj Dobrze Zabezpieczone Oprogramowanie"),
+    ("RV", "Reaguj na Podatności"),
 ]
 
 
@@ -550,35 +553,35 @@ def extract_ssdf_controls(controls: List[Dict[str, Any]]) -> List[Dict[str, Any]
 # several aliases (basename without extension, the validator module name, and the A.x id itself).
 # This is a fixed editorial mapping (a clause crosswalk), NOT a computed compliance figure.
 COMPLIANCE_AS_CODE_CATALOG: List[Dict[str, Any]] = [
-    {"id": "A.1", "title": "DORA Register of Information (RoI) — critical/important ICT providers, "
-        "exit strategy & substitutability",
+    {"id": "A.1", "title": "Rejestr Informacji DORA (RoI) — krytyczni/istotni dostawcy ICT, "
+        "strategia wyjścia i zastępowalność",
      "clause": "DORA Art.28(3); Reg (EU) 2024/2956 (ITS on RoI)",
      "files": ["roi-validation.json"], "validator": "validate-roi"},
-    {"id": "A.2", "title": "Data Processing Agreements (DPA) register — Art.28 processor clauses",
+    {"id": "A.2", "title": "Rejestr Umów Powierzenia Przetwarzania (DPA) — klauzule podmiotu przetwarzającego z Art.28",
      "clause": "GDPR/RODO Art.28(3)",
      "files": ["dpa-compliance-check.json"], "validator": "check-dpa-register"},
-    {"id": "A.3", "title": "Records of Processing (RoPA) + DPIA completeness",
+    {"id": "A.3", "title": "Rejestr Czynności Przetwarzania (RoPA) + kompletność DPIA",
      "clause": "GDPR/RODO Art.30(1)-(2), Art.35",
      "files": ["ropa-completeness.json"], "validator": "validate-ropa"},
-    {"id": "A.4", "title": "Incident register — statutory-clock schema (3-phase DORA clock)",
+    {"id": "A.4", "title": "Rejestr incydentów — schemat zegara ustawowego (3-fazowy zegar DORA)",
      "clause": "DORA Art.19; NIS2 Art.23",
      "files": ["incident-readiness.json"], "validator": "check-incident-register"},
-    {"id": "A.5", "title": "PII data-flow / transfer map",
+    {"id": "A.5", "title": "Mapa przepływu / transferu danych osobowych (PII)",
      "clause": "GDPR/RODO Art.30(5), Art.25",
      "files": ["data-flow-diagram.json"], "validator": "check-data-flow"},
-    {"id": "A.6", "title": "Governance freshness — management review & NIS2 management training",
+    {"id": "A.6", "title": "Aktualność ładu — przegląd zarządczy i szkolenie kadry zarządzającej NIS2",
      "clause": "DORA Art.5; NIS2 Art.20(2); ISO 27001 9.3",
      "files": ["governance-evidence.json"], "validator": "check-governance"},
-    {"id": "A.7", "title": "ICT third-party clauses + documented & tested exit strategy",
+    {"id": "A.7", "title": "Klauzule dla dostawców ICT (stron trzecich) + udokumentowana i przetestowana strategia wyjścia",
      "clause": "DORA Art.28-30 (Art.30(2)-(3), Art.28(8)); ISO 27001 A.5.19-A.5.23",
      "files": ["tpp-clauses.json"], "validator": "check-thirdparty-clauses"},
-    {"id": "A.8", "title": "Access-review cadence freshness (privileged re-certification)",
+    {"id": "A.8", "title": "Aktualność kadencji przeglądu dostępu (recertyfikacja uprzywilejowanych)",
      "clause": "NIS2 Art.21(2)(i); ISO 27001 A.8.2",
      "files": ["access-review.json"], "validator": "check-access-reviews"},
-    {"id": "A.9", "title": "Cryptographic posture — TLS floor & key management threshold",
+    {"id": "A.9", "title": "Stan kryptograficzny — dolny próg TLS i próg zarządzania kluczami",
      "clause": "NIS2 Art.21(2)(h); ISO 27001 A.8.24; SOC2 CC7.1",
      "files": ["crypto-posture.json"], "validator": "assert-crypto"},
-    {"id": "A.10", "title": "Backup restore-test proof + freshness (successful restore conducted)",
+    {"id": "A.10", "title": "Dowód testu odtworzenia z kopii zapasowej + aktualność (przeprowadzono udane odtworzenie)",
      "clause": "DORA Art.11-12; NIS2 Art.21(2)(c); ISO 27001 A.8.13",
      "files": ["restore-test.json"], "validator": "check-restore-test"},
 ]
@@ -790,7 +793,7 @@ def build_css(doc_id: str, doc_version: str) -> str:
     color: #56607a;
   }}
   @bottom-right {{
-    content: "Page " counter(page) " of " counter(pages);
+    content: "Strona " counter(page) " z " counter(pages);
     font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
     font-size: 7.5pt;
     color: #56607a;
@@ -816,12 +819,12 @@ def build_css(doc_id: str, doc_version: str) -> str:
   size: A4 landscape;
   margin: 16mm 14mm 16mm 14mm;
   @top-center {{
-    content: "{safe_id}  ·  v{safe_ver}  ·  Control-to-Evidence Matrix";
+    content: "{safe_id}  ·  v{safe_ver}  ·  Macierz Kontrola-Dowód";
     font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
     font-size: 7.5pt; color: #56607a;
   }}
   @bottom-right {{
-    content: "Page " counter(page) " of " counter(pages);
+    content: "Strona " counter(page) " z " counter(pages);
     font-family: "IBM Plex Mono", "DejaVu Sans Mono", monospace;
     font-size: 7.5pt; color: #56607a;
   }}
@@ -997,7 +1000,7 @@ thead {{ display: table-header-group; }}
 # --------------------------------------------------------------------------------------------------
 
 def unavailable(reason: str) -> str:
-    return f'<div class="unavailable">Not available this run — {esc(reason)}.</div>'
+    return f'<div class="unavailable">Niedostępne w tym uruchomieniu — {esc(reason)}.</div>'
 
 
 def render_cover(ctx: Dict[str, Any]) -> str:
@@ -1010,30 +1013,30 @@ def render_cover(ctx: Dict[str, Any]) -> str:
     return f"""
 <section class="page-cover section" id="cover">
   <h1 class="cover-title">{esc(DOC_TITLE)}</h1>
-  <div class="cover-sub">Forensic, data-driven evidence report — regenerated per release.</div>
+  <div class="cover-sub">Forensiczny, oparty na danych raport dowodowy — generowany na nowo dla każdego wydania.</div>
 
   <div class="cover-grid">
-    <div class="k">Report ID</div><div class="v">{esc(ctx['report_id'])}</div>
-    <div class="k">Version</div><div class="v">{esc(ctx['doc_version'])}</div>
-    <div class="k">Classification</div><div class="v">{esc(DOC_CLASSIFICATION)}</div>
-    <div class="k">Generated (UTC)</div><div class="v">{esc(ctx['generated_at'])}</div>
-    <div class="k">Period covered</div><div class="v">{fmt_period(m.get('period'))}</div>
-    <div class="k">Build git SHA</div><div class="v">{esc(m.get('git_sha'))}</div>
-    <div class="k">Deployed image digest</div><div class="v">{esc(m.get('image_digest'))}</div>
-    <div class="k">Merkle algorithm</div><div class="v">{esc(m.get('merkle_algorithm') or 'RFC6962-SHA256')}</div>
-    <div class="k">WORM state</div><div class="v">{esc(m.get('worm_state'))}</div>
+    <div class="k">ID Raportu</div><div class="v">{esc(ctx['report_id'])}</div>
+    <div class="k">Wersja</div><div class="v">{esc(ctx['doc_version'])}</div>
+    <div class="k">Klasyfikacja</div><div class="v">{esc(DOC_CLASSIFICATION)}</div>
+    <div class="k">Wygenerowano (UTC)</div><div class="v">{esc(ctx['generated_at'])}</div>
+    <div class="k">Okres objęty</div><div class="v">{fmt_period(m.get('period'))}</div>
+    <div class="k">SHA git budowy</div><div class="v">{esc(m.get('git_sha'))}</div>
+    <div class="k">Skrót wdrożonego obrazu</div><div class="v">{esc(m.get('image_digest'))}</div>
+    <div class="k">Algorytm Merkle</div><div class="v">{esc(m.get('merkle_algorithm') or 'RFC6962-SHA256')}</div>
+    <div class="k">Stan WORM</div><div class="v">{esc(m.get('worm_state'))}</div>
   </div>
 
-  <h4>Evidence-pack Merkle root (verbatim)</h4>
+  <h4>Korzeń Merkle pakietu dowodowego (dosłownie)</h4>
   <div class="merkle" title="{esc_attr(merkle)}">{esc(merkle)}</div>
 
   <div class="honesty">
-    <h4>Honesty banner — read before relying on this document</h4>
+    <h4>Baner uczciwości — przeczytaj przed poleganiem na tym dokumencie</h4>
     <ul>{banner_rows}</ul>
   </div>
 
   <div class="legend">
-    <strong>Provenance-flag legend:</strong>
+    <strong>Legenda flagi proweniencji:</strong>
     <ul style="margin:4px 0 0; padding-left:18px;">{legend_rows}</ul>
   </div>
 </section>
@@ -1044,31 +1047,32 @@ def render_doc_control(ctx: Dict[str, Any]) -> str:
     m = ctx["manifest"] or {}
     return f"""
 <section class="section" id="doc-control">
-  <h2>1. Document Control</h2>
+  <h2>1. Kontrola Dokumentu</h2>
   <div class="kv">
-    <div class="k">Document title</div><div>{esc(DOC_TITLE)}</div>
-    <div class="k">Document ID</div><div>{esc(ctx['doc_id'])}</div>
-    <div class="k">Version</div><div>{esc(ctx['doc_version'])}</div>
-    <div class="k">Owner</div><div>CyberForge DevSecOps (preparer of record)</div>
-    <div class="k">Classification handling</div><div>{esc(DOC_CLASSIFICATION)} — restricted distribution; do not redistribute.</div>
-    <div class="k">Valid as of</div><div>{esc(ctx['generated_at'])} (regenerated per release)</div>
-    <div class="k">Re-issue trigger</div><div>Any new release / deployment, or change to evidence inputs.</div>
-    <div class="k">Distribution list</div><div>Internal audit, external assessor (on request), engineering leadership.</div>
+    <div class="k">Tytuł dokumentu</div><div>{esc(DOC_TITLE)}</div>
+    <div class="k">ID dokumentu</div><div>{esc(ctx['doc_id'])}</div>
+    <div class="k">Wersja</div><div>{esc(ctx['doc_version'])}</div>
+    <div class="k">Właściciel</div><div>CyberForge DevSecOps (sporządzający dokument)</div>
+    <div class="k">Postępowanie z klasyfikacją</div><div>{esc(DOC_CLASSIFICATION)} — dystrybucja ograniczona; nie rozpowszechniać.</div>
+    <div class="k">Ważny na dzień</div><div>{esc(ctx['generated_at'])} (generowany na nowo dla każdego wydania)</div>
+    <div class="k">Wyzwalacz ponownego wydania</div><div>Każde nowe wydanie / wdrożenie lub zmiana danych dowodowych.</div>
+    <div class="k">Lista dystrybucyjna</div><div>Audyt wewnętrzny, zewnętrzny asesor (na żądanie), kierownictwo inżynierii.</div>
   </div>
-  <h3>Version &amp; change history</h3>
+  <h3>Historia wersji i zmian</h3>
   <table>
-    <thead><tr><th>Version</th><th>Date (UTC)</th><th>Generated from git SHA</th><th>Note</th></tr></thead>
+    <thead><tr><th>Wersja</th><th>Data (UTC)</th><th>Wygenerowano z SHA git</th><th>Uwaga</th></tr></thead>
     <tbody>
       <tr>
         <td>{esc(ctx['doc_version'])}</td>
         <td>{esc(ctx['generated_at'])}</td>
         <td class="mono">{esc(m.get('git_sha'))}</td>
-        <td>Auto-generated forensic evidence report (this issue).</td>
+        <td>Automatycznie wygenerowany forensiczny raport dowodowy (to wydanie).</td>
       </tr>
     </tbody>
   </table>
-  <p class="small">This document is machine-generated each release from the signed evidence pack;
-  there is no manual edit history. Prior issues are retained per the retention policy.</p>
+  <p class="small">Niniejszy dokument jest generowany maszynowo dla każdego wydania z podpisanego
+  pakietu dowodowego; nie istnieje ręczna historia edycji. Wcześniejsze wydania są przechowywane
+  zgodnie z polityką retencji.</p>
 </section>
 """
 
@@ -1086,10 +1090,10 @@ def render_toc(ctx: Dict[str, Any]) -> str:
         )
     return f"""
 <section class="section" id="toc">
-  <h2>Table of Contents</h2>
+  <h2>Spis Treści</h2>
   <ul class="toc">{''.join(items)}</ul>
-  <p class="small">Page numbers and running headers/footers (document ID, version, classification,
-  Page X of N) are rendered by the CSS Paged Media engine at PDF render time.</p>
+  <p class="small">Numery stron oraz nagłówki/stopki bieżące (ID dokumentu, wersja, klasyfikacja,
+  Strona X z N) są renderowane przez mechanizm CSS Paged Media w chwili generowania PDF.</p>
 </section>
 """
 
@@ -1097,20 +1101,21 @@ def render_toc(ctx: Dict[str, Any]) -> str:
 def render_authority(ctx: Dict[str, Any]) -> str:
     return f"""
 <section class="section" id="authority">
-  <h2>2. Statement of Authority &amp; Document Relationship</h2>
-  <p>This report is the <strong>evidentiary</strong> artifact of the CyberForge DevSecOps pipeline.
-  It is <strong>data-driven</strong>: every measured figure is computed from the signed evidence
-  pack (<code>manifest.json</code>, <code>compliance-matrix.json</code>, and the per-tool scanner
-  outputs), not hand-authored. It is <strong>regenerated per release</strong> and is bound to the
-  deployed artifact's provenance digest (printed on the cover and asserted four-way against the
-  SLSA provenance subject, the cosign-verified digest, and <code>/api/build-info</code>).</p>
-  <p>The marketing showcase (<code>app/src/public/index.html</code>) is <strong>illustrative
-  cover-stock only</strong> and is explicitly non-evidentiary; where its numbers differ from this
-  report, <strong>this report governs</strong>. The served showcase hash is recorded in the manifest
-  so even the illustrative surface is change-detectable.</p>
-  <p class="small">Authoritative time: runner clock times in this document are informational. The
-  trusted time references are the cosign/Rekor Signed Entry Timestamp and the RFC-3161 token
-  (see the Tamper-Evidence appendix).</p>
+  <h2>2. Oświadczenie o Umocowaniu i Relacji Dokumentu</h2>
+  <p>Niniejszy raport jest artefaktem <strong>dowodowym</strong> pipeline'u DevSecOps CyberForge.
+  Jest <strong>oparty na danych</strong>: każda zmierzona wartość jest wyliczana z podpisanego
+  pakietu dowodowego (<code>manifest.json</code>, <code>compliance-matrix.json</code> oraz wyników
+  poszczególnych skanerów), a nie redagowana ręcznie. Jest <strong>generowany na nowo dla każdego
+  wydania</strong> i powiązany ze skrótem proweniencji wdrożonego artefaktu (wydrukowanym na
+  okładce i weryfikowanym czterostronnie wobec podmiotu proweniencji SLSA, skrótu zweryfikowanego
+  przez cosign oraz <code>/api/build-info</code>).</p>
+  <p>Witryna marketingowa (<code>app/src/public/index.html</code>) jest <strong>wyłącznie ilustracyjną
+  oprawą</strong> i jawnie nie ma charakteru dowodowego; gdy jej liczby różnią się od tego raportu,
+  <strong>rozstrzyga niniejszy raport</strong>. Skrót udostępnionej witryny jest zapisany w manifeście,
+  dzięki czemu nawet powierzchnia ilustracyjna jest wykrywalna pod kątem zmian.</p>
+  <p class="small">Czas miarodajny: czasy zegara runnera w tym dokumencie mają charakter informacyjny.
+  Zaufanymi odniesieniami czasu są cosign/Rekor Signed Entry Timestamp oraz token RFC-3161
+  (zob. załącznik o odporności na manipulację).</p>
 </section>
 """
 
@@ -1131,12 +1136,12 @@ def render_exec_summary(ctx: Dict[str, Any]) -> str:
                 f"<td>{status_badge('PASS' if c['fail'] == 0 and c['total'] else 'FAIL' if c['fail'] else 'NA')}</td></tr>"
             )
         cov_block = (
-            "<table><thead><tr><th>Framework</th><th>Pass</th><th>Fail</th><th>N/A</th>"
-            "<th>Total</th><th>Gate</th></tr></thead><tbody>"
+            "<table><thead><tr><th>Ramy regulacyjne</th><th>Zaliczone</th><th>Niezaliczone</th><th>Nie dotyczy</th>"
+            "<th>Razem</th><th>Bramka</th></tr></thead><tbody>"
             + "".join(rows)
             + "</tbody></table>"
-            "<p class=\"small\">Coverage is COMPUTED from the controls in compliance-matrix.json — "
-            "never hardcoded. Each figure is live/measured from the matrix.</p>"
+            "<p class=\"small\">Pokrycie jest WYLICZANE z kontroli w compliance-matrix.json — "
+            "nigdy zakodowane na stałe. Każda wartość jest na żywo / zmierzona z macierzy.</p>"
         )
 
     total_controls = len(controls)
@@ -1145,25 +1150,25 @@ def render_exec_summary(ctx: Dict[str, Any]) -> str:
     static_count = sum(1 for a in artifacts if a.get("provenance") == "static")
     exceptions_count = ctx["exception_count"]
     exc_str = (str(exceptions_count) if exceptions_count is not None
-               else "see Exceptions register")
+               else "zob. rejestr wyjątków")
 
     return f"""
 <section class="section" id="exec-summary">
-  <h2>3. Executive Assurance Summary</h2>
-  <p class="small">The five-minute page. All figures below are live/measured from the evidence pack.</p>
+  <h2>3. Streszczenie Zarządcze Zapewnienia</h2>
+  <p class="small">Strona „na pięć minut”. Wszystkie wartości poniżej są na żywo / zmierzone z pakietu dowodowego.</p>
   <div class="kv">
-    <div class="k">Scope</div><div>CyberForge DevSecOps pipeline (build &rarr; sign &rarr; deploy &rarr; evidence).</div>
-    <div class="k">Period</div><div>{fmt_period(m.get('period'))}</div>
-    <div class="k">Controls evaluated</div><div>{esc(total_controls) if total_controls else '&mdash;'}</div>
-    <div class="k">Evidence artifacts</div><div>{esc(len(artifacts))} total — {esc(live_count)} live/measured, {esc(static_count)} static/asserted.</div>
-    <div class="k">Exceptions noted</div><div>{esc(exc_str)}</div>
-    <div class="k">Deployed image digest</div><div class="mono">{esc(m.get('image_digest'))}</div>
-    <div class="k">Merkle root</div><div class="mono" title="{esc_attr(m.get('merkle_root'))}">{short_hash(m.get('merkle_root'), 24, 12)}</div>
-    <div class="k">WORM state</div><div>{esc(m.get('worm_state'))} (read live from manifest — not hardcoded).</div>
+    <div class="k">Zakres</div><div>Pipeline DevSecOps CyberForge (budowa &rarr; podpis &rarr; wdrożenie &rarr; dowody).</div>
+    <div class="k">Okres</div><div>{fmt_period(m.get('period'))}</div>
+    <div class="k">Ocenione kontrole</div><div>{esc(total_controls) if total_controls else '&mdash;'}</div>
+    <div class="k">Artefakty dowodowe</div><div>{esc(len(artifacts))} łącznie — {esc(live_count)} na żywo / zmierzone, {esc(static_count)} statyczne / deklarowane.</div>
+    <div class="k">Odnotowane wyjątki</div><div>{esc(exc_str)}</div>
+    <div class="k">Skrót wdrożonego obrazu</div><div class="mono">{esc(m.get('image_digest'))}</div>
+    <div class="k">Korzeń Merkle</div><div class="mono" title="{esc_attr(m.get('merkle_root'))}">{short_hash(m.get('merkle_root'), 24, 12)}</div>
+    <div class="k">Stan WORM</div><div>{esc(m.get('worm_state'))} (odczytany na żywo z manifestu — nie zakodowany na stałe).</div>
   </div>
-  <h3>Framework coverage (computed)</h3>
+  <h3>Pokrycie ram regulacyjnych (wyliczone)</h3>
   {cov_block}
-  <h3>One-line verification</h3>
+  <h3>Weryfikacja jednoliniowa</h3>
   <pre class="mono">bash scripts/verify-evidence-pack.sh &lt;evidence_dir&gt;</pre>
 </section>
 """
@@ -1189,16 +1194,16 @@ def render_compliance_as_code(ctx: Dict[str, Any]) -> str:
     if status_norm.get("available"):
         overall_badge = compliance_status_badge(overall)
         gate_line = (
-            f'<p><strong>Aggregate compliance gate:</strong> {overall_badge} '
-            f'<span class="small">(read from compliance-status.json overall_status — the signed, '
-            f'fail-closed verdict; not recomputed here).</span></p>'
+            f'<p><strong>Zbiorcza bramka zgodności:</strong> {overall_badge} '
+            f'<span class="small">(odczytano z pola overall_status w compliance-status.json — podpisany, '
+            f'odmawiający domyślnie werdykt; nie przeliczany ponownie tutaj).</span></p>'
         )
     else:
         gate_line = (
-            '<p><strong>Aggregate compliance gate:</strong> '
+            '<p><strong>Zbiorcza bramka zgodności:</strong> '
             '<span class="badge badge-unknown">NOT AVAILABLE</span> '
-            '<span class="small">— compliance-status.json was not present in this evidence pack; '
-            'the per-control table below shows NOT REPORTED for each control rather than a fabricated '
+            '<span class="small">— plik compliance-status.json nie był obecny w tym pakiecie dowodowym; '
+            'tabela kontroli poniżej pokazuje NOT REPORTED dla każdej kontroli zamiast sfałszowanego '
             'PASS.</span></p>'
         )
 
@@ -1212,11 +1217,11 @@ def render_compliance_as_code(ctx: Dict[str, Any]) -> str:
                        and (r["tier"] or "").upper() == "BLOCKING")
 
     summary = (
-        f'<p class="small">A.1-A.10 verdicts: '
-        f'{n_pass} PASS, {n_fail} FAIL ({n_block_fail} BLOCKING), {n_indet} INDETERMINATE, '
-        f'{n_unrep} NOT REPORTED. Only a BLOCKING FAIL fails the gate; an EVIDENCE-ONLY FAIL is '
-        f'recorded honestly but does not break the build (per the validator tiers in '
-        f'libcompliance.Tier).</p>'
+        f'<p class="small">Werdykty A.1-A.10: '
+        f'{n_pass} PASS, {n_fail} FAIL ({n_block_fail} BLOKUJĄCYCH), {n_indet} INDETERMINATE, '
+        f'{n_unrep} NOT REPORTED. Tylko BLOKUJĄCY FAIL powoduje niepowodzenie bramki; FAIL typu '
+        f'EVIDENCE-ONLY jest rejestrowany uczciwie, lecz nie przerywa budowy (zgodnie z poziomami '
+        f'walidatora w libcompliance.Tier).</p>'
     )
 
     body_rows = ""
@@ -1229,7 +1234,7 @@ def render_compliance_as_code(ctx: Dict[str, Any]) -> str:
         else:
             measured_cell = f'<span class="mono">{esc(measured)}</span>'
         thr = r["threshold"]
-        thr_cell = (f' / thr {esc(json.dumps(thr) if isinstance(thr, (dict, list)) else thr)}'
+        thr_cell = (f' / próg {esc(json.dumps(thr) if isinstance(thr, (dict, list)) else thr)}'
                     if thr not in (None, "") else "")
         # Remediation: only shown for non-PASS rows; a PASS needs no fix pointer.
         is_pass = (r["status"] or "").upper() == "PASS"
@@ -1254,28 +1259,30 @@ def render_compliance_as_code(ctx: Dict[str, Any]) -> str:
 
     table = (
         '<table><thead><tr>'
-        '<th>Control</th><th>Organizational control</th><th>Framework clause</th>'
-        '<th>Evidence verdict (provenance)</th><th>Tier</th>'
-        '<th>Result / measured</th><th>Remediation pointer</th>'
+        '<th>Kontrola</th><th>Kontrola organizacyjna</th><th>Klauzula ram regulacyjnych</th>'
+        '<th>Werdykt dowodowy (proweniencja)</th><th>Poziom</th>'
+        '<th>Wynik / zmierzono</th><th>Wskazanie naprawcze</th>'
         '</tr></thead><tbody>' + body_rows + '</tbody></table>'
     )
 
     return f"""
 <section class="page-landscape section" id="compliance-as-code">
-  <h2>3a. Compliance-as-Code — Organizational-Control Verdicts (Part A)</h2>
-  <p>The signed organizational-control layer (struktura &sect;6 'bramka zgodno&#347;ci' / compliance
-  gate). Each A.x control is checked by a content validator that emits a verdict only when it parsed
-  a value and that value met a stated threshold (libcompliance) &mdash; never a silent PASS. The
-  verdicts are aggregated into the fail-closed gate below. This is the proof that the differentiator
-  is machine-checked: a buyer sees signed PASS/FAIL org-control verdicts, not just DevSecOps SARIF.</p>
+  <h2>3a. Zgodność jako Kod — Werdykty Kontroli Organizacyjnych (Część A)</h2>
+  <p>Podpisana warstwa kontroli organizacyjnych (struktura &sect;6 'bramka zgodno&#347;ci' / compliance
+  gate). Każda kontrola A.x jest sprawdzana przez walidator treści, który wydaje werdykt wyłącznie
+  wtedy, gdy odczytał wartość spełniającą określony próg (libcompliance) &mdash; nigdy nie wystawia
+  cichego PASS. Werdykty są agregowane w odmawiającą domyślnie bramkę poniżej. Jest to dowód, że
+  wyróżnik jest maszynowo weryfikowany: kupujący widzi podpisane werdykty PASS/FAIL kontroli
+  organizacyjnych, a nie tylko raporty SARIF z DevSecOps.</p>
   {gate_line}
   {summary}
   {table}
-  <p class="small"><strong>Golden thread (struktura &sect;1):</strong> every row maps
-  control &rarr; evidence verdict (SHA-bound in the manifest &amp; &sect;17) &rarr; framework clause.
-  A BLOCKING FAIL (e.g. a past-due access review under A.8, or 'restore not yet conducted' under
-  A.10) makes the aggregate gate exit non-zero on a non-PR run &mdash; honest, fail-closed
-  enforcement with a concrete remediation pointer, not a green-for-show banner.</p>
+  <p class="small"><strong>Złota nić (struktura &sect;1):</strong> każdy wiersz mapuje
+  kontrolę &rarr; werdykt dowodowy (powiązany skrótem SHA w manifeście i &sect;17) &rarr; klauzulę ram
+  regulacyjnych. BLOKUJĄCY FAIL (np. zaległy przegląd dostępu w A.8 lub 'odtworzenie jeszcze
+  nieprzeprowadzone' w A.10) powoduje, że zbiorcza bramka kończy się kodem niezerowym przy
+  uruchomieniu spoza PR &mdash; uczciwe, odmawiające domyślnie egzekwowanie z konkretnym wskazaniem
+  działań naprawczych, a nie baner „na zielono dla pozoru”.</p>
 </section>
 """
 
@@ -1302,10 +1309,10 @@ def render_soa_maturity(ctx: Dict[str, Any]) -> str:
     """
     sm = ctx["soa_maturity"]
     if not isinstance(sm, dict):
-        body = unavailable("soa-maturity.json not provided (run scripts/validators/soa_maturity.py)")
+        body = unavailable("nie dostarczono soa-maturity.json (uruchom scripts/validators/soa_maturity.py)")
         return f"""
 <section class="section" id="soa-maturity">
-  <h2>3b. Statement of Applicability + Maturity Scores (Part D.3 / &sect;9)</h2>
+  <h2>3b. Deklaracja Stosowalności + Oceny Dojrzałości (Część D.3 / &sect;9)</h2>
   {body}
 </section>
 """
@@ -1320,17 +1327,17 @@ def render_soa_maturity(ctx: Dict[str, Any]) -> str:
 
     if (status or "").strip().upper() == "INDETERMINATE" or not overall:
         headline = (
-            '<p><strong>Computed pack maturity:</strong> '
+            '<p><strong>Wyliczona dojrzałość pakietu:</strong> '
             '<span class="badge badge-indet">INDETERMINATE</span> '
             f'<span class="small">{esc(sm.get("detail"))}</span></p>'
         )
     else:
-        weak_str = (f' Weakest dimension(s): {esc(", ".join(weakest))}.' if weakest else "")
+        weak_str = (f' Najsłabsze wymiar(y): {esc(", ".join(weakest))}.' if weakest else "")
         headline = (
-            f'<p><strong>Computed pack maturity:</strong> {_maturity_badge(overall)} '
-            f'<span class="small">(the LOWEST of the five &sect;9 dimensions &mdash; a chain is as '
-            f'strong as its weakest link; this is the COMPUTED level, never a hardcoded L5).{weak_str}'
-            f'</span></p>'
+            f'<p><strong>Wyliczona dojrzałość pakietu:</strong> {_maturity_badge(overall)} '
+            f'<span class="small">(NAJNIŻSZY z pięciu wymiarów &sect;9 &mdash; łańcuch jest tak '
+            f'mocny, jak jego najsłabsze ogniwo; jest to poziom WYLICZONY, nigdy zakodowany na stałe '
+            f'L5).{weak_str}</span></p>'
         )
 
     # SoA coverage block (computed from the parsed Annex A rows, not the doc's own summary table).
@@ -1338,22 +1345,22 @@ def render_soa_maturity(ctx: Dict[str, Any]) -> str:
         complete = soa.get("structurally_complete")
         complete_badge = (status_badge("PASS") if complete else status_badge("FAIL"))
         soa_block = (
-            "<h3>3b.1 ISO 27001 Statement of Applicability — coverage (computed)</h3>"
+            "<h3>3b.1 ISO 27001 Deklaracja Stosowalności — pokrycie (wyliczone)</h3>"
             '<div class="kv">'
-            f'<div class="k">Annex A controls parsed</div><div>{esc(soa.get("total_controls_parsed"))} '
-            f'of {esc(soa.get("iso_total_expected"))} expected {complete_badge}</div>'
-            f'<div class="k">Applicable</div><div>{esc(soa.get("applicable"))}</div>'
-            f'<div class="k">Not applicable</div><div>{esc(soa.get("not_applicable"))}</div>'
-            f'<div class="k">Implemented</div><div>{esc(soa.get("implemented"))}</div>'
-            f'<div class="k">Partially implemented</div><div>{esc(soa.get("partially_implemented"))}</div>'
-            f'<div class="k">Planned</div><div>{esc(soa.get("planned"))}</div>'
-            f'<div class="k">Implementation rate (applicable)</div>'
+            f'<div class="k">Przetworzone kontrole Załącznika A</div><div>{esc(soa.get("total_controls_parsed"))} '
+            f'z {esc(soa.get("iso_total_expected"))} oczekiwanych {complete_badge}</div>'
+            f'<div class="k">Mające zastosowanie</div><div>{esc(soa.get("applicable"))}</div>'
+            f'<div class="k">Niemające zastosowania</div><div>{esc(soa.get("not_applicable"))}</div>'
+            f'<div class="k">Wdrożone</div><div>{esc(soa.get("implemented"))}</div>'
+            f'<div class="k">Częściowo wdrożone</div><div>{esc(soa.get("partially_implemented"))}</div>'
+            f'<div class="k">Zaplanowane</div><div>{esc(soa.get("planned"))}</div>'
+            f'<div class="k">Wskaźnik wdrożenia (mające zastosowanie)</div>'
             f'<div>{esc(soa.get("implementation_rate_applicable"))}</div>'
             "</div>"
         )
     elif soa.get("error"):
-        soa_block = ("<h3>3b.1 ISO 27001 Statement of Applicability — coverage</h3>"
-                     + unavailable(f"SoA could not be parsed — {soa.get('error')}"))
+        soa_block = ("<h3>3b.1 ISO 27001 Deklaracja Stosowalności — pokrycie</h3>"
+                     + unavailable(f"nie udało się przetworzyć SoA — {soa.get('error')}"))
     else:
         soa_block = ""
 
@@ -1372,8 +1379,8 @@ def render_soa_maturity(ctx: Dict[str, Any]) -> str:
                 "</tr>"
             )
         dim_block = (
-            "<h3>3b.2 §9 maturity dimensions (L1 minimum &rarr; L5 state-of-the-art)</h3>"
-            "<table><thead><tr><th>Dimension</th><th>Level</th><th>Why this level (measured)</th>"
+            "<h3>3b.2 Wymiary dojrzałości §9 (L1 minimum &rarr; L5 stan najnowocześniejszy)</h3>"
+            "<table><thead><tr><th>Wymiar</th><th>Poziom</th><th>Dlaczego ten poziom (zmierzono)</th>"
             "</tr></thead><tbody>" + drows + "</tbody></table>"
         )
     else:
@@ -1381,17 +1388,18 @@ def render_soa_maturity(ctx: Dict[str, Any]) -> str:
 
     return f"""
 <section class="section" id="soa-maturity">
-  <h2>3b. Statement of Applicability + Maturity Scores (Part D.3 / &sect;9)</h2>
-  <p>The ISO 27001 Statement of Applicability coverage and the spec &sect;9 maturity benchmark.
-  The headline maturity is the <strong>computed</strong> lowest-of-dimensions level from real
-  evidence state &mdash; it deliberately corrects the legacy "L5 (state-of-the-art)" headline that
-  was hard-coded in the struktura, since two dimensions are honestly capped below L5 (SLSA Build L2,
-  not L3; non-qualified TSA, not a QTS).</p>
+  <h2>3b. Deklaracja Stosowalności + Oceny Dojrzałości (Część D.3 / &sect;9)</h2>
+  <p>Pokrycie ISO 27001 Deklaracji Stosowalności oraz wzorzec dojrzałości ze specyfikacji &sect;9.
+  Nagłówkowa dojrzałość to <strong>wyliczony</strong> poziom najniższego z wymiarów na podstawie
+  rzeczywistego stanu dowodów &mdash; celowo koryguje on starszy nagłówek „L5 (stan
+  najnowocześniejszy)” zakodowany na stałe w strukturze, ponieważ dwa wymiary są uczciwie
+  ograniczone poniżej L5 (SLSA Build L2, nie L3; niekwalifikowany TSA, nie QTS).</p>
   {headline}
   {soa_block}
   {dim_block}
-  <p class="small">Maturity is recorded at the EVIDENCE-ONLY tier (a measured fact for the pack, not
-  a build-breaking gate). The per-article A.1-A.10 validators own the blocking gate.</p>
+  <p class="small">Dojrzałość jest rejestrowana na poziomie EVIDENCE-ONLY (zmierzony fakt dla pakietu,
+  a nie bramka przerywająca budowę). Bramkę blokującą posiadają walidatory poszczególnych artykułów
+  A.1-A.10.</p>
 </section>
 """
 
@@ -1407,11 +1415,11 @@ def render_scope_applicability(ctx: Dict[str, Any]) -> str:
     appl = ctx["applicability_yaml"]  # the maintained source, for the per-regime rationale text
     if not isinstance(sd, dict):
         body = unavailable(
-            "scope-determination.json not provided (run scripts/validators/applicability.py); the "
-            "narrative scope below (Part 4) still applies")
+            "nie dostarczono scope-determination.json (uruchom scripts/validators/applicability.py); "
+            "opisowy zakres poniżej (Część 4) nadal obowiązuje")
         return f"""
 <section class="section" id="scope-applicability">
-  <h2>3c. Scope &amp; Regulatory-Applicability Determination (Part B)</h2>
+  <h2>3c. Określenie Zakresu i Stosowalności Regulacyjnej (Część B)</h2>
   {body}
 </section>
 """
@@ -1421,17 +1429,17 @@ def render_scope_applicability(ctx: Dict[str, Any]) -> str:
     applies_map = measured.get("applies") if isinstance(measured.get("applies"), dict) else {}
 
     if status == "INDETERMINATE":
-        verdict = ('<p><strong>Determination:</strong> '
+        verdict = ('<p><strong>Określenie:</strong> '
                    '<span class="badge badge-indet">INDETERMINATE</span> '
                    f'<span class="small">{esc(sd.get("detail"))}</span></p>')
     elif status == "FAIL":
-        verdict = ('<p><strong>Determination:</strong> '
+        verdict = ('<p><strong>Określenie:</strong> '
                    f'{status_badge("FAIL")} '
                    f'<span class="small">{esc(sd.get("detail"))} '
-                   '(spec &sect;8 anti-pattern #10 — scope hand-waving is a rejection trigger).'
-                   '</span></p>')
+                   '(specyfikacja &sect;8 antywzorzec #10 — pobieżne traktowanie zakresu jest '
+                   'przesłanką odrzucenia).</span></p>')
     else:
-        verdict = ('<p><strong>Determination:</strong> '
+        verdict = ('<p><strong>Określenie:</strong> '
                    f'{status_badge("PASS")} '
                    f'<span class="small">{esc(sd.get("detail"))}</span></p>')
 
@@ -1449,8 +1457,8 @@ def render_scope_applicability(ctx: Dict[str, Any]) -> str:
             applies = applies_map.get(key)
             if applies is None:
                 applies = block.get("applies")
-            applies_cell = (status_badge("PASS") + " applies" if applies is True
-                            else status_badge("NA") + " not applicable" if applies is False
+            applies_cell = (status_badge("PASS") + " dotyczy" if applies is True
+                            else status_badge("NA") + " nie dotyczy" if applies is False
                             else "&mdash;")
             rationale = block.get("rationale")
             basis = block.get("clause_basis") or block.get("legal_basis")
@@ -1463,24 +1471,25 @@ def render_scope_applicability(ctx: Dict[str, Any]) -> str:
                 "</tr>"
             )
         regime_block = (
-            "<table><thead><tr><th>Regime</th><th>Applies?</th><th>Rationale</th>"
-            "<th>Clause / legal basis</th></tr></thead><tbody>" + rrows + "</tbody></table>"
+            "<table><thead><tr><th>Reżim</th><th>Dotyczy?</th><th>Uzasadnienie</th>"
+            "<th>Klauzula / podstawa prawna</th></tr></thead><tbody>" + rrows + "</tbody></table>"
         )
     else:
-        regime_block = unavailable("no per-regime applicability data parsed from the determination")
+        regime_block = unavailable("z określenia nie przetworzono danych o stosowalności dla poszczególnych reżimów")
 
     return f"""
 <section class="section" id="scope-applicability">
-  <h2>3c. Scope &amp; Regulatory-Applicability Determination (Part B)</h2>
-  <p>The machine-validated answer to "why does DORA / NIS2-KSC / CRA / RODO apply (or not)?". This is
-  the structured, signed determination the spec mandates in Part B.3 and that closes &sect;8
-  anti-pattern #10 (scope hand-waving). The validator FAILs the pipeline if any regime lacks an
-  explicit <code>applies</code> decision or a documented rationale.</p>
+  <h2>3c. Określenie Zakresu i Stosowalności Regulacyjnej (Część B)</h2>
+  <p>Maszynowo zweryfikowana odpowiedź na pytanie „dlaczego DORA / NIS2-KSC / CRA / RODO ma (lub nie
+  ma) zastosowania?”. Jest to ustrukturyzowane, podpisane określenie wymagane przez specyfikację w
+  Części B.3, które zamyka antywzorzec #10 z &sect;8 (pobieżne traktowanie zakresu). Walidator
+  oznacza pipeline jako FAIL, jeśli któremukolwiek reżimowi brakuje jawnej decyzji
+  <code>applies</code> lub udokumentowanego uzasadnienia.</p>
   {verdict}
   {regime_block}
-  <p class="small"><strong>Honesty:</strong> the validator proves the determination is structurally
-  complete and OWNED (named approver + date). It does NOT assert the legal correctness of the
-  classification &mdash; that is an EVIDENCE-ONLY attestation by the named accountable officer.</p>
+  <p class="small"><strong>Uczciwość:</strong> walidator dowodzi, że określenie jest strukturalnie
+  kompletne i ma WŁAŚCICIELA (wskazany zatwierdzający + data). NIE potwierdza on prawnej poprawności
+  klasyfikacji &mdash; jest to atestacja EVIDENCE-ONLY wskazanego odpowiedzialnego kierownika.</p>
 </section>
 """
 
@@ -1493,10 +1502,10 @@ def render_crosswalk(ctx: Dict[str, Any]) -> str:
     rows = ctx["crosswalk_rows"]
     if not rows:
         body = unavailable(
-            "compliance-matrix.json not provided or contained no controls — no crosswalk to derive")
+            "nie dostarczono compliance-matrix.json lub nie zawierał kontroli — brak tablicy korelacji do wyprowadzenia")
         return f"""
 <section class="page-landscape section" id="crosswalk">
-  <h2>7a. Auto-Generated Regulatory Crosswalk</h2>
+  <h2>7a. Automatycznie Generowana Tablica Korelacji Regulacyjnej</h2>
   {body}
 </section>
 """
@@ -1517,28 +1526,30 @@ def render_crosswalk(ctx: Dict[str, Any]) -> str:
             "</tr>"
         )
     table = (
-        "<table><thead><tr><th>Evidence artifact</th><th>Frameworks spanned</th>"
-        "<th>Clauses mapped (satisfied only when present AND PASS)</th>"
-        "<th>Satisfied / total</th></tr></thead><tbody>" + trows + "</tbody></table>"
+        "<table><thead><tr><th>Artefakt dowodowy</th><th>Objęte ramy regulacyjne</th>"
+        "<th>Zmapowane klauzule (spełnione tylko gdy obecne ORAZ PASS)</th>"
+        "<th>Spełnione / razem</th></tr></thead><tbody>" + trows + "</tbody></table>"
     )
 
     multi = [r for r in rows if len(r["frameworks"]) >= 3]
     lead = (
-        f'<p class="small">{len(rows)} evidence artifact(s) mapped; '
-        f'{len(multi)} span &ge;3 frameworks. The widest-spanning evidence is listed first: a single '
-        f'artifact (e.g. the SBOM + provenance) simultaneously backs DORA, NIS2 and ISO clauses &mdash; '
-        f'the "one evidence &rarr; many clauses" relationship the spec requires. Unsatisfied clauses '
-        f'(absent or non-PASS) are listed but flagged, not hidden, so they feed the gap register.</p>'
+        f'<p class="small">Zmapowano {len(rows)} artefakt(ów) dowodowych; '
+        f'{len(multi)} obejmuje &ge;3 ramy regulacyjne. Najszerzej obejmujący dowód jest wymieniony '
+        f'jako pierwszy: pojedynczy artefakt (np. SBOM + proweniencja) jednocześnie wspiera klauzule '
+        f'DORA, NIS2 i ISO &mdash; relacja „jeden dowód &rarr; wiele klauzul” wymagana przez '
+        f'specyfikację. Niespełnione klauzule (nieobecne lub inne niż PASS) są wymienione, lecz '
+        f'oznaczone, a nie ukryte, dzięki czemu zasilają rejestr luk.</p>'
     )
 
     return f"""
 <section class="page-landscape section" id="crosswalk">
-  <h2>7a. Auto-Generated Regulatory Crosswalk (one evidence &rarr; many clauses)</h2>
-  <p>The content-derived crosswalk mandated by spec 5.2 / struktura D.2. Unlike a presence-only matrix,
-  each row pivots on an <strong>evidence artifact</strong> and enumerates every framework clause that
-  artifact satisfies, with the real per-clause verdict. A clause is satisfied <strong>only</strong>
-  when its validated row is present AND PASS &mdash; a missing or failing artifact never satisfies a
-  clause.</p>
+  <h2>7a. Automatycznie Generowana Tablica Korelacji Regulacyjnej (jeden dowód &rarr; wiele klauzul)</h2>
+  <p>Wyprowadzona z treści tablica korelacji wymagana przez specyfikację 5.2 / strukturę D.2. W
+  odróżnieniu od macierzy opartej wyłącznie na obecności, każdy wiersz osadza się na
+  <strong>artefakcie dowodowym</strong> i wylicza każdą klauzulę ram regulacyjnych, którą ten artefakt
+  spełnia, wraz z rzeczywistym werdyktem dla danej klauzuli. Klauzula jest spełniona
+  <strong>wyłącznie</strong> wtedy, gdy jej zweryfikowany wiersz jest obecny ORAZ ma status PASS
+  &mdash; brakujący lub niezaliczony artefakt nigdy nie spełnia klauzuli.</p>
   {lead}
   {table}
 </section>
@@ -1555,10 +1566,10 @@ def render_vex(ctx: Dict[str, Any]) -> str:
     vex = ctx["vex_doc"]
     if not isinstance(vex, dict):
         body = unavailable(
-            "vex.openvex.json not provided (run scripts/generate-vex.py with the image digest)")
+            "nie dostarczono vex.openvex.json (uruchom scripts/generate-vex.py ze skrótem obrazu)")
         return f"""
 <section class="section" id="vex">
-  <h2>10a. Vulnerability-Exploitability Exchange (VEX) Summary</h2>
+  <h2>10a. Podsumowanie Wymiany Eksploatowalności Podatności (VEX)</h2>
   {body}
 </section>
 """
@@ -1587,37 +1598,38 @@ def render_vex(ctx: Dict[str, Any]) -> str:
             f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
             for k, v in sorted(by_status.items())
         )
-        summary_block = f'<h3>10a.1 Statements by status (by_status)</h3><div class="kv">{status_cells}</div>'
+        summary_block = f'<h3>10a.1 Oświadczenia wg statusu (by_status)</h3><div class="kv">{status_cells}</div>'
     else:
-        summary_block = unavailable("VEX document carried no statements")
+        summary_block = unavailable("dokument VEX nie zawierał żadnych oświadczeń")
 
     detail_block = ""
     if cve_rows:
         detail_block = (
-            "<h3>10a.2 Per-CVE exploitability statements</h3>"
-            "<table><thead><tr><th>CVE</th><th>Status</th><th>Justification / note</th>"
+            "<h3>10a.2 Oświadczenia o eksploatowalności dla poszczególnych CVE</h3>"
+            "<table><thead><tr><th>CVE</th><th>Status</th><th>Uzasadnienie / uwaga</th>"
             "</tr></thead><tbody>" + cve_rows + "</tbody></table>"
         )
 
     n_open = by_status.get("under_investigation", 0)
     open_note = (
-        f'<p class="small">{n_open} statement(s) are <code>under_investigation</code> (reported by '
-        'the scanner, not yet triaged) &mdash; surfaced honestly so the open triage is visible, never '
-        'silently marked not_affected.</p>' if n_open else "")
+        f'<p class="small">{n_open} oświadcze(ń) ma status <code>under_investigation</code> (zgłoszone '
+        'przez skaner, jeszcze nieotriagowane) &mdash; ujawnione uczciwie, aby otwarty triaż był '
+        'widoczny, nigdy po cichu oznaczone jako not_affected.</p>' if n_open else "")
 
     return f"""
 <section class="section" id="vex">
-  <h2>10a. Vulnerability-Exploitability Exchange (VEX) Summary</h2>
-  <p>Per-release OpenVEX exploitability triage (Part C.11). Without a VEX every CVE reads as an open
-  finding to an auditor (spec &sect;8 anti-pattern "no VEX"). Each <code>not_affected</code>/
-  <code>fixed</code> statement carries a CISA-category justification and is bound to the released
-  image digest; the companion validator FAILs the build on any unjustified non-<code>affected</code>
-  claim.</p>
+  <h2>10a. Podsumowanie Wymiany Eksploatowalności Podatności (VEX)</h2>
+  <p>Triaż eksploatowalności OpenVEX dla każdego wydania (Część C.11). Bez VEX każde CVE jawi się
+  audytorowi jako otwarte znalezisko (specyfikacja &sect;8 antywzorzec „brak VEX”). Każde oświadczenie
+  <code>not_affected</code>/<code>fixed</code> niesie uzasadnienie według kategorii CISA i jest
+  powiązane ze skrótem wydanego obrazu; towarzyszący walidator oznacza budowę jako FAIL przy każdym
+  nieuzasadnionym twierdzeniu innym niż <code>affected</code>.</p>
   {summary_block}
   {open_note}
   {detail_block}
-  <p class="small">VEX author: {esc(vex.get("author"))}. This summary is rendered from the signed
-  OpenVEX document committed-to by the Merkle root; verdicts are not recomputed here.</p>
+  <p class="small">Autor VEX: {esc(vex.get("author"))}. Niniejsze podsumowanie jest renderowane z
+  podpisanego dokumentu OpenVEX powiązanego z korzeniem Merkle; werdykty nie są tu przeliczane
+  ponownie.</p>
 </section>
 """
 
@@ -1656,11 +1668,11 @@ def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
 
     if not isinstance(rh, dict):
         body = unavailable(
-            "runtime-hardening.json not provided "
-            "(run scripts/validators/runtime_hardening.py against the Dockerfile + IaC)")
+            "nie dostarczono runtime-hardening.json "
+            "(uruchom scripts/validators/runtime_hardening.py wobec pliku Dockerfile + IaC)")
         return f"""
 <section class="section" id="runtime-hardening">
-  <h2>10b. Runtime-Hardening Posture (Part C.15)</h2>
+  <h2>10b. Stan Utwardzenia Środowiska Uruchomieniowego (Część C.15)</h2>
   {body}
 </section>
 """
@@ -1670,13 +1682,13 @@ def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
     measured = rh.get("measured") if isinstance(rh.get("measured"), dict) else {}
 
     verdict_block = (
-        "<p><strong>Validator verdict:</strong> "
+        "<p><strong>Werdykt walidatora:</strong> "
         f"{compliance_status_badge(status)} {tier_badge(tier)} "
         f'<span class="small">{esc(rh.get("detail"))}</span></p>'
     )
 
     platform = measured.get("platform")
-    platform_block = (f'<p class="small">Platform: {esc(platform)}.</p>' if platform else "")
+    platform_block = (f'<p class="small">Platforma: {esc(platform)}.</p>' if platform else "")
 
     # Posture summary (measured key/values), surfaced verbatim from the artifact.
     rl = measured.get("resource_limits") if isinstance(measured.get("resource_limits"), dict) else {}
@@ -1684,18 +1696,18 @@ def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
     ingress_label = (", ".join(str(p) for p in ingress)
                      if isinstance(ingress, list) and ingress else None)
     summary_pairs: List[Tuple[str, Any]] = [
-        ("Runs as non-root", measured.get("runs_as_non_root")),
-        ("Runtime user (UID)", measured.get("user")),
-        ("Privileged", measured.get("privileged")),
-        ("Ingress ports", ingress_label),
-        ("Ingress external", measured.get("ingress_external")),
-        ("Read-only rootfs", measured.get("read_only_rootfs")),
-        ("Seccomp (runtime default)", measured.get("seccomp_runtime_default")),
-        ("Managed identity", measured.get("managed_identity")),
-        ("CPU limit", rl.get("cpu")),
-        ("Memory limit", rl.get("memory")),
-        ("Max replicas", rl.get("max_replicas")),
-        ("Tool", rh.get("tool_version")),
+        ("Uruchamia się jako nie-root", measured.get("runs_as_non_root")),
+        ("Użytkownik uruchomieniowy (UID)", measured.get("user")),
+        ("Uprzywilejowany", measured.get("privileged")),
+        ("Porty wejściowe (ingress)", ingress_label),
+        ("Ingress zewnętrzny", measured.get("ingress_external")),
+        ("System plików root tylko do odczytu", measured.get("read_only_rootfs")),
+        ("Seccomp (domyślny uruchomieniowy)", measured.get("seccomp_runtime_default")),
+        ("Tożsamość zarządzana", measured.get("managed_identity")),
+        ("Limit CPU", rl.get("cpu")),
+        ("Limit pamięci", rl.get("memory")),
+        ("Maks. liczba replik", rl.get("max_replicas")),
+        ("Narzędzie", rh.get("tool_version")),
     ]
     summary_cells = "".join(
         f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
@@ -1715,35 +1727,38 @@ def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
             for name, state in sorted(controls.items())
         )
         controls_block = (
-            "<h3>10b.1 Per-control runtime posture</h3>"
-            "<table><thead><tr><th>Control</th><th>State</th></tr></thead>"
+            "<h3>10b.1 Stan środowiska uruchomieniowego dla poszczególnych kontroli</h3>"
+            "<table><thead><tr><th>Kontrola</th><th>Stan</th></tr></thead>"
             f"<tbody>{crows}</tbody></table>"
         )
 
     parse_err = measured.get("iac_parse_error")
     parse_block = (
-        f'<p class="small"><strong>IaC parse error:</strong> {esc(parse_err)}.</p>'
+        f'<p class="small"><strong>Błąd parsowania IaC:</strong> {esc(parse_err)}.</p>'
         if parse_err else "")
 
     return f"""
 <section class="section" id="runtime-hardening">
-  <h2>10b. Runtime-Hardening Posture (Part C.15)</h2>
-  <p>The spec's Part C.15 row requires a least-privilege runtime. The deployed app is an Azure
-  Container App (not Kubernetes), so the honest evidence is a container/runtime least-privilege
-  posture statement — non-root user, no privileged mode, least-privilege ingress, resource limits,
-  managed identity — derived from the Dockerfile + Terraform by
-  <code>scripts/validators/runtime_hardening.py</code> (BLOCKING on "runs as non-root"). This is NOT
-  a fabricated k8s Pod-Security "restricted" claim; platform-managed controls the IaC cannot express
-  are shown as <span class="badge badge-indet">INDETERMINATE</span>, never asserted. Provenance:
+  <h2>10b. Stan Utwardzenia Środowiska Uruchomieniowego (Część C.15)</h2>
+  <p>Wiersz Części C.15 specyfikacji wymaga środowiska uruchomieniowego z minimalnymi uprawnieniami.
+  Wdrożona aplikacja to Azure Container App (nie Kubernetes), więc uczciwym dowodem jest oświadczenie
+  o stanie minimalnych uprawnień kontenera/środowiska — użytkownik nie-root, brak trybu
+  uprzywilejowanego, ingress z minimalnymi uprawnieniami, limity zasobów, tożsamość zarządzana —
+  wyprowadzone z pliku Dockerfile + Terraform przez
+  <code>scripts/validators/runtime_hardening.py</code> (BLOKUJĄCE wobec „uruchamia się jako nie-root”).
+  NIE jest to sfałszowane twierdzenie o profilu k8s Pod-Security „restricted”; kontrole zarządzane
+  przez platformę, których IaC nie może wyrazić, są pokazane jako
+  <span class="badge badge-indet">INDETERMINATE</span>, nigdy deklarowane. Proweniencja:
   {provenance_badge(prov)}.</p>
   {verdict_block}
   {platform_block}
   {summary_block}
   {controls_block}
   {parse_block}
-  <p class="small"><strong>Honesty:</strong> this is the DECLARED posture consistent with the IaC.
-  A live runtime scan + continuous drift alerting are TARGET-STATE (runtime-hardening.md §6); this
-  section asserts only what the build-time configuration provably sets.</p>
+  <p class="small"><strong>Uczciwość:</strong> jest to stan ZADEKLAROWANY, spójny z IaC. Skan
+  środowiska uruchomieniowego na żywo + ciągłe alertowanie o dryfie to STAN DOCELOWY
+  (runtime-hardening.md §6); niniejsza sekcja deklaruje wyłącznie to, co konfiguracja z czasu budowy
+  dowodliwie ustawia.</p>
 </section>
 """
 
@@ -1751,32 +1766,32 @@ def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
 def render_scope(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="scope">
-  <h2>4. Scope, Boundaries, Subservice Carve-Outs &amp; CUECs</h2>
-  <h3>In scope</h3>
+  <h2>4. Zakres, Granice, Wyłączenia Podusług i CUEC</h2>
+  <h3>W zakresie</h3>
   <ul>
-    <li>The CyberForge pipeline repository, its GitHub Actions workflows, OPA policies, Terraform IaC, and the demo application container.</li>
-    <li>Build-time and supply-chain controls: scanning gates, SBOM, signing, provenance, evidence assembly.</li>
-    <li>The deployed container artifact identified by the digest on the cover page.</li>
+    <li>Repozytorium pipeline CyberForge, jego przepływy pracy GitHub Actions, polityki OPA, IaC Terraform oraz kontener aplikacji demonstracyjnej.</li>
+    <li>Kontrole z czasu budowy i łańcucha dostaw: bramki skanowania, SBOM, podpisywanie, proweniencja, montaż dowodów.</li>
+    <li>Wdrożony artefakt kontenera zidentyfikowany przez skrót na stronie tytułowej.</li>
   </ul>
-  <h3>Out of scope / exclusions</h3>
+  <h3>Poza zakresem / wyłączenia</h3>
   <ul>
-    <li>Operating effectiveness over a full audit window (no operating track record yet — design effectiveness only).</li>
-    <li>Physical/environmental controls (cloud-provider responsibility — carved out below).</li>
+    <li>Skuteczność operacyjna w pełnym oknie audytowym (brak jeszcze historii operacyjnej — wyłącznie skuteczność projektowa).</li>
+    <li>Kontrole fizyczne/środowiskowe (odpowiedzialność dostawcy chmury — wyłączone poniżej).</li>
   </ul>
-  <h3>Subservice organizations (carve-out method)</h3>
+  <h3>Organizacje podusług (metoda wyłączenia)</h3>
   <table>
-    <thead><tr><th>Subservice</th><th>Service relied upon</th><th>Carve-out basis</th></tr></thead>
+    <thead><tr><th>Podusługa</th><th>Wykorzystywana usługa</th><th>Podstawa wyłączenia</th></tr></thead>
     <tbody>
-      <tr><td>GitHub</td><td>Source control, Actions CI/CD, OIDC identity, Releases</td><td>Carved out; provider SOC 2 / ISO to be obtained and reviewed.</td></tr>
-      <tr><td>Microsoft Azure</td><td>Container Apps, ACR, immutable Blob storage, Key Vault</td><td>Carved out; provider attestations to be obtained and reviewed.</td></tr>
-      <tr><td>Sigstore (Fulcio / Rekor)</td><td>Keyless signing CA &amp; transparency log</td><td>Carved out; public-good transparency infrastructure; trust roots archived into the pack.</td></tr>
+      <tr><td>GitHub</td><td>Kontrola wersji, CI/CD Actions, tożsamość OIDC, wydania (Releases)</td><td>Wyłączone; certyfikaty SOC 2 / ISO dostawcy do uzyskania i przeglądu.</td></tr>
+      <tr><td>Microsoft Azure</td><td>Container Apps, ACR, niezmienne magazyny Blob, Key Vault</td><td>Wyłączone; atestacje dostawcy do uzyskania i przeglądu.</td></tr>
+      <tr><td>Sigstore (Fulcio / Rekor)</td><td>Bezkluczowy CA podpisujący i dziennik przejrzystości</td><td>Wyłączone; infrastruktura przejrzystości dobra publicznego; korzenie zaufania zarchiwizowane w pakiecie.</td></tr>
     </tbody>
   </table>
-  <h3>Complementary User-Entity Controls (CUECs)</h3>
+  <h3>Uzupełniające Kontrole Podmiotu Użytkującego (CUEC)</h3>
   <ul>
-    <li>The relying party MUST verify signatures with identity pinning (<code>--certificate-identity</code> + <code>--certificate-oidc-issuer</code>).</li>
-    <li>The relying party MUST re-validate the evidence pack on retrieval (re-hash + Merkle compare + cosign/RFC-3161 verify).</li>
-    <li>The relying party MUST confirm the deployed digest matches the digest on the cover before relying on any control claim.</li>
+    <li>Strona polegająca MUSI weryfikować podpisy z powiązaniem tożsamości (<code>--certificate-identity</code> + <code>--certificate-oidc-issuer</code>).</li>
+    <li>Strona polegająca MUSI ponownie zweryfikować pakiet dowodowy przy jego pobraniu (ponowne przeliczenie skrótu + porównanie Merkle + weryfikacja cosign/RFC-3161).</li>
+    <li>Strona polegająca MUSI potwierdzić, że wdrożony skrót odpowiada skrótowi na okładce, zanim oprze się na jakimkolwiek twierdzeniu o kontroli.</li>
   </ul>
 </section>
 """
@@ -1815,11 +1830,11 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
 
     if not isinstance(tm, dict) and not isinstance(val, dict):
         body = unavailable(
-            "threat-model.yaml / threat-model-validation.json not provided "
-            "(run scripts/validators/threat_model.py and include the model in the pack)")
+            "nie dostarczono threat-model.yaml / threat-model-validation.json "
+            "(uruchom scripts/validators/threat_model.py i dołącz model do pakietu)")
         return f"""
 <section class="section" id="threat-model">
-  <h2>4a. Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)</h2>
+  <h2>4a. Model Zagrożeń (STRIDE) — Dowód Bezpiecznego Projektowania (Część C.1)</h2>
   {body}
 </section>
 """
@@ -1831,20 +1846,20 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
         tier = val.get("tier")
         measured = val.get("measured") if isinstance(val.get("measured"), dict) else {}
         verdict_block = (
-            "<p><strong>Validator verdict:</strong> "
+            "<p><strong>Werdykt walidatora:</strong> "
             f"{compliance_status_badge(status)} {tier_badge(tier)} "
             f'<span class="small">{esc(val.get("detail"))}</span></p>'
         )
         meta_pairs: List[Tuple[str, Any]] = [
-            ("Model version", measured.get("version") or (tm or {}).get("version")),
-            ("Reviewed", measured.get("reviewed_date") or (tm or {}).get("reviewed_date")),
-            ("Age (days)", measured.get("age_days")),
-            ("Review window (days)", measured.get("review_window_days")
+            ("Wersja modelu", measured.get("version") or (tm or {}).get("version")),
+            ("Zrecenzowano", measured.get("reviewed_date") or (tm or {}).get("reviewed_date")),
+            ("Wiek (dni)", measured.get("age_days")),
+            ("Okno przeglądu (dni)", measured.get("review_window_days")
              or (tm or {}).get("review_window_days")),
-            ("Threats", measured.get("threats")),
-            ("STRIDE coverage", measured.get("stride_coverage")),
-            ("Open gaps", measured.get("gaps")),
-            ("Tool", val.get("tool_version")),
+            ("Zagrożenia", measured.get("threats")),
+            ("Pokrycie STRIDE", measured.get("stride_coverage")),
+            ("Otwarte luki", measured.get("gaps")),
+            ("Narzędzie", val.get("tool_version")),
         ]
         meta_cells = "".join(
             f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
@@ -1876,7 +1891,7 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
             label = stride_vocab.get(code, code) if isinstance(stride_vocab, dict) else code
             cov_cells += f'<div class="k">{esc(code)} — {esc(label)}</div><div>{esc(by_stride[code])}</div>'
         coverage_block = (
-            "<h3>4a.1 STRIDE coverage (threats per category)</h3>"
+            "<h3>4a.1 Pokrycie STRIDE (zagrożenia na kategorię)</h3>"
             f'<div class="kv">{cov_cells}</div>'
         )
     elif isinstance(val, dict):
@@ -1884,8 +1899,8 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
         cats = measured.get("stride_categories")
         if isinstance(cats, list) and cats:
             coverage_block = (
-                "<h3>4a.1 STRIDE coverage</h3>"
-                f'<p class="small">Categories covered (from validator): '
+                "<h3>4a.1 Pokrycie STRIDE</h3>"
+                f'<p class="small">Pokryte kategorie (z walidatora): '
                 f'{esc(", ".join(str(c) for c in cats))} '
                 f'({esc(measured.get("stride_coverage"))}/6).</p>'
             )
@@ -1897,12 +1912,12 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
             for k, v in sorted(by_status.items())
         )
         status_block = (
-            "<h3>4a.2 Threats by mitigation status</h3>"
+            "<h3>4a.2 Zagrożenia wg statusu mitygacji</h3>"
             f'<div class="kv">{st_cells}</div>'
-            '<p class="small">GAP rows are target-state (not achieved); PARTIAL rows carry a '
-            'residual-risk note. MITIGATED is a human-reviewed assertion that the named control '
-            'addresses the threat — the validator proves schema/coverage/freshness, not real-world '
-            'efficacy.</p>'
+            '<p class="small">Wiersze GAP to stan docelowy (nieosiągnięty); wiersze PARTIAL niosą '
+            'uwagę o ryzyku szczątkowym. MITIGATED to zweryfikowane przez człowieka twierdzenie, że '
+            'wskazana kontrola adresuje zagrożenie — walidator dowodzi schematu/pokrycia/aktualności, '
+            'a nie skuteczności w warunkach rzeczywistych.</p>'
         )
 
     # Per-threat table (capped to keep the section readable; note any truncation).
@@ -1926,13 +1941,13 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
                 f'<td class="mono small">{esc(trace)}</td>'
                 "</tr>"
             )
-        trunc = (f'<p class="small">Showing 60 of {len(threats)} threats; the complete model is '
-                 f'hashed into the §17 tamper-evidence appendix.</p>'
+        trunc = (f'<p class="small">Pokazano 60 z {len(threats)} zagrożeń; kompletny model jest '
+                 f'zahaszowany do załącznika o odporności na manipulację §17.</p>'
                  if len(threats) > 60 else "")
         detail_block = (
-            "<h3>4a.3 Per-feature STRIDE threats</h3>"
-            "<table><thead><tr><th>ID</th><th>STRIDE</th><th>Component</th><th>Threat</th>"
-            "<th>Mitigation</th><th>Status</th><th>Residual</th><th>Trace</th>"
+            "<h3>4a.3 Zagrożenia STRIDE dla poszczególnych funkcji</h3>"
+            "<table><thead><tr><th>ID</th><th>STRIDE</th><th>Komponent</th><th>Zagrożenie</th>"
+            "<th>Mitygacja</th><th>Status</th><th>Szczątkowe</th><th>Powiązanie</th>"
             f"</tr></thead><tbody>{rows}</tbody></table>{trunc}"
         )
 
@@ -1954,9 +1969,9 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
                 "</tr>"
             )
         gap_block = (
-            "<h3>4a.4 Open gap register (target-state)</h3>"
-            "<table><thead><tr><th>Gap</th><th>Element</th><th>STRIDE</th><th>Planned action</th>"
-            f"<th>Tracking</th></tr></thead><tbody>{grows}</tbody></table>"
+            "<h3>4a.4 Rejestr otwartych luk (stan docelowy)</h3>"
+            "<table><thead><tr><th>Luka</th><th>Element</th><th>STRIDE</th><th>Planowane działanie</th>"
+            f"<th>Śledzenie</th></tr></thead><tbody>{grows}</tbody></table>"
         )
 
     methodology = (tm or {}).get("methodology")
@@ -1964,25 +1979,26 @@ def render_threat_model(ctx: Dict[str, Any]) -> str:
 
     return f"""
 <section class="section" id="threat-model">
-  <h2>4a. Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)</h2>
-  <p>The structured, per-feature STRIDE threat model is the answer to the first DevSecOps stage
-  ("Plan / threat-model") and the spec's Part C.1 secure-design row (NIS2 21(2)(e); DORA RTS
-  2024/1774; ISO 8.25; SSDF PW.1). The model is rendered here from the signed
-  <code>threat-model.yaml</code> committed-to by the Merkle root; the validator
-  (<code>scripts/validators/threat_model.py</code>) FAILs the pipeline on a schema-incomplete entry,
-  insufficient STRIDE coverage, or a stale review date. Provenance:
-  {provenance_badge(prov)}.</p>
-  {f'<p class="small">Methodology: {esc(methodology)}. Source of truth: {esc(source_doc)}.</p>'
+  <h2>4a. Model Zagrożeń (STRIDE) — Dowód Bezpiecznego Projektowania (Część C.1)</h2>
+  <p>Ustrukturyzowany model zagrożeń STRIDE dla poszczególnych funkcji jest odpowiedzią na pierwszy
+  etap DevSecOps („Plan / model zagrożeń”) oraz na wiersz bezpiecznego projektowania z Części C.1
+  specyfikacji (NIS2 21(2)(e); DORA RTS 2024/1774; ISO 8.25; SSDF PW.1). Model jest tu renderowany z
+  podpisanego <code>threat-model.yaml</code> powiązanego z korzeniem Merkle; walidator
+  (<code>scripts/validators/threat_model.py</code>) oznacza pipeline jako FAIL przy wpisie
+  niekompletnym schematowo, niewystarczającym pokryciu STRIDE lub nieaktualnej dacie przeglądu.
+  Proweniencja: {provenance_badge(prov)}.</p>
+  {f'<p class="small">Metodyka: {esc(methodology)}. Źródło prawdy: {esc(source_doc)}.</p>'
      if methodology or source_doc else ''}
   {verdict_block}
   {coverage_block}
   {status_block}
   {detail_block}
   {gap_block}
-  <p class="small"><strong>Honesty:</strong> the validator proves the model is structurally complete,
-  STRIDE-covered, and freshly reviewed. That each named control <em>actually and fully</em> mitigates
-  its threat in production is an EVIDENCE-ONLY human assertion, not something the pipeline proves; GAP
-  rows are target-state and are never claimed as achieved.</p>
+  <p class="small"><strong>Uczciwość:</strong> walidator dowodzi, że model jest strukturalnie
+  kompletny, pokryty STRIDE i świeżo zrecenzowany. To, że każda wskazana kontrola <em>faktycznie i w
+  pełni</em> mityguje swoje zagrożenie w środowisku produkcyjnym, jest twierdzeniem człowieka typu
+  EVIDENCE-ONLY, a nie czymś, co pipeline dowodzi; wiersze GAP to stan docelowy i nigdy nie są
+  deklarowane jako osiągnięte.</p>
 </section>
 """
 
@@ -1991,34 +2007,34 @@ def render_attestation(ctx: Dict[str, Any]) -> str:
     owners = ctx["control_owners_text"]
     if owners:
         owners_block = (
-            "<h3>Named roles (sourced from control-owners.md)</h3>"
+            "<h3>Wskazane role (na podstawie control-owners.md)</h3>"
             f'<pre class="mono">{esc(owners[:4000])}</pre>'
         )
     else:
         owners_block = (
-            "<h3>Named roles</h3>"
-            + unavailable("control-owners.md not provided — preparer/reviewer/approver pending")
+            "<h3>Wskazane role</h3>"
+            + unavailable("nie dostarczono control-owners.md — sporządzający/recenzent/zatwierdzający oczekują")
         )
     return f"""
 <section class="section" id="attestation">
-  <h2>5. Management Attestation of Accuracy &amp; Completeness</h2>
-  <p>Management asserts that, to the best of its knowledge and belief, the description of the
-  pipeline's controls in this report is fairly presented and that the evidence referenced was
-  produced by the mechanisms described. This assertion follows the SSAE-18 / AT-C 205
-  management-assertion shape. <strong>Design effectiveness only</strong> is asserted; operating
-  effectiveness over a period is NOT yet asserted.</p>
+  <h2>5. Atestacja Zarządu o Rzetelności i Kompletności</h2>
+  <p>Zarząd oświadcza, że zgodnie z jego najlepszą wiedzą i przekonaniem opis kontroli pipeline'u w
+  niniejszym raporcie jest rzetelnie przedstawiony oraz że przywołane dowody zostały wytworzone przez
+  opisane mechanizmy. Niniejsze oświadczenie ma formę oświadczenia zarządu zgodną z SSAE-18 / AT-C
+  205. Deklarowana jest <strong>wyłącznie skuteczność projektowa</strong>; skuteczność operacyjna w
+  okresie NIE jest jeszcze deklarowana.</p>
   {owners_block}
-  <h3>Signature block (PAdES-backed)</h3>
+  <h3>Blok podpisu (oparty na PAdES)</h3>
   <table>
-    <thead><tr><th>Role</th><th>Name</th><th>Date (UTC)</th><th>Signature</th></tr></thead>
+    <thead><tr><th>Rola</th><th>Imię i nazwisko</th><th>Data (UTC)</th><th>Podpis</th></tr></thead>
     <tbody>
-      <tr><td>Preparer</td><td>(see control-owners.md)</td><td>{esc(ctx['generated_at'])}</td><td class="small">PAdES signature applied at seal time.</td></tr>
-      <tr><td>Reviewer</td><td>(see control-owners.md)</td><td>&mdash;</td><td class="small">Pending second review data point.</td></tr>
-      <tr><td>Approver</td><td>(see control-owners.md)</td><td>&mdash;</td><td class="small">2-approval gate enforced in branch protection.</td></tr>
+      <tr><td>Sporządzający</td><td>(zob. control-owners.md)</td><td>{esc(ctx['generated_at'])}</td><td class="small">Podpis PAdES nałożony w chwili plombowania.</td></tr>
+      <tr><td>Recenzent</td><td>(zob. control-owners.md)</td><td>&mdash;</td><td class="small">Oczekuje na drugi punkt danych przeglądu.</td></tr>
+      <tr><td>Zatwierdzający</td><td>(zob. control-owners.md)</td><td>&mdash;</td><td class="small">Bramka 2 zatwierdzeń egzekwowana w ochronie gałęzi.</td></tr>
     </tbody>
   </table>
-  <p class="small">The cryptographic signature block is applied to the PDF rendering of this
-  document (pyHanko PAdES; honest trust-anchor label) — see the Document Self-Seal page.</p>
+  <p class="small">Kryptograficzny blok podpisu jest nakładany na renderowanie PDF tego dokumentu
+  (pyHanko PAdES; uczciwa etykieta kotwicy zaufania) — zob. stronę Samozaplombowania Dokumentu.</p>
 </section>
 """
 
@@ -2027,23 +2043,24 @@ def render_ipe(ctx: Dict[str, Any]) -> str:
     artifacts = ctx["artifacts"]
     return f"""
 <section class="section" id="ipe">
-  <h2>6. Methodology, Sampling &amp; Population Statement (IPE)</h2>
-  <p>Information Produced by the Entity (IPE) disclosure. The populations relevant to this report
-  are the build/deploy events, pull requests, access changes, and security scans within the period
-  on the cover. Complete population counts are reconciled to the GitHub and Azure source-of-truth.</p>
-  <h3>Population &amp; sampling basis</h3>
+  <h2>6. Metodyka, Dobór Próby i Oświadczenie o Populacji (IPE)</h2>
+  <p>Ujawnienie Informacji Wytworzonych przez Podmiot (IPE). Populacje istotne dla niniejszego raportu
+  to zdarzenia budowy/wdrożenia, pull requesty, zmiany dostępu oraz skany bezpieczeństwa w okresie
+  podanym na okładce. Pełne liczebności populacji są uzgadniane ze źródłem prawdy GitHub i Azure.</p>
+  <h3>Podstawa populacji i doboru próby</h3>
   <table>
-    <thead><tr><th>Population</th><th>Source of truth</th><th>Basis</th></tr></thead>
+    <thead><tr><th>Populacja</th><th>Źródło prawdy</th><th>Podstawa</th></tr></thead>
     <tbody>
-      <tr><td>Deployments / releases</td><td>GitHub Actions run history</td><td>This issue reflects a single release; complete-population reconciliation pending an operating window.</td></tr>
-      <tr><td>Pull requests &amp; approvals</td><td>GitHub PR API + branch-protection.json</td><td>2-approval + signed-commit gate; population to be enumerated per window.</td></tr>
-      <tr><td>Security scans</td><td>Scanner outputs in this pack ({esc(len(artifacts))} artifacts)</td><td>Full enumeration of this run's artifacts (no sampling within the run).</td></tr>
-      <tr><td>Access changes</td><td>Azure / GitHub audit logs</td><td>Reconciliation pending an operating window.</td></tr>
+      <tr><td>Wdrożenia / wydania</td><td>Historia uruchomień GitHub Actions</td><td>To wydanie odzwierciedla pojedyncze wydanie; uzgodnienie pełnej populacji oczekuje na okno operacyjne.</td></tr>
+      <tr><td>Pull requesty i zatwierdzenia</td><td>GitHub PR API + branch-protection.json</td><td>Bramka 2 zatwierdzeń + podpisanego commita; populacja do wyliczenia dla każdego okna.</td></tr>
+      <tr><td>Skany bezpieczeństwa</td><td>Wyniki skanerów w tym pakiecie ({esc(len(artifacts))} artefaktów)</td><td>Pełne wyliczenie artefaktów tego uruchomienia (brak doboru próby w obrębie uruchomienia).</td></tr>
+      <tr><td>Zmiany dostępu</td><td>Dzienniki audytowe Azure / GitHub</td><td>Uzgodnienie oczekuje na okno operacyjne.</td></tr>
     </tbody>
   </table>
-  <p class="small"><strong>Disclosure:</strong> this report presents a <em>single run</em>, not a
-  sampled population over an audit window. It evidences <strong>design</strong> effectiveness;
-  operating-effectiveness sampling requires an accrued observation period.</p>
+  <p class="small"><strong>Ujawnienie:</strong> niniejszy raport przedstawia <em>pojedyncze
+  uruchomienie</em>, a nie próbę populacji w oknie audytowym. Stanowi on dowód skuteczności
+  <strong>projektowej</strong>; dobór próby skuteczności operacyjnej wymaga zgromadzonego okresu
+  obserwacji.</p>
 </section>
 """
 
@@ -2076,21 +2093,21 @@ def render_control_matrix(ctx: Dict[str, Any]) -> str:
     controls = ctx["matrix_controls"]
     art_idx = ctx["artifact_index"]
     if not controls:
-        body = unavailable("compliance-matrix.json not provided or contained no controls")
+        body = unavailable("nie dostarczono compliance-matrix.json lub nie zawierał kontroli")
         ssdf_block = ""
     else:
         rows = "".join(_matrix_row(c, art_idx) for c in controls)
         body = (
-            "<table><thead><tr><th>Control ID</th><th>Framework</th><th>Description</th>"
-            "<th>Evidence artifact (SHA-256)</th><th>Test performed</th><th>Result / provenance</th>"
+            "<table><thead><tr><th>ID kontroli</th><th>Ramy regulacyjne</th><th>Opis</th>"
+            "<th>Artefakt dowodowy (SHA-256)</th><th>Przeprowadzony test</th><th>Wynik / proweniencja</th>"
             "</tr></thead><tbody>" + rows + "</tbody></table>"
         )
         ssdf = ctx["ssdf_controls"]
         if ssdf:
             ssdf_rows = "".join(_matrix_row(c, art_idx) for c in ssdf)
             ssdf_table = (
-                "<table><thead><tr><th>Practice</th><th>Framework</th><th>Description</th>"
-                "<th>Evidence (SHA-256)</th><th>Test</th><th>Result / provenance</th></tr></thead>"
+                "<table><thead><tr><th>Praktyka</th><th>Ramy regulacyjne</th><th>Opis</th>"
+                "<th>Dowód (SHA-256)</th><th>Test</th><th>Wynik / proweniencja</th></tr></thead>"
                 "<tbody>" + ssdf_rows + "</tbody></table>"
             )
         else:
@@ -2100,22 +2117,22 @@ def render_control_matrix(ctx: Dict[str, Any]) -> str:
                 for code, name in SSDF_FAMILIES
             )
             ssdf_table = (
-                "<table><thead><tr><th>Practice family</th><th>Name</th><th>Status</th></tr></thead>"
+                "<table><thead><tr><th>Rodzina praktyk</th><th>Nazwa</th><th>Status</th></tr></thead>"
                 "<tbody>" + fam_rows + "</tbody></table>"
-                "<p class=\"small\">No SSDF practice rows were present in the matrix; the four NIST "
-                "SSDF families are listed as asserted-pending placeholders (not measured).</p>"
+                "<p class=\"small\">W macierzy nie było wierszy praktyk SSDF; cztery rodziny NIST "
+                "SSDF są wymienione jako symbole zastępcze deklarowane-oczekujące (niemierzone).</p>"
             )
-        ssdf_block = f"<h3>7.1 SSDF PO / PS / PW / RV sub-matrix</h3>{ssdf_table}"
+        ssdf_block = f"<h3>7.1 Pod-macierz SSDF PO / PS / PW / RV</h3>{ssdf_table}"
 
     return f"""
 <section class="page-landscape section" id="control-matrix">
-  <h2>7. Control-to-Evidence Cross-Reference Matrix</h2>
-  <p class="small">The single authoritative generated control mapping. Each row: control &rarr;
-  description &rarr; evidence artifact + SHA-256 &rarr; test performed &rarr; result, with a
-  live/measured vs static/asserted provenance badge. Coverage spans SOC2, ISO 27001 Annex A,
-  PCI Req 6/11, DORA, NIS2, GDPR, UKSC Art.8, CRA Art.13, and the SSDF sub-matrix. Rendered in
-  landscape orientation. UKSC Art.8 / CRA Art.13 rows are appended as asserted-pending if the
-  source matrix omits them.</p>
+  <h2>7. Macierz Odniesień Kontrola-Dowód</h2>
+  <p class="small">Jedyne miarodajne, wygenerowane mapowanie kontroli. Każdy wiersz: kontrola &rarr;
+  opis &rarr; artefakt dowodowy + SHA-256 &rarr; przeprowadzony test &rarr; wynik, wraz z flagą
+  proweniencji na żywo/zmierzone vs statyczne/deklarowane. Pokrycie obejmuje SOC2, ISO 27001 Załącznik
+  A, PCI Req 6/11, DORA, NIS2, GDPR, UKSC Art.8, CRA Art.13 oraz pod-macierz SSDF. Renderowane w
+  orientacji poziomej. Wiersze UKSC Art.8 / CRA Art.13 są dołączane jako deklarowane-oczekujące, jeśli
+  macierz źródłowa je pomija.</p>
   {body}
   {ssdf_block}
 </section>
@@ -2136,37 +2153,38 @@ def render_provenance_sbom(ctx: Dict[str, Any]) -> str:
             prov = prov or art
     sbom_cell = (f'<span class="mono" title="{esc_attr(sbom.get("sha256"))}">'
                  f'{short_hash(sbom.get("sha256"))}</span> — {esc(sbom.get("path"))}'
-                 if sbom else unavailable("no SBOM artifact found in manifest"))
+                 if sbom else unavailable("nie znaleziono artefaktu SBOM w manifeście"))
     prov_cell = (f'<span class="mono" title="{esc_attr(prov.get("sha256"))}">'
                  f'{short_hash(prov.get("sha256"))}</span> — {esc(prov.get("path"))}'
-                 if prov else unavailable("no provenance artifact found in manifest"))
+                 if prov else unavailable("nie znaleziono artefaktu proweniencji w manifeście"))
     return f"""
 <section class="section" id="provenance-sbom">
-  <h2>8. Verified Provenance &amp; SBOM Attestation</h2>
-  <p>The deployed image carries a CycloneDX SBOM attestation and SLSA in-toto provenance, both
-  cosign-signed (keyless, GitHub OIDC &rarr; Fulcio/Rekor). Verification is identity-pinned.</p>
-  <h3>Predicate fields to assert (identity-pinned)</h3>
+  <h2>8. Zweryfikowana Proweniencja i Atestacja SBOM</h2>
+  <p>Wdrożony obraz niesie atestację SBOM CycloneDX oraz proweniencję SLSA in-toto, obie podpisane
+  przez cosign (bezkluczowo, GitHub OIDC &rarr; Fulcio/Rekor). Weryfikacja jest powiązana z
+  tożsamością.</p>
+  <h3>Pola predykatu do potwierdzenia (powiązane z tożsamością)</h3>
   <table>
-    <thead><tr><th>Field</th><th>Expected</th></tr></thead>
+    <thead><tr><th>Pole</th><th>Oczekiwane</th></tr></thead>
     <tbody>
-      <tr><td>builder.id</td><td>Trusted GitHub Actions builder (this repo's reusable workflow).</td></tr>
-      <tr><td>source repo URI</td><td>This repository.</td></tr>
-      <tr><td>workflow ref</td><td>The release workflow ref.</td></tr>
+      <tr><td>builder.id</td><td>Zaufany builder GitHub Actions (wielokrotnie używalny przepływ pracy tego repozytorium).</td></tr>
+      <tr><td>URI repozytorium źródłowego</td><td>Niniejsze repozytorium.</td></tr>
+      <tr><td>referencja przepływu pracy</td><td>Referencja przepływu pracy wydania.</td></tr>
       <tr><td>subject.digest</td><td class="mono">{esc(m.get('image_digest'))}</td></tr>
     </tbody>
   </table>
-  <h3>Attestation artifacts in this pack</h3>
+  <h3>Artefakty atestacji w tym pakiecie</h3>
   <div class="kv">
     <div class="k">SBOM (CycloneDX)</div><div>{sbom_cell}</div>
-    <div class="k">SLSA provenance</div><div>{prov_cell}</div>
+    <div class="k">Proweniencja SLSA</div><div>{prov_cell}</div>
   </div>
-  <h3>Identity-pinned verification command</h3>
+  <h3>Polecenie weryfikacji powiązane z tożsamością</h3>
   <pre class="mono">cosign verify-attestation --type slsaprovenance \\
   --certificate-identity "$COSIGN_IDENTITY" \\
   --certificate-oidc-issuer "$COSIGN_ISSUER" \\
   {esc(m.get('image_digest') or '<image>@<digest>')}</pre>
-  <p class="small">SLSA Build L2 is claimed; L3 is NOT — provenance generation is best-effort and
-  not demonstrably isolated from the build job.</p>
+  <p class="small">Deklarowany jest SLSA Build L2; poziom L3 NIE — generowanie proweniencji jest
+  najlepszym możliwym staraniem i nie jest dowodliwie odizolowane od zadania budowy.</p>
 </section>
 """
 
@@ -2295,8 +2313,8 @@ def load_scan_findings(evidence_dir: Optional[str]) -> Dict[str, Any]:
 def _cve_table(rows: List[Dict[str, str]]) -> str:
     """Render Trivy vulnerability rows as a static table (or a clean empty note)."""
     if not rows:
-        return ('<p class="small">No vulnerabilities reported by this scan '
-                '(empty result set).</p>')
+        return ('<p class="small">Ten skan nie zgłosił żadnych podatności '
+                '(pusty zbiór wyników).</p>')
     body = ""
     for r in rows:
         body += (
@@ -2308,8 +2326,8 @@ def _cve_table(rows: List[Dict[str, str]]) -> str:
             f"<td>{esc(r['title'])}</td></tr>"
         )
     return (
-        "<table><thead><tr><th>CVE</th><th>Severity</th><th>Package</th>"
-        "<th>Installed</th><th>Fixed in</th><th>Title</th></tr></thead>"
+        "<table><thead><tr><th>CVE</th><th>Istotność</th><th>Pakiet</th>"
+        "<th>Zainstalowana</th><th>Naprawiono w</th><th>Tytuł</th></tr></thead>"
         f"<tbody>{body}</tbody></table>"
     )
 
@@ -2340,12 +2358,12 @@ def render_evidence_detail(ctx: Dict[str, Any]) -> str:
             for r in sast_rows
         )
         sast_html = (
-            "<table><thead><tr><th>Tool</th><th>Rule</th><th>Level</th>"
-            "<th>Location</th><th>Finding</th></tr></thead>"
+            "<table><thead><tr><th>Narzędzie</th><th>Reguła</th><th>Poziom</th>"
+            "<th>Lokalizacja</th><th>Znalezisko</th></tr></thead>"
             f"<tbody>{sast_body}</tbody></table>"
         )
     else:
-        sast_html = '<p class="small">No SAST/IaC findings reported (CodeQL + Checkov clean).</p>'
+        sast_html = '<p class="small">Nie zgłoszono znalezisk SAST/IaC (CodeQL + Checkov czyste).</p>'
 
     # DAST (ZAP) table.
     if zap:
@@ -2355,11 +2373,11 @@ def render_evidence_detail(ctx: Dict[str, Any]) -> str:
             for r in zap
         )
         zap_html = (
-            "<table><thead><tr><th>Alert</th><th>Risk</th><th>Target</th></tr>"
+            "<table><thead><tr><th>Alert</th><th>Ryzyko</th><th>Cel</th></tr>"
             f"</thead><tbody>{zap_body}</tbody></table>"
         )
     else:
-        zap_html = '<p class="small">No DAST alerts reported by OWASP ZAP.</p>'
+        zap_html = '<p class="small">OWASP ZAP nie zgłosił żadnych alertów DAST.</p>'
 
     # SBOM table (cap rows to keep the section readable; note any truncation).
     if sbom:
@@ -2369,15 +2387,15 @@ def render_evidence_detail(ctx: Dict[str, Any]) -> str:
             f"<td class='mono'>{esc(c['version'])}</td><td>{esc(c['type'])}</td></tr>"
             for c in shown
         )
-        trunc = (f'<p class="small">Showing 60 of {len(sbom)} components; the complete '
-                 f'CycloneDX SBOM is embedded as a PDF attachment and hashed in §17.</p>'
+        trunc = (f'<p class="small">Pokazano 60 z {len(sbom)} składników; kompletny '
+                 f'SBOM CycloneDX jest osadzony jako załącznik PDF i zahaszowany w §17.</p>'
                  if len(sbom) > 60 else "")
         sbom_html = (
-            "<table><thead><tr><th>Component</th><th>Version</th><th>Type</th></tr>"
+            "<table><thead><tr><th>Składnik</th><th>Wersja</th><th>Typ</th></tr>"
             f"</thead><tbody>{sbom_body}</tbody></table>{trunc}"
         )
     else:
-        sbom_html = '<p class="small">No SBOM components parsed.</p>'
+        sbom_html = '<p class="small">Nie przetworzono żadnych składników SBOM.</p>'
 
     # Coverage summary.
     if cov:
@@ -2386,37 +2404,38 @@ def render_evidence_detail(ctx: Dict[str, Any]) -> str:
             p = v.get("pct") if isinstance(v, dict) else None
             return f"{p}%" if p is not None else "—"
         cov_html = (
-            "<table><thead><tr><th>Lines</th><th>Branches</th><th>Functions</th>"
+            "<table><thead><tr><th>Linie</th><th>Gałęzie</th><th>Funkcje</th>"
             "</tr></thead><tbody><tr>"
             f"<td>{pct('lines')}</td><td>{pct('branches')}</td><td>{pct('functions')}</td>"
             "</tr></tbody></table>"
         )
     else:
-        cov_html = '<p class="small">No coverage summary parsed.</p>'
+        cov_html = '<p class="small">Nie przetworzono podsumowania pokrycia.</p>'
 
     return f"""
 <section class="section" id="evidence-detail">
-  <h2>9. Per-Control Evidence Detail</h2>
-  <p class="small">Findings below are parsed server-side directly from the run's scanner
-  artifacts — every row is {provenance_badge('live')} live/measured output. The raw artifacts are
-  embedded as PDF attachments and hashed in the §17 tamper-evidence appendix.</p>
+  <h2>9. Szczegóły Dowodów dla Poszczególnych Kontroli</h2>
+  <p class="small">Znaleziska poniżej są przetwarzane po stronie serwera bezpośrednio z artefaktów
+  skanerów uruchomienia — każdy wiersz to wynik {provenance_badge('live')} na żywo / zmierzony. Surowe
+  artefakty są osadzone jako załączniki PDF i zahaszowane w załączniku o odporności na manipulację
+  §17.</p>
 
-  <h3>9.1 Dependency Vulnerabilities — Trivy SCA (package-lock.json)</h3>
+  <h3>9.1 Podatności Zależności — Trivy SCA (package-lock.json)</h3>
   {_cve_table(sca)}
 
-  <h3>9.2 Container Image Vulnerabilities — Trivy (built image)</h3>
+  <h3>9.2 Podatności Obrazu Kontenera — Trivy (zbudowany obraz)</h3>
   {_cve_table(img)}
 
-  <h3>9.3 Static Analysis — CodeQL (SAST) + Checkov (IaC)</h3>
+  <h3>9.3 Analiza Statyczna — CodeQL (SAST) + Checkov (IaC)</h3>
   {sast_html}
 
-  <h3>9.4 Dynamic Analysis — OWASP ZAP (DAST)</h3>
+  <h3>9.4 Analiza Dynamiczna — OWASP ZAP (DAST)</h3>
   {zap_html}
 
-  <h3>9.5 Software Bill of Materials — CycloneDX</h3>
+  <h3>9.5 Wykaz Składników Oprogramowania — CycloneDX</h3>
   {sbom_html}
 
-  <h3>9.6 Test Coverage</h3>
+  <h3>9.6 Pokrycie Testami</h3>
   {cov_html}
 </section>
 """
@@ -2425,21 +2444,21 @@ def render_evidence_detail(ctx: Dict[str, Any]) -> str:
 def render_vuln_mgmt(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="vuln-mgmt">
-  <h2>10. Vulnerability Management</h2>
-  <h3>Severity SLAs (KEV-aligned)</h3>
+  <h2>10. Zarządzanie Podatnościami</h2>
+  <h3>SLA wg istotności (zgodne z KEV)</h3>
   <table>
-    <thead><tr><th>Severity</th><th>Remediation SLA</th><th>Basis</th></tr></thead>
+    <thead><tr><th>Istotność</th><th>SLA działań naprawczych</th><th>Podstawa</th></tr></thead>
     <tbody>
-      <tr><td>Critical</td><td>15 days</td><td>KEV-aligned; CISA BOD 22-01 spirit.</td></tr>
-      <tr><td>High</td><td>30 days</td><td>KEV-aligned.</td></tr>
-      <tr><td>Medium / Low</td><td>Risk-based</td><td>Tracked with expiry on accepted risk.</td></tr>
+      <tr><td>Krytyczna</td><td>15 dni</td><td>Zgodne z KEV; w duchu CISA BOD 22-01.</td></tr>
+      <tr><td>Wysoka</td><td>30 dni</td><td>Zgodne z KEV.</td></tr>
+      <tr><td>Średnia / Niska</td><td>Wg ryzyka</td><td>Śledzone z terminem wygaśnięcia zaakceptowanego ryzyka.</td></tr>
     </tbody>
   </table>
-  <h3>Remediation register &amp; measured MTTR</h3>
-  <div class="note">The remediation register (discovery &rarr; SLA due &rarr; closure or risk-accept
-  with expiry) and measured MTTR by severity accrue over an operating window. The per-run scanner
-  findings are in the Per-Control Evidence Detail (Trivy SCA + image). KEV cross-referencing is
-  performed at scan time.</div>
+  <h3>Rejestr działań naprawczych i zmierzony MTTR</h3>
+  <div class="note">Rejestr działań naprawczych (wykrycie &rarr; termin SLA &rarr; zamknięcie lub
+  akceptacja ryzyka z terminem wygaśnięcia) oraz zmierzony MTTR wg istotności gromadzą się w oknie
+  operacyjnym. Znaleziska skanerów dla danego uruchomienia znajdują się w Szczegółach Dowodów dla
+  Poszczególnych Kontroli (Trivy SCA + obraz). Odniesienie do KEV jest wykonywane w czasie skanu.</div>
 </section>
 """
 
@@ -2448,21 +2467,21 @@ def render_change_approval(ctx: Dict[str, Any]) -> str:
     m = ctx["manifest"] or {}
     return f"""
 <section class="section" id="change-approval">
-  <h2>11. Change &amp; Approval Records</h2>
-  <p>Every change reaches the deployed artifact only through the pipeline. Branch protection enforces
-  two approvals and signed commits (CODEOWNERS + branch-protection.json), and a real, blocking
-  <code>cosign verify</code> runs before <code>terraform apply</code>.</p>
+  <h2>11. Rejestry Zmian i Zatwierdzeń</h2>
+  <p>Każda zmiana dociera do wdrożonego artefaktu wyłącznie przez pipeline. Ochrona gałęzi egzekwuje
+  dwa zatwierdzenia i podpisane commity (CODEOWNERS + branch-protection.json), a rzeczywiste,
+  blokujące <code>cosign verify</code> uruchamia się przed <code>terraform apply</code>.</p>
   <table>
-    <thead><tr><th>Control</th><th>Mechanism</th><th>Evidence</th></tr></thead>
+    <thead><tr><th>Kontrola</th><th>Mechanizm</th><th>Dowód</th></tr></thead>
     <tbody>
-      <tr><td>2-approval gate</td><td>Required reviews in branch-protection.json + CODEOWNERS</td><td>{provenance_badge('static')} intent file; live drift reconciliation pending.</td></tr>
-      <tr><td>Signed commits</td><td>PR commit-signature verification (GitHub API; core.setFailed on unsigned)</td><td>{provenance_badge('live')} enforced in CI.</td></tr>
-      <tr><td>Deploy-time integrity</td><td>cosign verify on image@digest before apply</td><td>{provenance_badge('live')} blocking gate.</td></tr>
-      <tr><td>Deployed-artifact binding</td><td>Provenance subject digest == deployed digest</td><td class="mono">{esc(m.get('image_digest'))}</td></tr>
+      <tr><td>Bramka 2 zatwierdzeń</td><td>Wymagane przeglądy w branch-protection.json + CODEOWNERS</td><td>{provenance_badge('static')} plik intencji; uzgodnienie dryfu na żywo oczekuje.</td></tr>
+      <tr><td>Podpisane commity</td><td>Weryfikacja podpisu commita PR (GitHub API; core.setFailed przy niepodpisanym)</td><td>{provenance_badge('live')} egzekwowane w CI.</td></tr>
+      <tr><td>Integralność w czasie wdrożenia</td><td>cosign verify na image@digest przed apply</td><td>{provenance_badge('live')} bramka blokująca.</td></tr>
+      <tr><td>Powiązanie wdrożonego artefaktu</td><td>Skrót podmiotu proweniencji == skrót wdrożony</td><td class="mono">{esc(m.get('image_digest'))}</td></tr>
     </tbody>
   </table>
-  <p class="small">Pipeline run metadata and gate approvals for this release are bound to git SHA
-  <span class="mono">{esc(m.get('git_sha'))}</span>.</p>
+  <p class="small">Metadane uruchomienia pipeline oraz zatwierdzenia bramek dla tego wydania są
+  powiązane ze skrótem git SHA <span class="mono">{esc(m.get('git_sha'))}</span>.</p>
 </section>
 """
 
@@ -2496,13 +2515,13 @@ def render_exceptions(ctx: Dict[str, Any]) -> str:
     rows = ctx["exception_rows"]
     if rows is None:
         body = (
-            unavailable("exception-register.md not provided")
-            + '<p class="small">Where a register is genuinely empty, the report states '
-            '"no exceptions noted"; absence of the file is reported honestly as unavailable, not as '
-            '"no exceptions".</p>'
+            unavailable("nie dostarczono exception-register.md")
+            + '<p class="small">Gdy rejestr jest rzeczywiście pusty, raport stwierdza '
+            '„brak odnotowanych wyjątków”; brak pliku jest uczciwie zgłaszany jako niedostępny, a nie '
+            'jako „brak wyjątków”.</p>'
         )
     elif not rows:
-        body = '<p><strong>No exceptions noted</strong> for this period (empty register).</p>'
+        body = '<p><strong>Brak odnotowanych wyjątków</strong> dla tego okresu (pusty rejestr).</p>'
     else:
         headers = list(rows[0].keys())
         thead = "".join(f"<th>{esc(h)}</th>" for h in headers)
@@ -2512,10 +2531,11 @@ def render_exceptions(ctx: Dict[str, Any]) -> str:
         body = f"<table><thead><tr>{thead}</tr></thead><tbody>{trows}</tbody></table>"
     return f"""
 <section class="section" id="exceptions">
-  <h2>12. Exceptions / Deviation Register</h2>
-  <p>Failed gates, accepted CVEs (with VEX justification), waived findings, and out-of-scope controls
-  with owner / justification / severity / approver / expiry. Known out-of-scope items include
-  EX-001 (DORA TLPT), EX-002 (NIS2 24/7 SOC), and EX-003 (DORA multi-region DR).</p>
+  <h2>12. Rejestr Wyjątków / Odstępstw</h2>
+  <p>Niezaliczone bramki, zaakceptowane CVE (z uzasadnieniem VEX), odstąpione znaleziska oraz kontrole
+  poza zakresem wraz z właścicielem / uzasadnieniem / istotnością / zatwierdzającym / terminem
+  wygaśnięcia. Znane pozycje poza zakresem obejmują EX-001 (DORA TLPT), EX-002 (NIS2 SOC 24/7) oraz
+  EX-003 (DORA wieloregionowy DR).</p>
   {body}
 </section>
 """
@@ -2532,11 +2552,11 @@ def render_residual_risk(ctx: Dict[str, Any]) -> str:
     rr = ctx["residual_risk"]
     if not isinstance(rr, dict):
         body = unavailable(
-            "residual-risk.json not provided (run scripts/validators/risk_acceptance.py); see the "
-            "Exceptions register above for the raw acceptances")
+            "nie dostarczono residual-risk.json (uruchom scripts/validators/risk_acceptance.py); "
+            "surowe akceptacje znajdują się w Rejestrze wyjątków powyżej")
         return f"""
 <section class="section" id="residual-risk">
-  <h2>12a. Risk-Acceptance &amp; Residual-Risk Statement (Part J.2 / D.4)</h2>
+  <h2>12a. Oświadczenie o Akceptacji Ryzyka i Ryzyku Szczątkowym (Część J.2 / D.4)</h2>
   {body}
 </section>
 """
@@ -2546,17 +2566,18 @@ def render_residual_risk(ctx: Dict[str, Any]) -> str:
     block = rr.get("residual_risk") if isinstance(rr.get("residual_risk"), dict) else {}
 
     if status == "INDETERMINATE":
-        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+        verdict = ('<p><strong>Bramka akceptacji ryzyka:</strong> '
                    f'<span class="badge badge-indet">INDETERMINATE</span> '
                    f'<span class="small">{esc(detail)}</span></p>')
     elif status == "FAIL":
-        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+        verdict = ('<p><strong>Bramka akceptacji ryzyka:</strong> '
                    f'{status_badge("FAIL")} '
                    f'<span class="small">{esc(detail)} '
-                   '(spec &sect;8 anti-pattern #5 — unbounded risk acceptances are a rejection '
-                   'trigger; this BLOCKING FAIL fails the gate on a non-PR run).</span></p>')
+                   '(specyfikacja &sect;8 antywzorzec #5 — nieograniczone akceptacje ryzyka są '
+                   'przesłanką odrzucenia; ten BLOKUJĄCY FAIL powoduje niepowodzenie bramki przy '
+                   'uruchomieniu spoza PR).</span></p>')
     else:
-        verdict = ('<p><strong>Risk-acceptance gate:</strong> '
+        verdict = ('<p><strong>Bramka akceptacji ryzyka:</strong> '
                    f'{status_badge("PASS")} '
                    f'<span class="small">{esc(detail)}</span></p>')
 
@@ -2568,13 +2589,13 @@ def render_residual_risk(ctx: Dict[str, Any]) -> str:
     board = block.get("board_tolerance") if isinstance(block.get("board_tolerance"), dict) else {}
 
     sev_str = ", ".join(f"{k}: {v}" for k, v in by_sev.items()) if by_sev else "&mdash;"
-    soonest_str = (f"{esc(soonest.get('id'))} expires {esc(soonest.get('expiry'))} "
-                   f"({esc(soonest.get('days_to_expiry'))}d)" if soonest else "&mdash;")
+    soonest_str = (f"{esc(soonest.get('id'))} wygasa {esc(soonest.get('expiry'))} "
+                   f"({esc(soonest.get('days_to_expiry'))} dni)" if soonest else "&mdash;")
     posture = (
         '<div class="kv">'
-        f'<div class="k">Open accepted risks</div><div>{esc(open_count)}</div>'
-        f'<div class="k">By severity</div><div>{sev_str}</div>'
-        f'<div class="k">Soonest expiry</div><div>{soonest_str}</div>'
+        f'<div class="k">Otwarte zaakceptowane ryzyka</div><div>{esc(open_count)}</div>'
+        f'<div class="k">Wg istotności</div><div>{sev_str}</div>'
+        f'<div class="k">Najbliższy termin wygaśnięcia</div><div>{soonest_str}</div>'
         "</div>"
     )
 
@@ -2594,36 +2615,38 @@ def render_residual_risk(ctx: Dict[str, Any]) -> str:
                 "</tr>"
             )
         open_table = (
-            "<h3>12a.1 Open accepted risks (named approver + expiry required)</h3>"
-            "<table><thead><tr><th>ID</th><th>Control / vuln</th><th>Severity</th><th>Owner</th>"
-            "<th>Approver</th><th>Expiry</th></tr></thead><tbody>" + orows + "</tbody></table>"
+            "<h3>12a.1 Otwarte zaakceptowane ryzyka (wymagany wskazany zatwierdzający + termin wygaśnięcia)</h3>"
+            "<table><thead><tr><th>ID</th><th>Kontrola / podatność</th><th>Istotność</th><th>Właściciel</th>"
+            "<th>Zatwierdzający</th><th>Termin wygaśnięcia</th></tr></thead><tbody>" + orows + "</tbody></table>"
         )
     else:
-        open_table = ('<p><strong>No open accepted risks</strong> — register clean / no exceptions '
-                      'noted.</p>')
+        open_table = ('<p><strong>Brak otwartych zaakceptowanych ryzyk</strong> — rejestr czysty / brak '
+                      'odnotowanych wyjątków.</p>')
 
     board_block = ""
     if board:
         board_block = (
-            '<h3>12a.2 Board risk-tolerance basis (Part D.4)</h3>'
+            '<h3>12a.2 Podstawa tolerancji ryzyka zarządu (Część D.4)</h3>'
             f'<div class="note">{esc(board.get("basis"))} {esc(board.get("iso_27001_2022"))}</div>'
         )
 
     return f"""
 <section class="section" id="residual-risk">
-  <h2>12a. Risk-Acceptance &amp; Residual-Risk Statement (Part J.2 / D.4)</h2>
-  <p>The residual-risk posture, tied to the board-approved risk tolerance (DORA Art. 5(2)). Every
-  open accepted risk must carry a named approver, a justification, and a future expiry within the
-  12-month maximum; an unbounded acceptance is a documented rejection trigger.</p>
+  <h2>12a. Oświadczenie o Akceptacji Ryzyka i Ryzyku Szczątkowym (Część J.2 / D.4)</h2>
+  <p>Stan ryzyka szczątkowego, powiązany z tolerancją ryzyka zatwierdzoną przez zarząd (DORA Art.
+  5(2)). Każde otwarte zaakceptowane ryzyko musi mieć wskazanego zatwierdzającego, uzasadnienie oraz
+  przyszły termin wygaśnięcia w ramach maksimum 12 miesięcy; nieograniczona akceptacja jest
+  udokumentowaną przesłanką odrzucenia.</p>
   {verdict}
-  <h3>Residual posture</h3>
+  <h3>Stan szczątkowy</h3>
   {posture}
   <div class="note">{esc(statement)}</div>
   {open_table}
   {board_block}
-  <p class="small"><strong>Honesty:</strong> this artifact is the machine-readable substrate of the
-  residual-risk statement. The accountable-officer signature is a human act applied at seal time
-  (<code>signed_by_accountable_officer</code> is recorded honestly, not asserted here).</p>
+  <p class="small"><strong>Uczciwość:</strong> niniejszy artefakt jest maszynowo czytelnym podłożem
+  oświadczenia o ryzyku szczątkowym. Podpis odpowiedzialnego kierownika jest aktem ludzkim
+  nakładanym w chwili plombowania (<code>signed_by_accountable_officer</code> jest rejestrowany
+  uczciwie, a nie deklarowany tutaj).</p>
 </section>
 """
 
@@ -2631,19 +2654,20 @@ def render_residual_risk(ctx: Dict[str, Any]) -> str:
 def render_break_glass(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="break-glass">
-  <h2>13. Emergency-Change / Break-Glass Disclosure</h2>
-  <p>The pipeline is the only normal path to production. A break-glass procedure (ticket +
-  retroactive approval + post-incident review) exists for emergencies. Detecting out-of-pipeline
-  changes to Azure (e.g. via Activity-Log drift alerting) is a <strong>design-stage</strong> control
-  &mdash; no live posture/drift scan runs in this pipeline yet, so this report does not claim live
-  detection coverage.</p>
+  <h2>13. Ujawnienie Zmian Awaryjnych / Procedury Break-Glass</h2>
+  <p>Pipeline jest jedyną normalną drogą do produkcji. Na wypadek sytuacji awaryjnych istnieje
+  procedura break-glass (zgłoszenie + zatwierdzenie wsteczne + przegląd poincydentalny). Wykrywanie
+  zmian poza pipeline'em w Azure (np. przez alertowanie o dryfie z Activity-Log) jest kontrolą
+  <strong>w fazie projektowej</strong> &mdash; w tym pipeline nie działa jeszcze żaden skan stanu/
+  dryfu na żywo, więc niniejszy raport nie deklaruje pokrycia wykrywania na żywo.</p>
   <div class="kv">
-    <div class="k">Break-glass events this period</div><div>0 (no emergency changes recorded this run).</div>
-    <div class="k">Out-of-pipeline change detection</div><div>Azure Activity-Log drift alerting — design-stage (no live scan).</div>
+    <div class="k">Zdarzenia break-glass w tym okresie</div><div>0 (brak odnotowanych zmian awaryjnych w tym uruchomieniu).</div>
+    <div class="k">Wykrywanie zmian poza pipeline'em</div><div>Alertowanie o dryfie z Azure Activity-Log — faza projektowa (brak skanu na żywo).</div>
   </div>
-  <p class="small">A count of zero is asserted for this single-run report. Continuous out-of-pipeline
-  detection (a live CSPM / drift scan) is not yet wired; until it is, this control is design-stage
-  only and no operating coverage is claimed.</p>
+  <p class="small">Dla tego raportu z pojedynczego uruchomienia deklarowana jest liczba zero. Ciągłe
+  wykrywanie zmian poza pipeline'em (skan CSPM / dryfu na żywo) nie jest jeszcze podłączone; dopóki
+  nie będzie, kontrola ta jest wyłącznie w fazie projektowej i nie jest deklarowane żadne pokrycie
+  operacyjne.</p>
 </section>
 """
 
@@ -2651,22 +2675,23 @@ def render_break_glass(ctx: Dict[str, Any]) -> str:
 def render_kpi_trends(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="kpi-trends">
-  <h2>14. DORA &amp; Security-KPI Trends</h2>
-  <p>ISO Clause 9.1 monitoring evidence. The DORA four keys plus security KPIs — percent of builds
-  with valid + verified provenance, escaped-vulnerability rate, gate pass/fail, and exception aging
-  — are computed as trends over the observation window.</p>
+  <h2>14. Trendy DORA i Wskaźników Bezpieczeństwa</h2>
+  <p>Dowód monitorowania wg Klauzuli 9.1 ISO. Cztery kluczowe wskaźniki DORA oraz wskaźniki
+  bezpieczeństwa — odsetek budów z ważną i zweryfikowaną proweniencją, wskaźnik podatności, które się
+  prześlizgnęły, zaliczenie/niezaliczenie bramek oraz starzenie się wyjątków — są wyliczane jako
+  trendy w oknie obserwacji.</p>
   <table>
-    <thead><tr><th>Metric</th><th>This run</th><th>Trend basis</th></tr></thead>
+    <thead><tr><th>Wskaźnik</th><th>To uruchomienie</th><th>Podstawa trendu</th></tr></thead>
     <tbody>
-      <tr><td>Deployment frequency</td><td>1 (this release)</td><td>Accrues per release.</td></tr>
-      <tr><td>Change lead time</td><td>&mdash;</td><td>Computed from PR-merge &rarr; deploy timestamps over the window.</td></tr>
-      <tr><td>Change failure rate</td><td>&mdash;</td><td>Failed deploys / total over the window.</td></tr>
-      <tr><td>MTTR (restore)</td><td>&mdash;</td><td>Incident restore times over the window.</td></tr>
-      <tr><td>% builds with verified provenance</td><td>&mdash;</td><td>Verified-provenance builds / total.</td></tr>
+      <tr><td>Częstotliwość wdrożeń</td><td>1 (to wydanie)</td><td>Gromadzi się dla każdego wydania.</td></tr>
+      <tr><td>Czas wprowadzenia zmiany</td><td>&mdash;</td><td>Wyliczany ze znaczników czasu scalenie PR &rarr; wdrożenie w oknie.</td></tr>
+      <tr><td>Wskaźnik niepowodzeń zmian</td><td>&mdash;</td><td>Niepowodzenia wdrożeń / wszystkie w oknie.</td></tr>
+      <tr><td>MTTR (odtworzenie)</td><td>&mdash;</td><td>Czasy odtworzenia po incydentach w oknie.</td></tr>
+      <tr><td>% budów ze zweryfikowaną proweniencją</td><td>&mdash;</td><td>Budowy ze zweryfikowaną proweniencją / wszystkie.</td></tr>
     </tbody>
   </table>
-  <div class="note">Trend lines require multiple data points across an operating window; this
-  single-run report establishes the measurement baseline.</div>
+  <div class="note">Linie trendu wymagają wielu punktów danych w oknie operacyjnym; niniejszy raport z
+  pojedynczego uruchomienia ustanawia bazę pomiarową.</div>
 </section>
 """
 
@@ -2685,42 +2710,43 @@ def render_retention(ctx: Dict[str, Any]) -> str:
         worm_label = worm
     return f"""
 <section class="section" id="retention">
-  <h2>15. Retention &amp; Records-Management Metadata</h2>
+  <h2>15. Metadane Retencji i Zarządzania Rekordami</h2>
   <table>
-    <thead><tr><th>Attribute</th><th>Value</th><th>Source</th></tr></thead>
+    <thead><tr><th>Atrybut</th><th>Wartość</th><th>Źródło</th></tr></thead>
     <tbody>
-      <tr><td>Retention class</td><td>Audit evidence — long-term (DORA 5-yr horizon target)</td><td>{provenance_badge('static')} policy</td></tr>
-      <tr><td>WORM / object-lock state</td><td>{esc(worm_label)}</td><td>{provenance_badge('live')} read from manifest.worm_state — NOT hardcoded</td></tr>
-      <tr><td>Retain-until</td><td>{esc(retain_until) if retain_until else '&mdash; (written back by seal step when a locked WORM backend is present)'}</td><td>{provenance_badge('live')} manifest</td></tr>
-      <tr><td>Legal hold</td><td>Per backend policy when locked</td><td>{provenance_badge('static')} policy</td></tr>
-      <tr><td>Record owner</td><td>CyberForge DevSecOps</td><td>{provenance_badge('static')}</td></tr>
-      <tr><td>Archive URI</td><td>Azure immutable blob (target) / GitHub Release (fallback)</td><td>{provenance_badge('static')}</td></tr>
+      <tr><td>Klasa retencji</td><td>Dowody audytowe — długoterminowe (cel horyzontu 5 lat DORA)</td><td>{provenance_badge('static')} polityka</td></tr>
+      <tr><td>Stan WORM / blokady obiektu</td><td>{esc(worm_label)}</td><td>{provenance_badge('live')} odczytano z manifest.worm_state — NIE zakodowane na stałe</td></tr>
+      <tr><td>Przechowuj do</td><td>{esc(retain_until) if retain_until else '&mdash; (zapisywane wstecznie przez krok plombowania, gdy obecny jest zablokowany backend WORM)'}</td><td>{provenance_badge('live')} manifest</td></tr>
+      <tr><td>Wstrzymanie prawne</td><td>Wg polityki backendu, gdy zablokowane</td><td>{provenance_badge('static')} polityka</td></tr>
+      <tr><td>Właściciel rekordu</td><td>CyberForge DevSecOps</td><td>{provenance_badge('static')}</td></tr>
+      <tr><td>URI archiwum</td><td>Niezmienny blob Azure (cel) / GitHub Release (rozwiązanie zapasowe)</td><td>{provenance_badge('static')}</td></tr>
     </tbody>
   </table>
-  <p class="small"><strong>Honesty:</strong> immutability is DESIGNED, not necessarily locked. The
-  WORM state above is whatever the manifest recorded at seal time; if it reads "pending" or
-  "unlocked", the records are NOT yet under a locked retention policy.</p>
+  <p class="small"><strong>Uczciwość:</strong> niezmienność jest ZAPROJEKTOWANA, niekoniecznie
+  zablokowana. Powyższy stan WORM to dowolna wartość zarejestrowana przez manifest w chwili
+  plombowania; jeśli wskazuje „pending” lub „unlocked”, rekordy NIE są jeszcze objęte zablokowaną
+  polityką retencji.</p>
 </section>
 """
 
 
 GLOSSARY = [
-    ("SLSA", "Supply-chain Levels for Software Artifacts — build provenance assurance framework. This pipeline targets Build L2."),
-    ("PDF/A-3b", "ISO 19005-3 archival PDF profile allowing embedded arbitrary files (the raw evidence)."),
-    ("PAdES", "ETSI EN 319 142 PDF Advanced Electronic Signatures (B-T / B-LT / B-LTA conformance levels)."),
-    ("RFC-3161", "IETF time-stamp protocol; a TSA token binds a hash to a trusted time."),
-    ("RFC-6962", "Certificate Transparency Merkle tree construction (domain-separated leaf/node hashing) used for the evidence Merkle root."),
-    ("Rekor", "Sigstore transparency log; records a Signed Entry Timestamp for keyless signatures."),
-    ("OSCAL", "NIST Open Security Controls Assessment Language; the machine-readable Assessment Results twin."),
-    ("CUEC", "Complementary User-Entity Control — a control the relying party must operate for the system's controls to be effective."),
-    ("IPE", "Information Produced by the Entity — evidence whose completeness/accuracy the auditor must establish."),
-    ("WORM", "Write-Once-Read-Many immutable storage; here DESIGNED via Azure immutable blob, locked state read live."),
-    ("VEX", "Vulnerability Exploitability eXchange — machine-readable exploitability status for SBOM components."),
-    ("DORA", "EU Digital Operational Resilience Act (Reg. 2022/2554)."),
-    ("NIS2", "EU Directive 2022/2555 on network and information security."),
-    ("UKSC", "Polish National Cybersecurity System Act (Ustawa o krajowym systemie cyberbezpieczeństwa); Art. 8 = risk management measures."),
-    ("CRA", "EU Cyber Resilience Act; Art. 13 = manufacturer obligations (secure-by-design, vuln handling, SBOM)."),
-    ("SSDF", "NIST SP 800-218 Secure Software Development Framework — practice families PO / PS / PW / RV."),
+    ("SLSA", "Supply-chain Levels for Software Artifacts — ramy zapewnienia proweniencji budowy. Niniejszy pipeline celuje w Build L2."),
+    ("PDF/A-3b", "Archiwalny profil PDF wg ISO 19005-3 dopuszczający osadzanie dowolnych plików (surowych dowodów)."),
+    ("PAdES", "ETSI EN 319 142 PDF Advanced Electronic Signatures (poziomy zgodności B-T / B-LT / B-LTA)."),
+    ("RFC-3161", "Protokół znaczników czasu IETF; token TSA wiąże skrót z zaufanym czasem."),
+    ("RFC-6962", "Konstrukcja drzewa Merkle Certificate Transparency (haszowanie liści/węzłów z separacją domen) używana dla korzenia Merkle dowodów."),
+    ("Rekor", "Dziennik przejrzystości Sigstore; rejestruje Signed Entry Timestamp dla podpisów bezkluczowych."),
+    ("OSCAL", "NIST Open Security Controls Assessment Language; maszynowo czytelny odpowiednik Wyników Oceny."),
+    ("CUEC", "Uzupełniająca Kontrola Podmiotu Użytkującego — kontrola, którą musi obsługiwać strona polegająca, aby kontrole systemu były skuteczne."),
+    ("IPE", "Informacja Wytworzona przez Podmiot — dowód, którego kompletność/rzetelność musi ustalić audytor."),
+    ("WORM", "Niezmienny magazyn Write-Once-Read-Many; tutaj ZAPROJEKTOWANY przez niezmienny blob Azure, stan zablokowania odczytywany na żywo."),
+    ("VEX", "Vulnerability Exploitability eXchange — maszynowo czytelny status eksploatowalności składników SBOM."),
+    ("DORA", "Rozporządzenie UE w sprawie operacyjnej odporności cyfrowej (Rozp. 2022/2554)."),
+    ("NIS2", "Dyrektywa UE 2022/2555 w sprawie bezpieczeństwa sieci i informacji."),
+    ("UKSC", "Ustawa o krajowym systemie cyberbezpieczeństwa; Art. 8 = środki zarządzania ryzykiem."),
+    ("CRA", "Akt UE w sprawie cyberodporności; Art. 13 = obowiązki producenta (bezpieczeństwo w fazie projektowania, obsługa podatności, SBOM)."),
+    ("SSDF", "NIST SP 800-218 Secure Software Development Framework — rodziny praktyk PO / PS / PW / RV."),
 ]
 
 
@@ -2731,9 +2757,9 @@ def render_glossary(ctx: Dict[str, Any]) -> str:
     )
     return f"""
 <section class="section" id="glossary">
-  <h2>16. Glossary / Framework-Clause Appendix</h2>
+  <h2>16. Słownik / Załącznik z Klauzulami Ram Regulacyjnych</h2>
   <table>
-    <thead><tr><th>Term / clause</th><th>Definition / official reference</th></tr></thead>
+    <thead><tr><th>Termin / klauzula</th><th>Definicja / oficjalne odniesienie</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
 </section>
@@ -2756,22 +2782,23 @@ def render_tamper_evidence(ctx: Dict[str, Any]) -> str:
                 "</tr>"
             )
         hash_table = (
-            "<table><thead><tr><th>Path</th><th>SHA-256</th><th>Size</th><th>MIME</th>"
-            "<th>Provenance</th></tr></thead><tbody>" + rows + "</tbody></table>"
+            "<table><thead><tr><th>Ścieżka</th><th>SHA-256</th><th>Rozmiar</th><th>MIME</th>"
+            "<th>Proweniencja</th></tr></thead><tbody>" + rows + "</tbody></table>"
         )
     else:
-        hash_table = unavailable("manifest contained no artifacts")
+        hash_table = unavailable("manifest nie zawierał żadnych artefaktów")
 
     signatures = m.get("signatures") if isinstance(m.get("signatures"), dict) else {}
     sig_rows = ""
     if signatures:
         for k, v in signatures.items():
             sig_rows += f"<tr><td class=\"mono\">{esc(k)}</td><td class=\"mono\">{esc(json.dumps(v) if isinstance(v, (dict, list)) else v)}</td></tr>"
-        sig_table = ("<table><thead><tr><th>Signature ref</th><th>Value</th></tr></thead>"
+        sig_table = ("<table><thead><tr><th>Odniesienie podpisu</th><th>Wartość</th></tr></thead>"
                      f"<tbody>{sig_rows}</tbody></table>")
     else:
-        sig_table = ('<div class="note">No signature references recorded in the manifest yet — '
-                     'signatures{} is populated by the seal step (cosign / rfc3161 / pades / verapdf).</div>')
+        sig_table = ('<div class="note">W manifeście nie zarejestrowano jeszcze żadnych odniesień do '
+                     'podpisów — pole signatures{} jest wypełniane przez krok plombowania '
+                     '(cosign / rfc3161 / pades / verapdf).</div>')
 
     cmd_rows = "".join(
         f"<tr><td>{esc(label)}</td><td><pre class=\"mono\">{esc(cmd)}</pre></td></tr>"
@@ -2779,17 +2806,18 @@ def render_tamper_evidence(ctx: Dict[str, Any]) -> str:
     )
     return f"""
 <section class="section" id="tamper-evidence">
-  <h2>17. Tamper-Evidence Appendix</h2>
-  <h3>Evidence-pack Merkle root</h3>
+  <h2>17. Załącznik o Odporności na Manipulację</h2>
+  <h3>Korzeń Merkle pakietu dowodowego</h3>
   <div class="merkle" title="{esc_attr(m.get('merkle_root'))}">{esc(m.get('merkle_root'))}</div>
-  <p class="small">Algorithm: {esc(m.get('merkle_algorithm') or 'RFC6962-SHA256')} — domain-separated
-  leaf = SHA256(0x00 || data), node = SHA256(0x01 || left || right), over artifacts sorted by path.</p>
-  <h3>Full hash manifest</h3>
+  <p class="small">Algorytm: {esc(m.get('merkle_algorithm') or 'RFC6962-SHA256')} — z separacją domen
+  liść = SHA256(0x00 || dane), węzeł = SHA256(0x01 || lewy || prawy), po artefaktach posortowanych
+  według ścieżki.</p>
+  <h3>Pełny manifest skrótów</h3>
   {hash_table}
-  <h3>Signature references</h3>
+  <h3>Odniesienia do podpisów</h3>
   {sig_table}
-  <h3>Reproducible verification commands</h3>
-  <table><thead><tr><th>Check</th><th>Command</th></tr></thead><tbody>{cmd_rows}</tbody></table>
+  <h3>Powtarzalne polecenia weryfikacji</h3>
+  <table><thead><tr><th>Sprawdzenie</th><th>Polecenie</th></tr></thead><tbody>{cmd_rows}</tbody></table>
 </section>
 """
 
@@ -2798,30 +2826,31 @@ def render_self_seal(ctx: Dict[str, Any]) -> str:
     m = ctx["manifest"] or {}
     return f"""
 <section class="section" id="self-seal">
-  <h2>18. Document Self-Seal / Manifest Page</h2>
-  <p>This page declares the rendered PDF a <strong>forensic object</strong>. After rendering, the
-  PDF's own SHA-256 is computed and bound to the evidence-pack Merkle root below, sealing the human
-  document to the machine evidence.</p>
+  <h2>18. Strona Samozaplombowania / Manifestu Dokumentu</h2>
+  <p>Niniejsza strona ogłasza renderowany PDF <strong>obiektem forensicznym</strong>. Po
+  renderowaniu obliczany jest własny SHA-256 PDF i wiązany z poniższym korzeniem Merkle pakietu
+  dowodowego, plombując dokument ludzki z dowodami maszynowymi.</p>
   <div class="kv">
-    <div class="k">Bound Merkle root</div><div class="mono" title="{esc_attr(m.get('merkle_root'))}">{esc(m.get('merkle_root'))}</div>
-    <div class="k">PDF SHA-256</div><div class="mono">(computed at seal time and recorded in manifest.signatures)</div>
-    <div class="k">PAdES level</div><div>Honest label applied at seal time (B-T / B-LT achievable for free; B-LTA only with a trusted cert). Authoritative path = external cosign + Rekor + RFC-3161 bundle.</div>
-    <div class="k">Document timestamp</div><div>RFC-3161 token over the final PDF (see Tamper-Evidence appendix).</div>
+    <div class="k">Powiązany korzeń Merkle</div><div class="mono" title="{esc_attr(m.get('merkle_root'))}">{esc(m.get('merkle_root'))}</div>
+    <div class="k">SHA-256 PDF</div><div class="mono">(obliczany w chwili plombowania i rejestrowany w manifest.signatures)</div>
+    <div class="k">Poziom PAdES</div><div>Uczciwa etykieta nałożona w chwili plombowania (B-T / B-LT osiągalne bezpłatnie; B-LTA tylko z zaufanym certyfikatem). Ścieżka miarodajna = zewnętrzny pakiet cosign + Rekor + RFC-3161.</div>
+    <div class="k">Znacznik czasu dokumentu</div><div>Token RFC-3161 nad ostatecznym PDF (zob. załącznik o odporności na manipulację).</div>
   </div>
-  <p class="small">The body bytes are deterministic for identical inputs + pinned toolchain; the
-  appended signature and timestamp legitimately vary. The sealed PDF — not this HTML — is canonical.</p>
+  <p class="small">Bajty treści są deterministyczne dla identycznych danych wejściowych + przypiętego
+  łańcucha narzędzi; dołączony podpis i znacznik czasu w sposób uprawniony się różnią. Zaplombowany
+  PDF — a nie ten HTML — jest kanoniczny.</p>
 </section>
 """
 
 
 CLAIMS_REGISTER = [
-    ("Supply-chain build level", "SLSA Build L2 (not L3)", "cosign keyless signing + SLSA in-toto provenance + Rekor; L3 NOT claimed (provenance best-effort, not isolated)."),
-    ("Evidence immutability", "Immutability DESIGNED, not necessarily locked", "Azure immutable-blob policy (target); live WORM state read from manifest.worm_state, never hardcoded."),
-    ("Tamper-evidence", "Tamper-evident once anchored", "RFC-6962 Merkle root + cosign/Rekor SET + RFC-3161 token + PAdES; runner clock times are informational only."),
-    ("Deployed-digest trust", "Verify the digest externally", "The container does not self-attest its digest; verify against the registry / Rekor with the printed identity-pinned command."),
-    ("Coverage numbers", "Computed, not hardcoded", "All framework coverage figures are derived from compliance-matrix.json at render time."),
-    ("Operating effectiveness", "Design effectiveness only", "No operating track record yet; registers and review cadences are pre-Stage-2 / pre-Type-II."),
-    ("Document authority", "This report is evidentiary; the showcase is illustrative", "index.html is non-evidentiary cover-stock; its served hash is in the manifest for change-detection."),
+    ("Poziom budowy łańcucha dostaw", "SLSA Build L2 (nie L3)", "bezkluczowe podpisywanie cosign + proweniencja SLSA in-toto + Rekor; L3 NIE deklarowane (proweniencja najlepszym możliwym staraniem, nieodizolowana)."),
+    ("Niezmienność dowodów", "Niezmienność ZAPROJEKTOWANA, niekoniecznie zablokowana", "polityka niezmiennego bloba Azure (cel); bieżący stan WORM odczytywany z manifest.worm_state, nigdy zakodowany na stałe."),
+    ("Odporność na manipulację", "Odporne na manipulację po zakotwiczeniu", "korzeń Merkle RFC-6962 + SET cosign/Rekor + token RFC-3161 + PAdES; czasy zegara runnera mają charakter wyłącznie informacyjny."),
+    ("Zaufanie do wdrożonego skrótu", "Zweryfikuj skrót zewnętrznie", "kontener nie poświadcza samodzielnie swojego skrótu; zweryfikuj wobec rejestru / Rekor wydrukowanym poleceniem powiązanym z tożsamością."),
+    ("Liczby pokrycia", "Wyliczone, nie zakodowane na stałe", "wszystkie wartości pokrycia ram regulacyjnych są wyprowadzane z compliance-matrix.json w czasie renderowania."),
+    ("Skuteczność operacyjna", "Wyłącznie skuteczność projektowa", "brak jeszcze historii operacyjnej; rejestry i kadencje przeglądów są przed Etapem 2 / przed Typem II."),
+    ("Umocowanie dokumentu", "Niniejszy raport ma charakter dowodowy; witryna pokazowa jest ilustracyjna", "index.html to niedowodowa oprawa; jej udostępniony skrót jest w manifeście do wykrywania zmian."),
 ]
 
 
@@ -2832,18 +2861,19 @@ def render_claims_register(ctx: Dict[str, Any]) -> str:
     )
     return f"""
 <section class="section" id="claims-register">
-  <h2>19. Claims Register Appendix</h2>
-  <p>Every compliance / security claim mapped to its backing verified mechanism or honest relabel.
-  No claim in this document is made without a pointer to its evidence or an explicit honest caveat.</p>
+  <h2>19. Załącznik z Rejestrem Twierdzeń</h2>
+  <p>Każde twierdzenie o zgodności / bezpieczeństwie zmapowane na wspierający je zweryfikowany
+  mechanizm lub uczciwą reklasyfikację. Żadne twierdzenie w tym dokumencie nie jest formułowane bez
+  wskazania jego dowodu lub jawnego, uczciwego zastrzeżenia.</p>
   <table>
-    <thead><tr><th>Claim</th><th>Honest statement</th><th>Backing mechanism</th></tr></thead>
+    <thead><tr><th>Twierdzenie</th><th>Uczciwe oświadczenie</th><th>Wspierający mechanizm</th></tr></thead>
     <tbody>{rows}</tbody>
   </table>
-  <h3>Embedded attachments (PDF/A-3, AFRelationship Source/Data)</h3>
-  <p class="small">When rendered to PDF/A-3 by render-evidence-pdf.py, the following raw machine
-  evidence travels embedded inside the document so report + evidence form one byte-verifiable object:
-  manifest.json, *.bundle, *.tsr, SBOM, SARIF, OSCAL AR, provenance.intoto.jsonl, veraPDF report,
-  and the verify runbook.</p>
+  <h3>Osadzone załączniki (PDF/A-3, AFRelationship Source/Data)</h3>
+  <p class="small">Przy renderowaniu do PDF/A-3 przez render-evidence-pdf.py następujące surowe dowody
+  maszynowe podróżują osadzone wewnątrz dokumentu, dzięki czemu raport + dowody tworzą jeden
+  bajtowo weryfikowalny obiekt: manifest.json, *.bundle, *.tsr, SBOM, SARIF, OSCAL AR,
+  provenance.intoto.jsonl, raport veraPDF oraz procedura weryfikacji.</p>
 </section>
 """
 
@@ -2990,7 +3020,7 @@ def build_document(args: argparse.Namespace) -> str:
     css = build_css(doc_id, doc_version)
 
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -3273,16 +3303,16 @@ def selftest() -> int:
 
         # 3. Honesty banner present (no L3 overclaim).
         check("SLSA Build L2" in doc, "honesty banner missing SLSA Build L2 statement")
-        check("L3 is NOT claimed" in doc or "L3 NOT" in doc or "not claimed" in doc.lower(),
+        check("L3 NIE jest deklarowany" in doc or "poziom L3 NIE" in doc or "nie l3" in doc.lower(),
               "L3 honesty caveat missing")
 
         # 4. WORM state pulled from manifest, not hardcoded.
         check("pending" in doc, "worm_state 'pending' not surfaced from manifest")
 
         # 5. §9 renders REAL scanner tables (server-side), not the JS report.
-        check("Dependency Vulnerabilities" in doc, "§9 Trivy SCA subsection missing")
+        check("Podatności Zależności" in doc, "§9 Trivy SCA subsection missing")
         check("CVE-2024-0001" in doc, "§9 did not render the real Trivy CVE row")
-        check("Software Bill of Materials" in doc, "§9 SBOM subsection missing")
+        check("Wykaz Składników Oprogramowania" in doc, "§9 SBOM subsection missing")
         check("express" in doc, "§9 did not render the real SBOM component")
         check("alert(1)" not in doc, "JS leaked into the document")
         check('class="inlined-report"' not in doc, "obsolete inlined-report markup still present")
@@ -3327,7 +3357,7 @@ def selftest() -> int:
         check("INDETERMINATE" not in doc or "badge-indet" in doc,
               "INDETERMINATE badge class missing when status used")
         # Honest overall: the gate FAILed, and the section must reflect that (not a fabricated PASS).
-        check("Aggregate compliance gate" in doc, "aggregate gate verdict line missing")
+        check("Zbiorcza bramka zgodności" in doc, "aggregate gate verdict line missing")
         check("NOT REPORTED" in doc, "unreported A.x controls not shown as NOT REPORTED")
 
         # 13b. New render sections (T-102 crosswalk, T-116 VEX, T-120 scope, T-121 residual,
@@ -3339,7 +3369,7 @@ def selftest() -> int:
         check("NIS2-KSC" in doc or "NIS2" in doc, "scope regime not rendered")
         check('id="crosswalk"' in doc, "crosswalk section missing")
         # The SBOM+provenance evidence spans DORA + NIS2 (>=2 frameworks) in the matrix fixture.
-        check("Frameworks spanned" in doc, "crosswalk framework-span column missing")
+        check("Objęte ramy regulacyjne" in doc, "crosswalk framework-span column missing")
         check('id="vex"' in doc, "vex section missing")
         check("CVE-2024-0001" in doc and "not_affected" in doc, "VEX statement not rendered")
         check("under_investigation" in doc, "VEX under_investigation not surfaced")
@@ -3352,9 +3382,9 @@ def selftest() -> int:
         check('id="threat-model"' in doc, "threat-model section missing")
         check("STRIDE" in doc, "threat-model STRIDE wording missing")
         check("T-F1-S" in doc and "T-F1-T" in doc, "threat-model real threat rows not rendered")
-        check("Open gap register" in doc and "G-01" in doc,
+        check("Rejestr otwartych luk" in doc and "G-01" in doc,
               "threat-model open-gap (target-state) register not rendered")
-        check("Validator verdict" in doc, "threat-model validator verdict not surfaced")
+        check("Werdykt walidatora" in doc, "threat-model validator verdict not surfaced")
         # Provenance is read from the manifest flag (validation artifact tagged live), not hardcoded.
         check("LIVE / MEASURED" in doc, "threat-model live provenance badge missing")
 
@@ -3370,7 +3400,7 @@ def selftest() -> int:
         check("run_as_non_root" in doc, "runtime-hardening per-control table not rendered")
 
         # 13c. T-117 relabel: no implied LIVE cloud/drift posture (design-stage only).
-        check("design-stage (no live scan)" in doc or "no live scan" in doc,
+        check("faza projektowa (brak skanu na żywo)" in doc or "brak skanu na żywo" in doc,
               "T-117 relabel missing: break-glass must say no live drift/posture scan")
         check("drift alerting (design-stage)" not in doc,
               "T-117: stale 'drift alerting (design-stage)' wording still present")
@@ -3391,7 +3421,7 @@ def selftest() -> int:
             governance_dir=None, exception_register=None, control_owners=None,
         )
         doc_min = build_document(args_min)
-        check("Not available this run" in doc_min, "degraded section marker missing")
+        check("Niedostępne w tym uruchomieniu" in doc_min, "degraded section marker missing")
         for sid, _ in SECTION_ORDER:
             check(f'id="{sid}"' in doc_min, f"degraded doc missing section id={sid}")
         check(doc_min.startswith("<!DOCTYPE html>"), "degraded doc not valid HTML")

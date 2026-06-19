@@ -383,23 +383,23 @@ def parse_coverage():
 
 # ── Evidence file inventory ──────────────────────────────────────────────────
 EVIDENCE_FILES = [
-    ("pipeline-run.json", "Pipeline execution metadata", "All frameworks"),
-    ("security-report.json", "Consolidated scan results", "DORA Art.16, NIS2 Art.21"),
-    ("sbom.cyclonedx.json", "Software Bill of Materials", "DORA Art.28, NIS2 Art.21.2.d"),
-    ("cosign-verification.log", "Image signature proof", "ISO A.8.24, SOC2 CC8.1"),
-    ("provenance.intoto.jsonl", "SLSA build provenance", "DORA Art.28, SLSA Build L2"),
-    ("zap-report.json", "DAST scan results (JSON)", "NIS2 Art.21.2.e, ISO A.8.28"),
-    ("zap-report.html", "DAST scan results (HTML)", "NIS2 Art.21.2.e, ISO A.8.28"),
-    ("compliance-matrix.json", "Framework control mapping", "All frameworks"),
-    ("dpa-compliance-check.json", "Data processor agreements", "GDPR Art.28"),
-    ("data-flow-diagram.json", "PII data flow map", "GDPR Art.25, Art.30"),
-    ("manifest.sha256", "Integrity checksums", "ISO A.8.4, SOC2 PI1.1"),
-    ("trivy-sca-results.json", "Dependency CVE scan", "DORA Art.16.1.c"),
-    ("trivy-image-results.json", "Container image CVE scan", "NIS2 Art.21.2.d"),
-    ("checkov-results.sarif", "IaC security scan", "ISO A.8.9, SOC2 CC8.1"),
-    ("codeql/javascript.sarif", "SAST results", "ISO A.8.28, NIS2 Art.21.2.e"),
-    ("dependency-review.json", "Dependency review", "DORA Art.16.1.c"),
-    ("README.md", "Pack contents description", "—"),
+    ("pipeline-run.json", "Metadane wykonania pipeline", "Wszystkie ramy"),
+    ("security-report.json", "Skonsolidowane wyniki skanów", "DORA Art.16, NIS2 Art.21"),
+    ("sbom.cyclonedx.json", "Wykaz składników oprogramowania (SBOM)", "DORA Art.28, NIS2 Art.21.2.d"),
+    ("cosign-verification.log", "Dowód podpisu obrazu", "ISO A.8.24, SOC2 CC8.1"),
+    ("provenance.intoto.jsonl", "Proweniencja budowy SLSA", "DORA Art.28, SLSA Build L2"),
+    ("zap-report.json", "Wyniki skanu DAST (JSON)", "NIS2 Art.21.2.e, ISO A.8.28"),
+    ("zap-report.html", "Wyniki skanu DAST (HTML)", "NIS2 Art.21.2.e, ISO A.8.28"),
+    ("compliance-matrix.json", "Mapowanie kontroli na ramy regulacyjne", "Wszystkie ramy"),
+    ("dpa-compliance-check.json", "Umowy powierzenia przetwarzania danych", "RODO Art.28"),
+    ("data-flow-diagram.json", "Mapa przepływu danych osobowych (PII)", "RODO Art.25, Art.30"),
+    ("manifest.sha256", "Sumy kontrolne integralności", "ISO A.8.4, SOC2 PI1.1"),
+    ("trivy-sca-results.json", "Skan CVE zależności", "DORA Art.16.1.c"),
+    ("trivy-image-results.json", "Skan CVE obrazu kontenera", "NIS2 Art.21.2.d"),
+    ("checkov-results.sarif", "Skan bezpieczeństwa IaC", "ISO A.8.9, SOC2 CC8.1"),
+    ("codeql/javascript.sarif", "Wyniki SAST", "ISO A.8.28, NIS2 Art.21.2.e"),
+    ("dependency-review.json", "Przegląd zależności", "DORA Art.16.1.c"),
+    ("README.md", "Opis zawartości pakietu", "—"),
 ]
 
 def inventory():
@@ -477,19 +477,20 @@ if isinstance(worm_state, dict):
 else:
     worm_state_label = worm_state
 if (str(worm_state_label or "").strip().lower()) == "locked":
-    WORM_FOOTER = ("This pack is held in an immutable WORM archive — LOCKED "
-                   "(Azure Blob, 1825-day retention).")
+    WORM_FOOTER = ("Ten pakiet jest przechowywany w niezmiennym archiwum WORM — ZABLOKOWANY "
+                   "(Azure Blob, retencja 1825 dni).")
 else:
-    WORM_FOOTER = ("This pack is WORM-designed (unlocked) — retention enforced by "
-                   "Azure immutable-blob policy (target); object-lock is not yet "
-                   "engaged (worm_state read live from manifest, never hardcoded).")
+    WORM_FOOTER = ("Ten pakiet jest zaprojektowany w modelu WORM (odblokowany) — retencja "
+                   "egzekwowana przez politykę niezmiennego bloba Azure (cel docelowy); "
+                   "blokada obiektu nie jest jeszcze włączona (worm_state odczytany na żywo "
+                   "z manifestu, nigdy zakodowany na stałe).")
 
 # ── HTML template ────────────────────────────────────────────────────────────
 HTML = r"""<!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
 <meta charset="UTF-8">
-<title>Evidence Pack — CyberForge Pipeline</title>
+<title>Pakiet Dowodowy — Pipeline CyberForge</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
 :root{--ink:#07111D;--navy:#0D2147;--blue:#1A54D9;--blue2:#2E75F0;--blue3:#5B9AF5;--white:#fff;--mist:#F3F7FD;--fog:#E8F0FB;--txt:#334155;--mid:#64748B;--dim:#94A3B8;--border:#CBD5E8;--blt:#E2EAF5;--red:#DC2626;--orange:#EA580C;--green:#059669;--amber:#D97706;--purple:#7C3AED;--serif:'Playfair Display',Georgia,serif;--sans:'Syne','Inter',system-ui,sans-serif;--mono:'IBM Plex Mono',Menlo,monospace}
@@ -663,9 +664,9 @@ footer p{margin:4px 0}
 <header>
 <div class="wrap">
   <div class="h-left">
-    <span class="eyebrow" style="color:var(--blue3)">Evidence Pack Report</span>
-    <h1>Pipeline Run #__RUN_NUM__ <em>— __ENV__</em></h1>
-    <div class="h-meta">__REPO__ · commit __SHA_SHORT__ · __TIMESTAMP__ · run __RUN_ID__</div>
+    <span class="eyebrow" style="color:var(--blue3)">Raport Pakietu Dowodowego</span>
+    <h1>Uruchomienie Pipeline #__RUN_NUM__ <em>— __ENV__</em></h1>
+    <div class="h-meta">__REPO__ · commit __SHA_SHORT__ · __TIMESTAMP__ · uruchomienie __RUN_ID__</div>
   </div>
   <div class="logo">
     <div class="logo-bar"></div>
@@ -677,19 +678,19 @@ footer p{margin:4px 0}
 <div class="tabs">
 <div class="wrap">
 <div class="tabs-inner">
-  <button class="tab active" data-tab="dashboard">Dashboard</button>
-  <button class="tab" data-tab="vulns">Vulnerabilities <span class="tab-count" id="cnt-vulns">0</span></button>
+  <button class="tab active" data-tab="dashboard">Pulpit</button>
+  <button class="tab" data-tab="vulns">Podatności <span class="tab-count" id="cnt-vulns">0</span></button>
   <button class="tab" data-tab="sbom">SBOM <span class="tab-count" id="cnt-sbom">0</span></button>
   <button class="tab" data-tab="dast">DAST <span class="tab-count" id="cnt-dast">0</span></button>
-  <button class="tab" data-tab="compliance">Compliance</button>
-  <button class="tab" data-tab="compliance-code">Compliance-as-Code</button>
-  <button class="tab" data-tab="signing">Signing</button>
-  <button class="tab" data-tab="files">Files <span class="tab-count" id="cnt-files">0</span></button>
-  <button class="tab" data-tab="dpa">Vendors</button>
-  <button class="tab" data-tab="dataflow">Data Flow</button>
-  <button class="tab" data-tab="raw">Raw Data</button>
+  <button class="tab" data-tab="compliance">Zgodność</button>
+  <button class="tab" data-tab="compliance-code">Zgodność jako Kod</button>
+  <button class="tab" data-tab="signing">Podpisywanie</button>
+  <button class="tab" data-tab="files">Pliki <span class="tab-count" id="cnt-files">0</span></button>
+  <button class="tab" data-tab="dpa">Dostawcy</button>
+  <button class="tab" data-tab="dataflow">Przepływ Danych</button>
+  <button class="tab" data-tab="raw">Dane Surowe</button>
   <div class="search-wrap">
-    <input type="text" id="globalSearch" placeholder="Search everything…">
+    <input type="text" id="globalSearch" placeholder="Szukaj wszędzie…">
   </div>
 </div>
 </div>
@@ -706,31 +707,31 @@ footer p{margin:4px 0}
 
 <div class="grid-2">
   <div class="card">
-    <h3>Pipeline Run</h3>
+    <h3>Uruchomienie Pipeline</h3>
     <table>
       <tbody>
         <tr><td><strong>Pipeline</strong></td><td id="d-name"></td></tr>
-        <tr><td><strong>Run</strong></td><td>#<span id="d-run-num"></span> (id <span id="d-run-id"></span>, attempt <span id="d-run-attempt"></span>)</td></tr>
-        <tr><td><strong>Trigger</strong></td><td><span id="d-trigger"></span> by <span id="d-actor"></span></td></tr>
-        <tr><td><strong>Ref</strong></td><td><code id="d-ref"></code></td></tr>
+        <tr><td><strong>Uruchomienie</strong></td><td>#<span id="d-run-num"></span> (id <span id="d-run-id"></span>, próba <span id="d-run-attempt"></span>)</td></tr>
+        <tr><td><strong>Wyzwalacz</strong></td><td><span id="d-trigger"></span> przez <span id="d-actor"></span></td></tr>
+        <tr><td><strong>Referencja</strong></td><td><code id="d-ref"></code></td></tr>
         <tr><td><strong>Commit</strong></td><td><code id="d-sha"></code></td></tr>
-        <tr><td><strong>Repository</strong></td><td><a id="d-repo-link" target="_blank" rel="noopener"></a></td></tr>
-        <tr><td><strong>Environment</strong></td><td id="d-env"></td></tr>
-        <tr><td><strong>Image URI</strong></td><td><code id="d-imguri" style="font-size:.74rem"></code></td></tr>
-        <tr><td><strong>Image Digest</strong></td><td><code id="d-imgdigest" style="font-size:.7rem;word-break:break-all"></code></td></tr>
-        <tr><td><strong>Generated</strong></td><td id="d-generated"></td></tr>
+        <tr><td><strong>Repozytorium</strong></td><td><a id="d-repo-link" target="_blank" rel="noopener"></a></td></tr>
+        <tr><td><strong>Środowisko</strong></td><td id="d-env"></td></tr>
+        <tr><td><strong>URI Obrazu</strong></td><td><code id="d-imguri" style="font-size:.74rem"></code></td></tr>
+        <tr><td><strong>Skrót Obrazu</strong></td><td><code id="d-imgdigest" style="font-size:.7rem;word-break:break-all"></code></td></tr>
+        <tr><td><strong>Wygenerowano</strong></td><td id="d-generated"></td></tr>
       </tbody>
     </table>
   </div>
 
   <div class="card">
-    <h3>Compliance Coverage</h3>
+    <h3>Pokrycie Zgodności</h3>
     <div class="donut-wrap">
       <svg class="donut" viewBox="0 0 120 120">
         <circle class="donut-track" cx="60" cy="60" r="48"/>
         <circle class="donut-fill" cx="60" cy="60" r="48" id="donutPathDash" stroke="var(--green)"/>
         <text class="donut-text" x="60" y="60" text-anchor="middle" font-size="18" id="donutPctDash">0%</text>
-        <text class="donut-text" x="60" y="76" text-anchor="middle" font-size="8" fill="var(--dim)" font-weight="400">controls</text>
+        <text class="donut-text" x="60" y="76" text-anchor="middle" font-size="8" fill="var(--dim)" font-weight="400">kontrole</text>
       </svg>
       <div style="flex:1">
         <div id="fwBars"></div>
@@ -741,19 +742,19 @@ footer p{margin:4px 0}
 
 <div class="grid-2">
   <div class="card">
-    <h3>Severity Breakdown</h3>
-    <h4>Dependencies (Trivy SCA)</h4>
+    <h3>Podział wg Istotności</h3>
+    <h4>Zależności (Trivy SCA)</h4>
     <div id="trivyBars"></div>
-    <h4>Container Image (Trivy)</h4>
+    <h4>Obraz Kontenera (Trivy)</h4>
     <div id="trivyImgBars"></div>
-    <h4>Runtime (OWASP ZAP)</h4>
+    <h4>Środowisko Uruchomieniowe (OWASP ZAP)</h4>
     <div id="zapBars"></div>
   </div>
 
   <div class="card">
-    <h3>Tool Versions</h3>
+    <h3>Wersje Narzędzi</h3>
     <table>
-      <thead><tr><th>Tool</th><th>Version</th></tr></thead>
+      <thead><tr><th>Narzędzie</th><th>Wersja</th></tr></thead>
       <tbody id="toolsTable"></tbody>
     </table>
   </div>
@@ -763,62 +764,62 @@ footer p{margin:4px 0}
 
 <!-- ────────────────────────────── VULNS ────────────────────────────── -->
 <section class="panel" id="panel-vulns">
-<h2>Vulnerability Findings</h2>
-<p>Combined view of dependency-level CVEs (Trivy SCA against package-lock.json) and container-level CVEs (Trivy image scan against the built Docker image). Click any row to expand for details.</p>
+<h2>Znaleziska Podatności</h2>
+<p>Połączony widok podatności CVE na poziomie zależności (Trivy SCA wobec package-lock.json) oraz podatności CVE na poziomie kontenera (skan obrazu Trivy wobec zbudowanego obrazu Docker). Kliknij dowolny wiersz, aby rozwinąć szczegóły.</p>
 
 <div class="filter-row">
-  <input type="text" class="filter-input" id="vulnSearch" placeholder="Filter by CVE, package, or title…">
-  <button class="chip active" data-vsev="all">All</button>
-  <button class="chip" data-vsev="CRITICAL">Critical</button>
-  <button class="chip" data-vsev="HIGH">High</button>
-  <button class="chip" data-vsev="MEDIUM">Medium</button>
-  <button class="chip" data-vsev="LOW">Low</button>
-  <button class="chip" data-vsrc="all">All sources</button>
-  <button class="chip" data-vsrc="filesystem">SCA only</button>
-  <button class="chip" data-vsrc="container">Image only</button>
+  <input type="text" class="filter-input" id="vulnSearch" placeholder="Filtruj wg CVE, pakietu lub tytułu…">
+  <button class="chip active" data-vsev="all">Wszystkie</button>
+  <button class="chip" data-vsev="CRITICAL">Krytyczne</button>
+  <button class="chip" data-vsev="HIGH">Wysokie</button>
+  <button class="chip" data-vsev="MEDIUM">Średnie</button>
+  <button class="chip" data-vsev="LOW">Niskie</button>
+  <button class="chip" data-vsrc="all">Wszystkie źródła</button>
+  <button class="chip" data-vsrc="filesystem">Tylko SCA</button>
+  <button class="chip" data-vsrc="container">Tylko obraz</button>
 </div>
 
 <table id="vulnTable">
   <thead><tr>
-    <th class="sortable" data-sort="severity">Severity</th>
+    <th class="sortable" data-sort="severity">Istotność</th>
     <th class="sortable" data-sort="cve">CVE</th>
-    <th class="sortable" data-sort="package">Package</th>
-    <th class="sortable" data-sort="installed">Installed</th>
-    <th class="sortable" data-sort="fixed">Fixed in</th>
-    <th class="sortable" data-sort="kind">Source</th>
-    <th>Title</th>
+    <th class="sortable" data-sort="package">Pakiet</th>
+    <th class="sortable" data-sort="installed">Zainstalowana</th>
+    <th class="sortable" data-sort="fixed">Naprawiono w</th>
+    <th class="sortable" data-sort="kind">Źródło</th>
+    <th>Tytuł</th>
   </tr></thead>
   <tbody id="vulnRows"></tbody>
 </table>
-<p id="vulnEmpty" class="empty" style="display:none">No vulnerabilities matching your filter.</p>
+<p id="vulnEmpty" class="empty" style="display:none">Brak podatności pasujących do filtra.</p>
 </section>
 
 <!-- ────────────────────────────── SBOM ────────────────────────────── -->
 <section class="panel" id="panel-sbom">
-<h2>Software Bill of Materials</h2>
+<h2>Wykaz Składników Oprogramowania (SBOM)</h2>
 <p id="sbomMeta"></p>
 
 <div class="grid-2">
   <div class="card">
-    <h3>By Component Type</h3>
+    <h3>Wg Typu Składnika</h3>
     <div id="sbomTypes"></div>
   </div>
   <div class="card">
-    <h3>Top Licenses</h3>
+    <h3>Najczęstsze Licencje</h3>
     <div id="sbomLicenses"></div>
   </div>
 </div>
 
 <div class="filter-row">
-  <input type="text" class="filter-input" id="sbomSearch" placeholder="Filter components…">
+  <input type="text" class="filter-input" id="sbomSearch" placeholder="Filtruj składniki…">
 </div>
 
 <table id="sbomTable">
   <thead><tr>
-    <th class="sortable" data-sort="name">Name</th>
-    <th class="sortable" data-sort="version">Version</th>
-    <th class="sortable" data-sort="type">Type</th>
-    <th class="sortable" data-sort="license">License</th>
+    <th class="sortable" data-sort="name">Nazwa</th>
+    <th class="sortable" data-sort="version">Wersja</th>
+    <th class="sortable" data-sort="type">Typ</th>
+    <th class="sortable" data-sort="license">Licencja</th>
     <th>PURL</th>
   </tr></thead>
   <tbody id="sbomRows"></tbody>
@@ -827,18 +828,18 @@ footer p{margin:4px 0}
 
 <!-- ────────────────────────────── DAST ────────────────────────────── -->
 <section class="panel" id="panel-dast">
-<h2>DAST Findings (OWASP ZAP)</h2>
-<p>Runtime vulnerability scan against the deployed application: <code id="zapTarget"></code></p>
+<h2>Znaleziska DAST (OWASP ZAP)</h2>
+<p>Skan podatności w środowisku uruchomieniowym wobec wdrożonej aplikacji: <code id="zapTarget"></code></p>
 
 <div class="kpi-row" id="zapKpis"></div>
 
 <div class="filter-row">
-  <input type="text" class="filter-input" id="zapSearch" placeholder="Filter findings…">
-  <button class="chip active" data-zsev="all">All</button>
-  <button class="chip" data-zsev="High">High</button>
-  <button class="chip" data-zsev="Medium">Medium</button>
-  <button class="chip" data-zsev="Low">Low</button>
-  <button class="chip" data-zsev="Informational">Info</button>
+  <input type="text" class="filter-input" id="zapSearch" placeholder="Filtruj znaleziska…">
+  <button class="chip active" data-zsev="all">Wszystkie</button>
+  <button class="chip" data-zsev="High">Wysokie</button>
+  <button class="chip" data-zsev="Medium">Średnie</button>
+  <button class="chip" data-zsev="Low">Niskie</button>
+  <button class="chip" data-zsev="Informational">Informacyjne</button>
 </div>
 
 <div id="zapAlerts"></div>
@@ -846,8 +847,8 @@ footer p{margin:4px 0}
 
 <!-- ────────────────────────────── COMPLIANCE ────────────────────────────── -->
 <section class="panel" id="panel-compliance">
-<h2>Compliance Framework Mapping</h2>
-<p>Click any framework to see its control-level mapping. Each control points to the evidence artifact that satisfies it.</p>
+<h2>Mapowanie Ram Zgodności</h2>
+<p>Kliknij dowolne ramy regulacyjne, aby zobaczyć ich mapowanie na poziomie kontroli. Każda kontrola wskazuje na artefakt dowodowy, który ją spełnia.</p>
 
 <div class="fw-grid" id="fwGrid"></div>
 <div id="fwControls"></div>
@@ -855,126 +856,128 @@ footer p{margin:4px 0}
 
 <!-- ──────────────────────── COMPLIANCE-AS-CODE (Part A) ──────────────────────── -->
 <section class="panel" id="panel-compliance-code">
-<h2>Compliance-as-Code — Organizational-Control Verdicts (Part A)</h2>
-<p>The signed organizational-control layer (struktura &sect;6 compliance gate). Each A.1-A.10 control
-is checked by a content validator that emits <strong>PASS only</strong> when it parsed a value that
-met a stated threshold &mdash; never a silent PASS. Verdicts aggregate into the fail-closed gate
-below. This is the proof the differentiator is machine-checked: signed PASS/FAIL org-control
-verdicts, not just DevSecOps SARIF.</p>
+<h2>Zgodność jako Kod — Werdykty Kontroli Organizacyjnych (Część A)</h2>
+<p>Podpisana warstwa kontroli organizacyjnych (bramka zgodności wg struktury &sect;6). Każda kontrola
+A.1-A.10 jest sprawdzana przez walidator treści, który wydaje werdykt <strong>PASS wyłącznie</strong>
+wtedy, gdy odczytał wartość spełniającą określony próg &mdash; nigdy nie wystawia cichego PASS.
+Werdykty agregują się w bramkę odmawiającą domyślnie (fail-closed) poniżej. Jest to dowód, że
+wyróżnik jest maszynowo weryfikowany: podpisane werdykty PASS/FAIL kontroli organizacyjnych, a nie
+tylko raporty SARIF z DevSecOps.</p>
 <div class="card" id="ccGateCard">
-  <h3>Aggregate compliance gate</h3>
+  <h3>Zbiorcza bramka zgodności</h3>
   <p id="ccGateLine"></p>
   <p class="empty" id="ccCounts" style="font-size:.82rem"></p>
 </div>
 <div id="ccTableWrap"></div>
-<p style="font-size:.82rem;color:var(--mid);margin-top:10px"><strong>Golden thread (struktura
-&sect;1):</strong> each row maps control &rarr; evidence verdict (SHA-bound in the manifest) &rarr;
-framework clause. A BLOCKING FAIL (e.g. a past-due access review under A.8, or 'restore not yet
-conducted' under A.10) makes the aggregate gate exit non-zero on a non-PR run &mdash; honest,
-fail-closed enforcement with a concrete remediation pointer, not a green-for-show banner.</p>
+<p style="font-size:.82rem;color:var(--mid);margin-top:10px"><strong>Złota nić (struktura
+&sect;1):</strong> każdy wiersz mapuje kontrolę &rarr; werdykt dowodowy (powiązany skrótem SHA w
+manifeście) &rarr; klauzulę ram regulacyjnych. BLOKUJĄCY FAIL (np. zaległy przegląd dostępu w A.8 lub
+'odtworzenie jeszcze nieprzeprowadzone' w A.10) powoduje, że zbiorcza bramka kończy się kodem
+niezerowym przy uruchomieniu spoza PR &mdash; uczciwe, odmawiające domyślnie egzekwowanie z konkretnym
+wskazaniem działań naprawczych, a nie baner „na zielono dla pozoru”.</p>
 </section>
 
 <!-- ────────────────────────────── SIGNING ────────────────────────────── -->
 <section class="panel" id="panel-signing">
-<h2>Cosign Verification</h2>
-<p>Cryptographic chain of custody from source code to deployed image. Cosign uses keyless signing via Sigstore — every signing event is recorded in the public Rekor transparency log.</p>
+<h2>Weryfikacja Cosign</h2>
+<p>Kryptograficzny łańcuch nadzoru od kodu źródłowego do wdrożonego obrazu. Cosign stosuje podpisywanie bezkluczowe za pośrednictwem Sigstore — każde zdarzenie podpisania jest zapisywane w publicznym dzienniku przejrzystości Rekor.</p>
 
 <div class="grid-2">
   <div class="card">
-    <h3>Signature Status</h3>
+    <h3>Status Podpisu</h3>
     <p id="cosignStatus" style="font-size:1rem"></p>
-    <h4>Extracted Claims</h4>
+    <h4>Wyodrębnione Oświadczenia</h4>
     <table id="cosignClaims"><tbody></tbody></table>
   </div>
   <div class="card">
-    <h3>Verify Yourself</h3>
-    <p>Anyone can independently verify this image was signed by this exact pipeline:</p>
-    <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignCmd')">copy</span><span id="cosignCmd"></span></div>
+    <h3>Zweryfikuj Samodzielnie</h3>
+    <p>Każdy może niezależnie zweryfikować, że ten obraz został podpisany przez dokładnie ten pipeline:</p>
+    <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignCmd')">kopiuj</span><span id="cosignCmd"></span></div>
   </div>
 </div>
 
 <div class="card">
-  <h3>Raw Verification Log</h3>
-  <p>Output of <code>cosign verify</code> at deploy time:</p>
-  <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignRaw')">copy</span><span id="cosignRaw"></span></div>
+  <h3>Surowy Dziennik Weryfikacji</h3>
+  <p>Wynik polecenia <code>cosign verify</code> w czasie wdrożenia:</p>
+  <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignRaw')">kopiuj</span><span id="cosignRaw"></span></div>
 </div>
 
 <div class="card">
-  <h3>SLSA Build Provenance</h3>
-  <p>SLSA v1.0 provenance — proves how the image was built and what inputs were used. Excerpt:</p>
-  <div class="codeblock"><span class="copy-btn" onclick="copyEl('provExcerpt')">copy</span><span id="provExcerpt"></span></div>
+  <h3>Proweniencja Budowy SLSA</h3>
+  <p>Proweniencja SLSA v1.0 — dowodzi, jak obraz został zbudowany i jakie dane wejściowe wykorzystano. Fragment:</p>
+  <div class="codeblock"><span class="copy-btn" onclick="copyEl('provExcerpt')">kopiuj</span><span id="provExcerpt"></span></div>
 </div>
 </section>
 
 <!-- ────────────────────────────── FILES ────────────────────────────── -->
 <section class="panel" id="panel-files">
-<h2>Evidence File Inventory</h2>
-<p>All artifacts in this evidence pack with their purpose, size, and SHA256 hash. The SHA256 manifest is regenerated at archive time — auditors can re-hash any file and compare to detect tampering.</p>
+<h2>Inwentarz Plików Dowodowych</h2>
+<p>Wszystkie artefakty w tym pakiecie dowodowym wraz z ich przeznaczeniem, rozmiarem i skrótem SHA256. Manifest SHA256 jest generowany na nowo w chwili archiwizacji — audytorzy mogą ponownie przeliczyć skrót dowolnego pliku i porównać go, aby wykryć manipulację.</p>
 
 <div class="filter-row">
-  <input type="text" class="filter-input" id="fileSearch" placeholder="Filter files…">
-  <button class="chip active" data-fpres="all">All files</button>
-  <button class="chip" data-fpres="present">Present only</button>
-  <button class="chip" data-fpres="missing">Missing only</button>
+  <input type="text" class="filter-input" id="fileSearch" placeholder="Filtruj pliki…">
+  <button class="chip active" data-fpres="all">Wszystkie pliki</button>
+  <button class="chip" data-fpres="present">Tylko obecne</button>
+  <button class="chip" data-fpres="missing">Tylko brakujące</button>
 </div>
 
 <table id="invTable">
   <thead><tr>
-    <th class="sortable" data-sort="name">File</th>
-    <th class="sortable" data-sort="purpose">Purpose</th>
-    <th>Compliance Anchor</th>
-    <th class="sortable" data-sort="size">Size</th>
+    <th class="sortable" data-sort="name">Plik</th>
+    <th class="sortable" data-sort="purpose">Przeznaczenie</th>
+    <th>Odniesienie do Zgodności</th>
+    <th class="sortable" data-sort="size">Rozmiar</th>
     <th>Status</th>
   </tr></thead>
   <tbody id="invRows"></tbody>
 </table>
 
-<h3 style="margin-top:24px">SHA256 Manifest</h3>
-<p>Content-addressed integrity proof. Verify any file by running <code>sha256sum &lt;file&gt;</code> and comparing.</p>
+<h3 style="margin-top:24px">Manifest SHA256</h3>
+<p>Dowód integralności adresowany treścią. Zweryfikuj dowolny plik, uruchamiając <code>sha256sum &lt;plik&gt;</code> i porównując wynik.</p>
 <div class="filter-row">
-  <input type="text" class="filter-input" id="manifestSearch" placeholder="Filter manifest…">
+  <input type="text" class="filter-input" id="manifestSearch" placeholder="Filtruj manifest…">
 </div>
 <table id="manifestTable">
-  <thead><tr><th>SHA256 Hash</th><th>File</th></tr></thead>
+  <thead><tr><th>Skrót SHA256</th><th>Plik</th></tr></thead>
   <tbody id="manifestRows"></tbody>
 </table>
 </section>
 
 <!-- ────────────────────────────── DPA ────────────────────────────── -->
 <section class="panel" id="panel-dpa">
-<h2>Third-Party Processors (GDPR Art. 28)</h2>
+<h2>Podmioty Przetwarzające (RODO Art. 28)</h2>
 <p id="dpaIntro"></p>
 
 <table id="dpaTable">
   <thead><tr>
-    <th>Vendor</th>
-    <th>Service</th>
-    <th>DPA Status</th>
-    <th>Data Location</th>
-    <th>Justification</th>
+    <th>Dostawca</th>
+    <th>Usługa</th>
+    <th>Status DPA</th>
+    <th>Lokalizacja Danych</th>
+    <th>Uzasadnienie</th>
   </tr></thead>
   <tbody id="dpaRows"></tbody>
 </table>
 
 <div class="card" style="margin-top:14px">
-  <h3>Retention Policy</h3>
+  <h3>Polityka Retencji</h3>
   <table id="retentionTable"><tbody></tbody></table>
 </div>
 </section>
 
 <!-- ────────────────────────────── DATA FLOW ────────────────────────────── -->
 <section class="panel" id="panel-dataflow">
-<h2>Data Flow Diagram (GDPR Art. 25 & 30)</h2>
-<p>Personal data flow through the pipeline. PII presence is justified per stage; sanitisation removes developer emails before evidence archival.</p>
+<h2>Diagram Przepływu Danych (RODO Art. 25 i 30)</h2>
+<p>Przepływ danych osobowych przez pipeline. Obecność danych osobowych (PII) jest uzasadniona dla każdego etapu; sanityzacja usuwa adresy e-mail deweloperów przed archiwizacją dowodów.</p>
 
 <table id="dfTable">
   <thead><tr>
-    <th>Stage</th>
-    <th>Location</th>
-    <th>PII Present</th>
-    <th>Types</th>
-    <th>Justification</th>
-    <th>Flows To</th>
+    <th>Etap</th>
+    <th>Lokalizacja</th>
+    <th>Obecność PII</th>
+    <th>Typy</th>
+    <th>Uzasadnienie</th>
+    <th>Przepływa Do</th>
   </tr></thead>
   <tbody id="dfRows"></tbody>
 </table>
@@ -982,11 +985,11 @@ fail-closed enforcement with a concrete remediation pointer, not a green-for-sho
 
 <!-- ────────────────────────────── RAW ────────────────────────────── -->
 <section class="panel" id="panel-raw">
-<h2>Raw Pipeline Run Data</h2>
-<p>Complete JSON dump of <code>pipeline-run.json</code> — the source of truth for this report's metadata.</p>
-<div class="codeblock"><span class="copy-btn" onclick="copyEl('rawJson')">copy</span><span id="rawJson"></span></div>
+<h2>Surowe Dane Uruchomienia Pipeline</h2>
+<p>Pełny zrzut JSON pliku <code>pipeline-run.json</code> — źródło prawdy dla metadanych tego raportu.</p>
+<div class="codeblock"><span class="copy-btn" onclick="copyEl('rawJson')">kopiuj</span><span id="rawJson"></span></div>
 
-<h2 style="margin-top:24px">Tooling Summary</h2>
+<h2 style="margin-top:24px">Podsumowanie Narzędzi</h2>
 <div class="grid-3">
   <div class="card">
     <h3>CodeQL (SAST)</h3>
@@ -997,7 +1000,7 @@ fail-closed enforcement with a concrete remediation pointer, not a green-for-sho
     <p id="checkovStat"></p>
   </div>
   <div class="card">
-    <h3>Test Coverage</h3>
+    <h3>Pokrycie Testami</h3>
     <div id="coverageStat"></div>
   </div>
 </div>
@@ -1007,8 +1010,8 @@ fail-closed enforcement with a concrete remediation pointer, not a green-for-sho
 
 <footer>
 <div class="wrap">
-  <p>Evidence Pack generated <span id="genAt"></span> · CyberForge DevSecOps Pipeline · <a href="https://cyberforge.agency">cyberforge.agency</a></p>
-  <p>__WORM_FOOTER__ SHA256-manifested — auditors can re-hash any file and compare to detect tampering.</p>
+  <p>Pakiet Dowodowy wygenerowano <span id="genAt"></span> · Pipeline DevSecOps CyberForge · <a href="https://cyberforge.agency">cyberforge.agency</a></p>
+  <p>__WORM_FOOTER__ Zabezpieczony manifestem SHA256 — audytorzy mogą ponownie przeliczyć skrót dowolnego pliku i porównać go, aby wykryć manipulację.</p>
 </div>
 </footer>
 
@@ -1072,29 +1075,29 @@ function renderDashboard() {
   $('d-generated').textContent = DATA.generated_at;
 
   // Replace header tokens already done server-side; just mirror here
-  document.title = `Evidence Pack — Run #${p.run_number} (${p.environment})`;
+  document.title = `Pakiet Dowodowy — Uruchomienie #${p.run_number} (${p.environment})`;
   $('genAt').textContent = DATA.generated_at;
 
   // Phase row
-  const phaseLabels = ['Security Gate','Build & Scan','Sign & Attest','Deploy','DAST'];
+  const phaseLabels = ['Bramka Bezpieczeństwa','Budowa i Skan','Podpis i Atestacja','Wdrożenie','DAST'];
   const phaseKeys = ['security_gate','build_scan','sign_attest','deploy','dast'];
   const phaseRow = $('phaseRow');
   phaseRow.innerHTML = phaseKeys.map((k, i) => {
     const status = p.gates[k] || 'skipped';
     return `<div class="ph-node"><div class="ph-circle ${esc(status)}">${i+1}</div><div class="ph-name">${phaseLabels[i]}</div><div class="ph-status ${esc(status)}">${esc(status)}</div></div>`;
-  }).join('') + `<div class="ph-node"><div class="ph-circle success">6</div><div class="ph-name">Evidence Pack</div><div class="ph-status success">success</div></div>`;
+  }).join('') + `<div class="ph-node"><div class="ph-circle success">6</div><div class="ph-name">Pakiet Dowodowy</div><div class="ph-status success">success</div></div>`;
 
   // KPI row
   const s = DATA.stats;
   const kpis = [
-    {n: `${s.gates_passed}/${s.gates_total}`, l: 'Gates Passed', cls: s.gates_passed===s.gates_total?'green':'amber'},
-    {n: s.evidence_present + '/' + s.evidence_total, l: 'Evidence Files', cls: s.evidence_present>=11?'green':'amber'},
-    {n: s.compliance_passed + '/' + s.compliance_total, l: 'Compliance Controls', cls: 'green'},
-    {n: s.sbom_components, l: 'SBOM Components', cls: ''},
-    {n: s.total_cves, l: 'Vulnerabilities', cls: s.critical_cves>0?'red':(s.high_cves>0?'amber':'green'), sub: `${s.critical_cves}C / ${s.high_cves}H`},
-    {n: s.zap_high + s.zap_medium, l: 'DAST H+M', cls: s.zap_high>0?'red':(s.zap_medium>0?'amber':'green'), sub: `${s.zap_high}H / ${s.zap_medium}M`},
-    {n: (s.coverage_lines||0).toFixed(0)+'%', l: 'Test Coverage', cls: s.coverage_lines>=80?'green':'amber'},
-    {n: s.manifest_files, l: 'Manifested Files', cls: ''},
+    {n: `${s.gates_passed}/${s.gates_total}`, l: 'Bramki Zaliczone', cls: s.gates_passed===s.gates_total?'green':'amber'},
+    {n: s.evidence_present + '/' + s.evidence_total, l: 'Pliki Dowodowe', cls: s.evidence_present>=11?'green':'amber'},
+    {n: s.compliance_passed + '/' + s.compliance_total, l: 'Kontrole Zgodności', cls: 'green'},
+    {n: s.sbom_components, l: 'Składniki SBOM', cls: ''},
+    {n: s.total_cves, l: 'Podatności', cls: s.critical_cves>0?'red':(s.high_cves>0?'amber':'green'), sub: `${s.critical_cves}K / ${s.high_cves}W`},
+    {n: s.zap_high + s.zap_medium, l: 'DAST W+Ś', cls: s.zap_high>0?'red':(s.zap_medium>0?'amber':'green'), sub: `${s.zap_high}W / ${s.zap_medium}Ś`},
+    {n: (s.coverage_lines||0).toFixed(0)+'%', l: 'Pokrycie Testami', cls: s.coverage_lines>=80?'green':'amber'},
+    {n: s.manifest_files, l: 'Pliki w Manifeście', cls: ''},
   ];
   $('kpiRow').innerHTML = kpis.map(k =>
     `<div class="kpi ${k.cls}"><div class="kpi-num">${esc(k.n)}</div><div class="kpi-lbl">${esc(k.l)}</div>${k.sub?`<div class="kpi-sub">${esc(k.sub)}</div>`:''}</div>`
@@ -1129,7 +1132,7 @@ function renderDashboard() {
   // Tools table
   $('toolsTable').innerHTML = Object.entries(DATA.pipeline.tools || {}).map(([k,v]) =>
     `<tr><td><strong>${esc(k)}</strong></td><td><code>${esc(v)}</code></td></tr>`
-  ).join('') || '<tr><td colspan="2" class="empty">No tool versions recorded.</td></tr>';
+  ).join('') || '<tr><td colspan="2" class="empty">Nie zarejestrowano wersji narzędzi.</td></tr>';
 }
 
 // ── VULNS ────────────────────────────────────────────────────────────
@@ -1155,16 +1158,16 @@ function renderVulns() {
       <td><code>${esc(v.package)}</code></td>
       <td><code>${esc(v.installed)}</code></td>
       <td><code>${esc(v.fixed||'—')}</code></td>
-      <td>${v.kind==='filesystem'?'SCA':'Image'}</td>
+      <td>${v.kind==='filesystem'?'SCA':'Obraz'}</td>
       <td>${esc(v.title)}</td>
     </tr>
     <tr class="detail-row" id="vd-${idx}"><td colspan="7"><div class="detail-content">
       <dl>
         <dt>CVE</dt><dd><a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">${esc(v.cve)}</a></dd>
-        <dt>Target</dt><dd><code>${esc(v.target)}</code></dd>
-        <dt>CVSS Score</dt><dd>${esc(v.cvss||'n/a')}</dd>
-        <dt>Published</dt><dd>${esc(v.published||'—')}</dd>
-        <dt>Remediation</dt><dd>${v.fixed?`Upgrade to <code>${esc(v.fixed)}</code>`:'No fix available — risk-accept via .trivyignore with VEX justification'}</dd>
+        <dt>Cel</dt><dd><code>${esc(v.target)}</code></dd>
+        <dt>Wynik CVSS</dt><dd>${esc(v.cvss||'nd.')}</dd>
+        <dt>Opublikowano</dt><dd>${esc(v.published||'—')}</dd>
+        <dt>Działania naprawcze</dt><dd>${v.fixed?`Aktualizacja do <code>${esc(v.fixed)}</code>`:'Brak dostępnej poprawki — akceptacja ryzyka przez .trivyignore z uzasadnieniem VEX'}</dd>
       </dl>
     </div></td></tr>
   `).join('');
@@ -1193,7 +1196,7 @@ let sbomQ = '';
 function renderSbom() {
   const s = DATA.sbom;
   $('cnt-sbom').textContent = s.total;
-  $('sbomMeta').innerHTML = `<strong>${esc(s.total)}</strong> components · format <code>${esc(s.format)}</code>`;
+  $('sbomMeta').innerHTML = `<strong>${esc(s.total)}</strong> składników · format <code>${esc(s.format)}</code>`;
   // Type breakdown
   $('sbomTypes').innerHTML = Object.entries(s.types).map(([t,n]) => {
     const pct = (n/s.total*100).toFixed(1);
@@ -1203,7 +1206,7 @@ function renderSbom() {
   $('sbomLicenses').innerHTML = Object.entries(s.licenses).map(([l,n]) => {
     const max = Math.max(...Object.values(s.licenses), 1);
     return `<div class="bar-row"><div class="bar-label">${esc(l)}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:var(--purple)"></div></div><div class="bar-value">${esc(n)}</div></div>`;
-  }).join('') || '<p class="empty">No license metadata found.</p>';
+  }).join('') || '<p class="empty">Nie znaleziono metadanych licencji.</p>';
   // Filter & render
   const filtered = s.components.filter(c => {
     if (!sbomQ) return true;
@@ -1219,11 +1222,12 @@ $('sbomSearch').addEventListener('input', e => { sbomQ = e.target.value; renderS
 let zapFilter = {sev:'all', q:''};
 function renderDast() {
   const z = DATA.zap;
+  const zapRiskLabels = {High:'Wysokie', Medium:'Średnie', Low:'Niskie', Informational:'Informacyjne'};
   $('cnt-dast').textContent = z.alerts.length;
-  $('zapTarget').textContent = z.target || '(unknown)';
+  $('zapTarget').textContent = z.target || '(nieznany)';
   $('zapKpis').innerHTML = ['High','Medium','Low','Informational'].map(s => {
     const cls = s==='High'?'red':s==='Medium'?'amber':'';
-    return `<div class="kpi ${cls}"><div class="kpi-num">${esc(z.severity_count[s]||0)}</div><div class="kpi-lbl">${esc(s)}</div></div>`;
+    return `<div class="kpi ${cls}"><div class="kpi-num">${esc(z.severity_count[s]||0)}</div><div class="kpi-lbl">${esc(zapRiskLabels[s]||s)}</div></div>`;
   }).join('');
   const filtered = z.alerts.filter(a => {
     if (zapFilter.sev !== 'all' && a.risk !== zapFilter.sev) return false;
@@ -1232,23 +1236,23 @@ function renderDast() {
   });
   $('zapAlerts').innerHTML = filtered.length ? filtered.map((a,i) => `
     <div class="card">
-      <h3><span class="sev sev-${esc(a.risk)}">${esc(a.risk)}</span> ${esc(a.name)}</h3>
+      <h3><span class="sev sev-${esc(a.risk)}">${esc(zapRiskLabels[a.risk]||a.risk)}</span> ${esc(a.name)}</h3>
       <table><tbody>
-        <tr><td><strong>Confidence</strong></td><td>${esc(a.confidence)}</td></tr>
+        <tr><td><strong>Pewność</strong></td><td>${esc(a.confidence)}</td></tr>
         ${a.cwe?`<tr><td><strong>CWE</strong></td><td><a href="https://cwe.mitre.org/data/definitions/${esc(a.cwe)}.html" target="_blank" rel="noopener">CWE-${esc(a.cwe)}</a></td></tr>`:''}
-        <tr><td><strong>Instances</strong></td><td>${esc(a.count)} (showing ${Math.min(a.instances.length,10)})</td></tr>
+        <tr><td><strong>Wystąpienia</strong></td><td>${esc(a.count)} (pokazano ${Math.min(a.instances.length,10)})</td></tr>
       </tbody></table>
-      <h4>Description</h4>
+      <h4>Opis</h4>
       <p>${esc(a.desc)}</p>
-      <h4>Recommended Solution</h4>
+      <h4>Zalecane Rozwiązanie</h4>
       <p>${esc(a.solution)}</p>
       ${a.instances.length ? `
-        <h4>Affected URLs</h4>
-        <table><thead><tr><th>Method</th><th>URI</th></tr></thead><tbody>
+        <h4>Dotknięte Adresy URL</h4>
+        <table><thead><tr><th>Metoda</th><th>URI</th></tr></thead><tbody>
           ${a.instances.map(i => `<tr><td><code>${esc(i.method)}</code></td><td><code style="font-size:.7rem">${esc(i.uri)}</code></td></tr>`).join('')}
         </tbody></table>` : ''}
     </div>
-  `).join('') : '<p class="empty">No DAST findings match.</p>';
+  `).join('') : '<p class="empty">Brak pasujących znalezisk DAST.</p>';
 }
 $('zapSearch').addEventListener('input', e => { zapFilter.q = e.target.value; renderDast(); });
 document.querySelectorAll('[data-zsev]').forEach(c => c.addEventListener('click', () => {
@@ -1261,12 +1265,12 @@ let activeFw = null;
 function renderCompliance() {
   $('fwGrid').innerHTML = DATA.compliance.map(fw => {
     const cls = activeFw === fw.name ? 'active' : '';
-    return `<div class="fw-card ${cls}" data-fw="${esc(fw.name)}"><div class="fw-name">${esc(fw.name)}</div><div class="fw-cov">${esc(fw.passed)}/${esc(fw.total)}</div><div class="fw-lbl">controls</div></div>`;
+    return `<div class="fw-card ${cls}" data-fw="${esc(fw.name)}"><div class="fw-name">${esc(fw.name)}</div><div class="fw-cov">${esc(fw.passed)}/${esc(fw.total)}</div><div class="fw-lbl">kontrole</div></div>`;
   }).join('');
   $('fwControls').innerHTML = DATA.compliance.map(fw => `
     <div class="fw-controls ${activeFw===fw.name?'active':''}" data-fw="${esc(fw.name)}">
-      <h3>${esc(fw.name)} — ${esc(fw.passed)} of ${esc(fw.total)} controls satisfied</h3>
-      <table><thead><tr><th>Article</th><th>Requirement</th><th>Evidence</th><th>Status</th></tr></thead><tbody>
+      <h3>${esc(fw.name)} — spełniono ${esc(fw.passed)} z ${esc(fw.total)} kontroli</h3>
+      <table><thead><tr><th>Artykuł</th><th>Wymaganie</th><th>Dowód</th><th>Status</th></tr></thead><tbody>
         ${fw.controls.map(c => `<tr>
           <td><strong>${esc(c.article)}</strong></td>
           <td>${esc(c.requirement)}</td>
@@ -1303,24 +1307,24 @@ function renderComplianceCode() {
   // Gate verdict line — honest: NOT AVAILABLE when the signed status file is absent.
   if (cc.available) {
     $('ccGateLine').innerHTML = ccStatusBadge(cc.overall) +
-      ' <span style="font-size:.82rem;color:var(--mid)">read from compliance-status.json ' +
-      'overall_status — the signed, fail-closed verdict; not recomputed here.</span>';
+      ' <span style="font-size:.82rem;color:var(--mid)">odczytano z pola overall_status w ' +
+      'compliance-status.json — podpisany werdykt odmawiający domyślnie; nie przeliczany ponownie tutaj.</span>';
   } else {
-    $('ccGateLine').innerHTML = '<span class="badge-skip">NOT AVAILABLE</span> ' +
-      '<span style="font-size:.82rem;color:var(--mid)">compliance-status.json was not present in ' +
-      'this evidence pack; controls below show NOT REPORTED rather than a fabricated PASS.</span>';
+    $('ccGateLine').innerHTML = '<span class="badge-skip">NIEDOSTĘPNE</span> ' +
+      '<span style="font-size:.82rem;color:var(--mid)">plik compliance-status.json nie był obecny w ' +
+      'tym pakiecie dowodowym; kontrole poniżej pokazują NIE RAPORTOWANO zamiast sfałszowanego PASS.</span>';
   }
   const k = cc.counts || {};
   $('ccCounts').textContent =
-    'A.1-A.10 verdicts: ' + (k.pass||0) + ' PASS, ' + (k.fail||0) + ' FAIL (' +
-    (k.blocking_fail||0) + ' BLOCKING), ' + (k.indeterminate||0) + ' INDETERMINATE, ' +
-    (k.not_reported||0) + ' NOT REPORTED. Only a BLOCKING FAIL fails the gate; an EVIDENCE-ONLY ' +
-    'FAIL is recorded but does not break the build (libcompliance tiers).';
+    'Werdykty A.1-A.10: ' + (k.pass||0) + ' PASS, ' + (k.fail||0) + ' FAIL (' +
+    (k.blocking_fail||0) + ' BLOKUJĄCYCH), ' + (k.indeterminate||0) + ' INDETERMINATE, ' +
+    (k.not_reported||0) + ' NIE RAPORTOWANO. Tylko BLOKUJĄCY FAIL powoduje niepowodzenie bramki; ' +
+    'FAIL typu EVIDENCE-ONLY jest rejestrowany, ale nie przerywa budowy (poziomy libcompliance).';
   const rows = (cc.controls || []).map(c => {
     let measured = (c.measured === null || c.measured === undefined || c.measured === '') ? '—'
       : '<code style="font-size:.72rem">' + esc(c.measured) + '</code>';
     if (c.threshold !== null && c.threshold !== undefined && c.threshold !== '')
-      measured += ' <span style="color:var(--mid);font-size:.72rem">/ thr ' + esc(c.threshold) + '</span>';
+      measured += ' <span style="color:var(--mid);font-size:.72rem">/ próg ' + esc(c.threshold) + '</span>';
     const rem = c.remediation ? esc(c.remediation) : '—';
     const ev = c.evidence ? '<code style="font-size:.72rem">' + esc(c.evidence) + '</code>' : '—';
     return '<tr>' +
@@ -1334,8 +1338,8 @@ function renderComplianceCode() {
       '</tr>';
   }).join('');
   $('ccTableWrap').innerHTML =
-    '<table><thead><tr><th>Control</th><th>Organizational control</th><th>Framework clause</th>' +
-    '<th>Evidence verdict</th><th>Tier</th><th>Result / measured</th><th>Remediation pointer</th>' +
+    '<table><thead><tr><th>Kontrola</th><th>Kontrola organizacyjna</th><th>Klauzula ram regulacyjnych</th>' +
+    '<th>Werdykt dowodowy</th><th>Poziom</th><th>Wynik / zmierzono</th><th>Wskazanie naprawcze</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>';
 }
 
@@ -1343,20 +1347,20 @@ function renderComplianceCode() {
 function renderSigning() {
   const c = DATA.cosign;
   $('cosignStatus').innerHTML = c.verified
-    ? '<span class="badge-pass">✓ VERIFIED</span> Image signature verified at deploy time.'
-    : '<span class="badge-fail">UNVERIFIED</span>';
+    ? '<span class="badge-pass">✓ ZWERYFIKOWANO</span> Podpis obrazu zweryfikowany w czasie wdrożenia.'
+    : '<span class="badge-fail">NIEZWERYFIKOWANY</span>';
   $('cosignClaims').innerHTML = `<tbody>${
     Object.entries(c.claims).map(([k,v]) =>
       `<tr><td><strong>${esc(k)}</strong></td><td><code style="font-size:.74rem">${esc(v)}</code></td></tr>`
-    ).join('') || '<tr><td colspan="2" class="empty">No claims extracted</td></tr>'
+    ).join('') || '<tr><td colspan="2" class="empty">Nie wyodrębniono oświadczeń</td></tr>'
   }</tbody>`;
   const repo = DATA.pipeline.repo;
   const img = DATA.pipeline.image_uri || '';
   const dig = DATA.pipeline.image_digest || '';
   $('cosignCmd').textContent =
     `cosign verify \\\n  --certificate-identity-regexp='^https://github.com/${repo}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
-  $('cosignRaw').textContent = c.raw || '(no log captured)';
-  $('provExcerpt').textContent = DATA.provenance_excerpt || '(no provenance captured)';
+  $('cosignRaw').textContent = c.raw || '(nie zarejestrowano dziennika)';
+  $('provExcerpt').textContent = DATA.provenance_excerpt || '(nie zarejestrowano proweniencji)';
 }
 
 // ── FILES (inventory + manifest) ─────────────────────────────────────
@@ -1376,7 +1380,7 @@ function renderFiles() {
       <td>${esc(f.purpose)}</td>
       <td><code style="font-size:.7rem">${esc(f.framework)}</code></td>
       <td>${esc(f.size_fmt)}</td>
-      <td><span class="${f.present?'badge-pass':'badge-fail'}">${f.present?'PRESENT':'MISSING'}</span></td>
+      <td><span class="${f.present?'badge-pass':'badge-fail'}">${f.present?'OBECNY':'BRAKUJĄCY'}</span></td>
     </tr>
   `).join('');
 
@@ -1408,9 +1412,9 @@ function renderDpa() {
   `).join('');
   const r = d.retention_policy || {};
   $('retentionTable').innerHTML = `
-    <tr><td><strong>Evidence pack retention</strong></td><td>${esc(r.evidence_pack_retention_days || '—')} days</td></tr>
-    <tr><td><strong>Log retention</strong></td><td>${esc(r.log_retention_days || '—')} days</td></tr>
-    <tr><td><strong>Deletion schedule</strong></td><td>${esc(r.deletion_schedule || '—')}</td></tr>
+    <tr><td><strong>Retencja pakietu dowodowego</strong></td><td>${esc(r.evidence_pack_retention_days || '—')} dni</td></tr>
+    <tr><td><strong>Retencja dzienników</strong></td><td>${esc(r.log_retention_days || '—')} dni</td></tr>
+    <tr><td><strong>Harmonogram usuwania</strong></td><td>${esc(r.deletion_schedule || '—')}</td></tr>
   `;
 }
 
@@ -1421,7 +1425,7 @@ function renderDataFlow() {
     <tr>
       <td><strong>${esc(s.name)}</strong></td>
       <td>${esc(s.location)}</td>
-      <td><span class="${s.pii_present?'badge-fail':'badge-pass'}">${s.pii_present?'YES':'NO'}</span></td>
+      <td><span class="${s.pii_present?'badge-fail':'badge-pass'}">${s.pii_present?'TAK':'NIE'}</span></td>
       <td>${(s.pii_types||[]).map(t=>`<code style="font-size:.7rem">${esc(t)}</code>`).join('<br>')||'—'}</td>
       <td style="font-size:.78rem">${esc(s.pii_justification || '—')}</td>
       <td>${(s.data_flows_to||[]).map(t=>`<code style="font-size:.7rem">${esc(t)}</code>`).join('<br>')||'—'}</td>
@@ -1432,16 +1436,16 @@ function renderDataFlow() {
 // ── RAW ──────────────────────────────────────────────────────────────
 function renderRaw() {
   $('rawJson').textContent = JSON.stringify(DATA.pipeline, null, 2);
-  $('codeqlStat').innerHTML = `<strong>${esc(DATA.codeql.findings.length)}</strong> findings across <strong>${esc(DATA.codeql.rules_count)}</strong> rules`;
-  $('checkovStat').innerHTML = `<strong>${esc(DATA.checkov.findings.length)}</strong> findings across <strong>${esc(DATA.checkov.rules_count)}</strong> rules`;
+  $('codeqlStat').innerHTML = `<strong>${esc(DATA.codeql.findings.length)}</strong> znalezisk w <strong>${esc(DATA.codeql.rules_count)}</strong> regułach`;
+  $('checkovStat').innerHTML = `<strong>${esc(DATA.checkov.findings.length)}</strong> znalezisk w <strong>${esc(DATA.checkov.rules_count)}</strong> regułach`;
   const cov = DATA.coverage;
   $('coverageStat').innerHTML = cov.available ? `
     <table><tbody>
-      <tr><td>Lines</td><td><strong>${cov.lines.toFixed(1)}%</strong></td></tr>
-      <tr><td>Statements</td><td><strong>${cov.statements.toFixed(1)}%</strong></td></tr>
-      <tr><td>Functions</td><td><strong>${cov.functions.toFixed(1)}%</strong></td></tr>
-      <tr><td>Branches</td><td><strong>${cov.branches.toFixed(1)}%</strong></td></tr>
-    </tbody></table>` : '<p class="empty">No coverage data</p>';
+      <tr><td>Linie</td><td><strong>${cov.lines.toFixed(1)}%</strong></td></tr>
+      <tr><td>Instrukcje</td><td><strong>${cov.statements.toFixed(1)}%</strong></td></tr>
+      <tr><td>Funkcje</td><td><strong>${cov.functions.toFixed(1)}%</strong></td></tr>
+      <tr><td>Gałęzie</td><td><strong>${cov.branches.toFixed(1)}%</strong></td></tr>
+    </tbody></table>` : '<p class="empty">Brak danych o pokryciu</p>';
 }
 
 // ── Global search ────────────────────────────────────────────────────
