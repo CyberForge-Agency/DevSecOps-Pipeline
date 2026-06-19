@@ -15,15 +15,14 @@ on:
           - staging
           - production
 
+# Least privilege (OpenSSF Scorecard Token-Permissions): the orchestrator's
+# top-level token is read-only. Each phase that calls a reusable workflow grants
+# EXACTLY the write scopes that the called workflow's jobs use — the caller caps
+# the callee, so a missing scope here would starve the called workflow.
 permissions:
   contents: read
   actions: read
   pull-requests: read
-  security-events: write
-  id-token: write
-  packages: write
-  attestations: write
-  issues: write
 
 # Cancel in-progress runs for the same PR/branch
 concurrency:
@@ -40,6 +39,9 @@ jobs:
   # before anything builds, signs or deploys — nothing can depend-around it.
   self-test:
     name: "Phase 0: Self-Test"
+    # self-test.yml only reads the repo (opa test + pin-audit + pytest + bats).
+    permissions:
+      contents: read
     uses: ./.github/workflows/self-test.yml
 
   # ============================================
@@ -48,6 +50,11 @@ jobs:
   security-gate:
     name: "Phase 1: Security Gate"
     needs: [self-test]
+    # security-gate.yml: TruffleHog/Checkov/MegaLinter/PII (read repo) + commit-signing
+    # github-script calls pulls.listCommits (read). No write scopes used.
+    permissions:
+      contents: read
+      pull-requests: read   # commit-signing job: github.rest.pulls.listCommits
     uses: ./.github/workflows/security-gate.yml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -61,6 +68,13 @@ jobs:
   build-and-scan:
     name: "Phase 2: Build & Scan"
     needs: [security-gate]
+    # build-and-scan.yml: codeql job uploads SARIF (security-events: write);
+    # docker-build job uses azure/login OIDC to push to ACR (id-token: write).
+    permissions:
+      contents: read
+      actions: read
+      security-events: write   # codeql job: github/codeql-action/upload-sarif
+      id-token: write          # docker-build job: azure/login OIDC (ACR push)
     uses: ./.github/workflows/build-and-scan.yml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -73,6 +87,13 @@ jobs:
     name: "Phase 3: Sign & Attest"
     if: github.event_name != 'pull_request'
     needs: [build-and-scan]
+    # sign-and-attest.yml: cosign keyless + azure/login (id-token), push sig/attestation
+    # to registry (packages), actions/attest-build-provenance (attestations).
+    permissions:
+      contents: read
+      id-token: write        # azure/login OIDC + cosign keyless sign/attest/verify
+      packages: write        # push image signature + SBOM attestation + provenance to registry
+      attestations: write    # actions/attest-build-provenance
     uses: ./.github/workflows/sign-and-attest.yml
     with:
       image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
@@ -85,6 +106,10 @@ jobs:
     name: "Phase 4: Deploy"
     if: github.event_name != 'pull_request'
     needs: [sign-and-attest, build-and-scan]
+    # deploy.yml: azure/login OIDC + cosign keyless verify (id-token). No writes.
+    permissions:
+      contents: read
+      id-token: write        # azure/login OIDC + cosign keyless verify before deploy
     uses: ./.github/workflows/deploy.yml
     with:
       image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
@@ -103,6 +128,10 @@ jobs:
     name: "Phase 5: DAST"
     if: github.event_name != 'pull_request'
     needs: [deploy]
+    # dast.yml: creates a security-incident issue via github-script on HIGH/CRITICAL findings.
+    permissions:
+      contents: read
+      issues: write          # zap-scan job: github.rest.issues.create (incident issue)
     uses: ./.github/workflows/dast.yml
     with:
       target_url: ${{ needs.deploy.outputs.app_url }}
@@ -114,6 +143,13 @@ jobs:
     name: "Phase 6: Evidence Pack"
     if: always()
     needs: [security-gate, build-and-scan, sign-and-attest, deploy, dast]
+    # evidence-pack.yml: cosign keyless sign-blob (compliance status, toolchain
+    # inventory, source-control drift, compliance gate, PDF sealing) + azure/login
+    # OIDC for WORM blob upload (id-token). Reads live GitHub config via GH_TOKEN
+    # (read-only GETs). No write scopes.
+    permissions:
+      contents: read
+      id-token: write        # cosign keyless sign-blob + azure/login OIDC (WORM evidence upload)
     uses: ./.github/workflows/evidence-pack.yml
     with:
       image_uri: ${{ needs.build-and-scan.outputs.image_uri || 'N/A' }}

@@ -1,0 +1,32 @@
+CyberForge DevSecOps Pipeline — Proprietary License
+SPDX-License-Identifier: LicenseRef-CyberForge-Proprietary
+
+Copyright (c) 2026 CyberForge (CyberForge-Agency). All rights reserved.
+
+This repository and all of its contents (the "Software") are the proprietary
+and confidential property of CyberForge. The Software is published publicly
+for evaluation, transparency, and demonstration purposes only.
+
+PERMITTED without prior written permission:
+  - Viewing and reading the source code.
+  - Referencing it to evaluate CyberForge's products and services.
+
+NOT PERMITTED without prior written permission from CyberForge:
+  - Use, execution, or deployment of the Software, in whole or in part, for any
+    production, commercial, or internal business purpose.
+  - Copying, modification, adaptation, or creation of derivative works.
+  - Redistribution, sublicensing, sale, or other transfer to any third party.
+  - Removal or alteration of copyright, trademark, or attribution notices.
+
+No license or right is granted by implication, estoppel, or otherwise except as
+expressly stated above. "CyberForge" and associated logos are trademarks of
+CyberForge and may not be used without permission.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing inquiries, contact CyberForge at https://github.com/CyberForge-Agency.

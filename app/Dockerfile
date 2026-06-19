@@ -1,5 +1,5 @@
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS builder
 WORKDIR /build
 COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
@@ -32,7 +32,7 @@ LABEL org.opencontainers.image.title="cyberforge-demo"
 LABEL org.opencontainers.image.description="CyberForge DevSecOps Pipeline demo application"
 
 # Stage 2: Production dependencies
-FROM node:20-alpine AS deps
+FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293 AS deps
 WORKDIR /deps
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev --ignore-scripts

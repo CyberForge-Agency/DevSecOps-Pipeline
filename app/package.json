@@ -30,6 +30,9 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.2"
   },
+  "overrides": {
+    "js-yaml": "^4.2.0"
+  },
   "engines": {
     "node": ">=20.0.0"
   }

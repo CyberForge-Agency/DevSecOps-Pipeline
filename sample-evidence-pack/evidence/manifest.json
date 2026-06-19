@@ -83,8 +83,8 @@
     },
     {
       "path": "evidence-report.html",
-      "sha256": "3a7991c071c6d6b6d1f7c908ac2071264e25ccdcdbca01c9c28801079f0d4d76",
-      "size": 91200,
+      "sha256": "2407171176bd9fd73cdf8958d35ffe919c3eb7171654779f89ea9c36a2219a2a",
+      "size": 91535,
       "mime": "text/html",
       "source": "asserted-document",
       "provenance": "static"
@@ -298,7 +298,7 @@
       "provenance": "live"
     }
   ],
-  "merkle_root": "1b1fe388a79b3468ba04c2facbbf78001c409cac016029848d355b646860e84c",
+  "merkle_root": "66caf002d58f2506cfb9411ed7340e89a4a7e7a283eee6a6cb37470f9d398b15",
   "merkle_algorithm": "RFC6962-SHA256",
   "tooling": {},
   "worm_state": "pending",

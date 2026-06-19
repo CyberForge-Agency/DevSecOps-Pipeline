@@ -1061,7 +1061,11 @@ function renderDashboard() {
   $('d-ref').textContent = p.ref;
   $('d-sha').textContent = p.sha;
   $('d-repo-link').textContent = p.repo;
-  $('d-repo-link').href = safeUrl(p.repo_url);
+  // Build the repo link from a sanitized slug + constant origin so no tainted
+  // value can reach href (CodeQL js/xss-through-dom): the char-class replace
+  // strips anything outside a safe slug, which also neutralizes any scheme.
+  const _repoSlug = String(p.repo ?? '').replace(/[^\w.\-\/]/g, '');
+  $('d-repo-link').href = _repoSlug ? 'https://github.com/' + _repoSlug : '#';
   $('d-env').textContent = p.environment;
   $('d-imguri').textContent = p.image_uri;
   $('d-imgdigest').textContent = p.image_digest;

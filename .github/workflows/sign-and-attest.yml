@@ -12,17 +12,21 @@ on:
         required: true
         type: string
 
+# Least privilege (OpenSSF Scorecard Token-Permissions): top-level is read-only;
+# every write scope is declared at the job level on the single job that needs it.
 permissions:
   contents: read
-  id-token: write
-  packages: write
-  attestations: write
 
 jobs:
   sign-and-attest:
     name: "Cosign Sign + SLSA Provenance + SBOM Attestation"
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    permissions:
+      contents: read        # actions/checkout + read signing scripts (generate-provenance.sh)
+      id-token: write       # azure/login OIDC + cosign keyless sign/attest/verify (Sigstore Fulcio OIDC token)
+      packages: write       # push image signature + SBOM attestation + provenance to the registry (attest-build-provenance push-to-registry: true)
+      attestations: write   # actions/attest-build-provenance (GitHub-native build provenance)
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
