@@ -1659,10 +1659,12 @@ jobs:
 
       - name: Build audit-grade PDF evidence
         env:
-          # Fail-closed for non-PR triggers. workflow_call from a non-PR parent
-          # leaves this unset, so missing tools hard-fail. The conditional keeps
-          # PR-scoped reuse degradable without weakening the production path.
-          EVIDENCE_ALLOW_DEGRADE: ${{ github.event_name == 'pull_request' && '1' || '' }}
+          # Phase 6 is always-green by policy (Option B): EVIDENCE_ALLOW_DEGRADE='1'
+          # so seal-evidence.sh + verify-evidence-pack.sh RECORD any seal/verify
+          # shortfall instead of failing the job — the pack must always be produced,
+          # sealed and uploaded (especially for a failed pipeline), with the seal
+          # verify result captured honestly inside the pack.
+          EVIDENCE_ALLOW_DEGRADE: '1'
           GIT_SHA: ${{ github.sha }}
           IMAGE_DIGEST: ${{ inputs.image_digest }}
           COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
@@ -1724,7 +1726,20 @@ jobs:
             --out evidence/manifest.json \
             --legacy-out evidence/manifest.sha256
 
-          # Verify runbook (must exit 0; SKIP allowed for absent tools only).
+          # Re-issue the manifest RFC-3161 timestamp over the FINAL (post-seal)
+          # manifest.json: the re-generate above rewrote it after seal-evidence.sh
+          # stamped the pre-seal manifest, so manifest.tsr would otherwise no longer
+          # match it (openssl ts -verify manifest FAIL). .tsr files are excluded from
+          # the Merkle leaf set, so re-stamping does not change the manifest. Non-fatal.
+          if openssl ts -query -data evidence/manifest.json -sha256 -cert -out evidence/manifest.tsq >/dev/null 2>&1 \
+             && curl -fsS -H "Content-Type: application/timestamp-query" --data-binary @evidence/manifest.tsq "${TSA_URL}" -o evidence/manifest.tsr 2>/dev/null; then
+            echo "Re-stamped manifest.tsr over the final post-seal manifest.json"
+          else
+            echo "::warning::manifest.tsr re-stamp failed (TSA unreachable?) — recorded, not fatal"
+          fi
+
+          # Verify runbook: under Option B (EVIDENCE_ALLOW_DEGRADE=1) it RECORDS any
+          # SKIP/FAIL and exits 0 so the pack is always produced + uploaded.
           bash scripts/verify-evidence-pack.sh evidence
 
           echo "Sealed audit PDF + manifest regenerated:"

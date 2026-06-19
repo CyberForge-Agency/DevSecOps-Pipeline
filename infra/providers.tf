@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.7.0"
+  required_version = ">= 1.9.0" # cross-variable validation (var.retention_minima_days in modules/storage) needs TF >= 1.9
 
   required_providers {
     azurerm = {
