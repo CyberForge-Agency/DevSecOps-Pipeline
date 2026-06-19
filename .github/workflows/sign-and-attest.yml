@@ -138,6 +138,7 @@ jobs:
           } > signing-proof.txt
 
       - name: Verify signature (proof for evidence pack)
+        timeout-minutes: 5
         run: |
           # pipefail REQUIRED: tee would otherwise mask a failed cosign verify,
           # letting a bad/missing signature pass this defense-in-depth check.
@@ -154,13 +155,22 @@ jobs:
           # caller path (pipeline.yml) instead, widen this regexp — confirm the
           # exact identity on the first live run via `cosign verify ... --output
           # json` (verification_status = NEEDS-CI for the live signature test).
+          # --offline: verify from the signing bundle's inclusion proof, no live
+          # Rekor/Fulcio call (the run already prints "verified offline"). Keeps this
+          # self-check deterministic and fast, and removes the network-stall surface.
           cosign verify \
+            --offline \
             --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
             2>&1 | tee cosign-verification.log
 
       - name: Verify SBOM attestation + Rekor inclusion (proof for evidence pack)
+        # HARD safety net: a live cosign verify-attestation was observed hanging
+        # ~12 min here while public Sigstore was fully responsive (cosign-side stall,
+        # no internal timeout). timeout-minutes caps it so it can never again block
+        # the pipeline toward the job's 45-min limit.
+        timeout-minutes: 5
         run: |
           # T-51 (spec §7.2 #2 / Part I.2 — Rekor transparency log): independently
           # confirm the CycloneDX SBOM attestation attached above is recorded in
@@ -176,6 +186,7 @@ jobs:
           cosign verify-attestation \
             --type cyclonedx \
             --insecure-ignore-tlog=false \
+            --offline \
             --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
