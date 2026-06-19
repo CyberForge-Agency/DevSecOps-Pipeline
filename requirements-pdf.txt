@@ -28,5 +28,6 @@ pyphen==0.17.2
 # --- PAdES self-seal (seal-evidence.sh -> pyhanko; fail-soft if absent) ---
 pyhanko==0.35.1
 pyhanko-certvalidator==0.31.1
-cryptography==48.0.0
+# 48.0.1: rebuilt wheels with patched OpenSSL (GHSA Dependabot #7); patch-only bump over 48.0.0
+cryptography==48.0.1
 asn1crypto==1.5.1
