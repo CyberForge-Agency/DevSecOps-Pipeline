@@ -2,7 +2,7 @@
   "validator": "check-thirdparty-clauses",
   "status": "PASS",
   "tier": "BLOCKING",
-  "checked_at": "2026-06-17T14:57:48Z",
+  "checked_at": "2026-06-18T10:41:38Z",
   "measured": 0,
   "threshold": 0,
   "detail": "All 3 Critical/High vendor(s) have a Documented/Tested exit plan.",
@@ -27,7 +27,7 @@
     "missing_categories": [],
     "last_reviewed": "2026-03-15",
     "cadence_status": "PASS",
-    "cadence_age_days": 94,
+    "cadence_age_days": 95,
     "max_age_days": 400
   },
   "vendors_requiring_exit_plan": [

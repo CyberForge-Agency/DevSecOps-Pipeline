@@ -1,9 +1,12 @@
 # Residency assertion + Polish management summary (Evidence Pack Part 6 / §6.4)
 
-> **Status: partial-implementation / human-confirm document.** This file delivers
+> **Status: wired-emission / human-confirm document.** This file delivers
 > two of the §6.4 obligations from [`poland-appendix.md`](poland-appendix.md):
 > (1) a **data-residency + lawful-transfer assertion** grounded in the *actual*
-> Terraform configuration, emitted as a `residency.json` artifact; and
+> Terraform configuration and emitted as a `residency.json` artifact by the
+> evidence-pack workflow (`.github/workflows/evidence-pack.yml`,
+> "Generate crosswalk, gap register, residency assertion (T-102/T-103/T-109)"
+> step — fail-closed on non-PR, warn-only on PR); and
 > (2) a **Polish-language executive summary** (warstwa zarządcza) of the Evidence
 > Pack for KNF / UODO / a Polish auditor. The pipeline can assert *configuration*
 > (region, retention) deterministically; it **cannot** make the legal
@@ -66,12 +69,14 @@ example.
 
 ### 1.3 Emitted artifact shape — `residency.json`
 
-> **TARGET-STATE wiring note.** The schema and the worked fixture below are
-> defined here; the emit-into-pack wiring (writing `residency.json` from the
-> applied Terraform region into the Evidence Pack) is owned by the pack/seal
-> lane and is **TARGET-STATE** until wired. The values below are the *default*
-> (`polandcentral`) deployment; the emitter MUST substitute the **applied**
-> region at run time.
+> **Wiring note.** The schema and the worked fixture below are defined here; the
+> emit-into-pack wiring (writing `residency.json` from the applied Terraform
+> region into the Evidence Pack) is now implemented in the evidence-pack workflow
+> (`.github/workflows/evidence-pack.yml` — the T-102/T-103/T-109 step), which
+> reads the **applied** region from `terraform output` when available and falls
+> back to the `infra/variables.tf` default, recording which source was used
+> (`azure_region_source`). The values below are the *default* (`polandcentral`)
+> deployment fixture; the emitter substitutes the **applied** region at run time.
 
 ```json
 {

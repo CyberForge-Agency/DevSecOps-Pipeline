@@ -1,0 +1,226 @@
+# Asset / Dependency & Critical-Function Map (DORA Art.8)
+#
+# HONESTY NOTE
+# ------------
+# This file is REAL architectural data, not the record of an unconducted
+# activity. Every entry below is transcribed from the existing, approved
+# inventories -- it is therefore allowed to PASS (cf. the A.10 restore-test
+# which honestly FAILs because no drill has actually happened yet).
+#
+# Provenance (1:1 traceable):
+#   * critical_functions  <- service-inventory.md SVC-001..SVC-005 + EXT-001..004
+#   * supporting_assets   <- asset-inventory.md TA-* / service-inventory.md SVC-*
+#   * data_stores         <- asset-inventory.md IA-* (information assets)
+#   * third_parties       <- service-inventory.md EXT-* / vendor-risk-register
+#   * rto / rpo (high)    <- bcdr-plan.md S.4 "RTO/RPO Targets" table
+#
+# If a value is genuinely unknown it MUST be left empty (null) so the validator
+# reports a completeness FAIL -- it must never be invented to manufacture a PASS.
+
+schema_version: "1.0"
+
+regulation:
+  framework: "DORA"
+  article: "Art.8 (ICT risk management - identification)"
+  note: "Also supports NIS2 Art.21.2.i asset management and ISO 27001 A.5.9."
+
+maintaining_entity:
+  name: "CyberForge"
+  last_updated: "2026-06-18"
+  review_cadence_days: 365
+  sources:
+    - "docs/governance/service-inventory.md"
+    - "docs/governance/asset-inventory.md"
+    - "docs/governance/vendor-risk-register.md"
+    - "docs/runbooks/bcdr-plan.md (S.4 RTO/RPO targets)"
+
+# --------------------------------------------------------------------------- #
+# Critical functions (ICT-supported business functions, DORA Art.8)           #
+# --------------------------------------------------------------------------- #
+critical_functions:
+  - name: "DevSecOps Pipeline (build/scan/sign/deploy/evidence)"
+    description: >-
+      6-phase CI/CD pipeline (SVC-001). Core service; single point of failure
+      requiring both GitHub and Azure (service-inventory.md S.4).
+    criticality: high
+    supporting_assets: ["SVC-001", "TA-001", "TA-002", "TA-008", "SVC-004"]
+    data_stores: ["IA-001", "IA-006", "IA-009"]
+    third_parties: ["GitHub (Microsoft)", "Microsoft Azure", "Sigstore"]
+    # bcdr-plan.md S.4: Pipeline RTO 4 hours, RPO 0.
+    rto: "4 hours"
+    rpo: "0 (no data loss)"
+
+  - name: "Evidence Pack Generation & WORM Archival"
+    description: >-
+      Automated compliance evidence archival (SVC-002) to Azure Blob WORM.
+      Evidence can be regenerated from git history (not a SPOF).
+    criticality: high
+    supporting_assets: ["SVC-002", "TA-006", "SVC-001"]
+    data_stores: ["IA-004", "IA-007", "IA-008", "IA-010"]
+    third_parties: ["Microsoft Azure"]
+    # bcdr-plan.md S.4: Evidence Packs RTO 24 hours, RPO 0.
+    rto: "24 hours"
+    rpo: "0 (no data loss)"
+
+  - name: "Infrastructure Management (Terraform/Azure)"
+    description: >-
+      Terraform-managed Azure resources (SVC-003). State versioned in Azure
+      Blob with GRS replication.
+    criticality: high
+    supporting_assets: ["SVC-003", "TA-002", "TA-007", "TA-003", "TA-004"]
+    data_stores: ["IA-005"]
+    third_parties: ["Microsoft Azure", "HashiCorp"]
+    # bcdr-plan.md S.4: Terraform State RTO 1 hour, RPO 0.
+    rto: "1 hour"
+    rpo: "0 (no data loss)"
+
+  - name: "Security Scanning"
+    description: >-
+      Continuous vulnerability detection (SVC-004) via OSS tools on ephemeral
+      runners. Degrades (not blocks) if NVD/OSV unavailable.
+    criticality: high
+    supporting_assets: ["SVC-004", "TA-009", "TA-001"]
+    data_stores: ["IA-008"]
+    third_parties: ["GitHub (Microsoft)", "NVD/OSV"]
+    # No dedicated BC/DR RTO line; security scanning is part of the Pipeline
+    # recovery path, so it inherits the Pipeline target (bcdr-plan.md S.4).
+    rto: "4 hours"
+    rpo: "0 (no data loss)"
+
+  - name: "Access Management (IAM lifecycle)"
+    description: >-
+      IAM lifecycle and review processes (SVC-005). SPOF requiring both GitHub
+      admin and Azure AD (service-inventory.md S.4).
+    criticality: med
+    supporting_assets: ["SVC-005", "TA-001", "TA-002", "TA-005"]
+    data_stores: ["IA-003"]
+    third_parties: ["GitHub (Microsoft)", "Microsoft Azure"]
+    # Medium criticality: RTO/RPO not BC/DR-mandated; left null honestly rather
+    # than invented (the validator only requires RTO/RPO for high-criticality).
+    rto: null
+    rpo: null
+
+# --------------------------------------------------------------------------- #
+# Assets (ICT + information). Owner & criticality transcribed verbatim.        #
+# --------------------------------------------------------------------------- #
+assets:
+  # Internal services (service-inventory.md S.2)
+  - id: "SVC-001"
+    name: "DevSecOps Pipeline"
+    type: service
+    owner: "Security Lead"
+    criticality: high
+  - id: "SVC-002"
+    name: "Evidence Pack Generation"
+    type: service
+    owner: "Security Lead"
+    criticality: high
+  - id: "SVC-003"
+    name: "Infrastructure Management"
+    type: service
+    owner: "DevOps Lead"
+    criticality: high
+  - id: "SVC-004"
+    name: "Security Scanning"
+    type: service
+    owner: "Security Lead"
+    criticality: high
+  - id: "SVC-005"
+    name: "Access Management"
+    type: service
+    owner: "Security Lead"
+    criticality: med
+
+  # Technology assets (asset-inventory.md S.4 -- criticality mapped High->high)
+  - id: "TA-001"
+    name: "GitHub Organization"
+    type: technology
+    owner: "CTO"
+    criticality: high
+  - id: "TA-002"
+    name: "Azure Subscription"
+    type: technology
+    owner: "CTO"
+    criticality: high
+  - id: "TA-003"
+    name: "Azure Container Registry"
+    type: technology
+    owner: "DevOps Lead"
+    criticality: high
+  - id: "TA-004"
+    name: "Azure Container Apps"
+    type: technology
+    owner: "DevOps Lead"
+    criticality: high
+  - id: "TA-005"
+    name: "Azure Key Vault"
+    type: technology
+    owner: "Security Lead"
+    criticality: high
+  - id: "TA-006"
+    name: "Azure Blob Storage (WORM)"
+    type: technology
+    owner: "Security Lead"
+    criticality: high
+  - id: "TA-007"
+    name: "Terraform"
+    type: technology
+    owner: "DevOps Lead"
+    criticality: high
+  - id: "TA-008"
+    name: "GitHub Actions Workflows"
+    type: technology
+    owner: "Security Lead"
+    criticality: high
+  - id: "TA-009"
+    name: "Security Scanning Tools"
+    type: technology
+    owner: "Security Lead"
+    criticality: high
+
+  # Information assets / data stores (asset-inventory.md S.3)
+  - id: "IA-001"
+    name: "Source Code"
+    type: information
+    owner: "CTO"
+    criticality: high
+  - id: "IA-003"
+    name: "Pipeline Secrets"
+    type: information
+    owner: "Security Lead"
+    criticality: high
+  - id: "IA-004"
+    name: "Evidence Packs"
+    type: information
+    owner: "Security Lead"
+    criticality: high
+  - id: "IA-005"
+    name: "Terraform State"
+    type: information
+    owner: "DevOps Lead"
+    criticality: high
+  - id: "IA-006"
+    name: "Container Images"
+    type: information
+    owner: "DevOps Lead"
+    criticality: med
+  - id: "IA-007"
+    name: "SBOM/Provenance"
+    type: information
+    owner: "Security Lead"
+    criticality: med
+  - id: "IA-008"
+    name: "Security Scan Results"
+    type: information
+    owner: "Security Lead"
+    criticality: high
+  - id: "IA-009"
+    name: "Governance Documents"
+    type: information
+    owner: "CTO"
+    criticality: med
+  - id: "IA-010"
+    name: "Pipeline Logs"
+    type: information
+    owner: "DevOps Lead"
+    criticality: low

@@ -22,17 +22,40 @@ job (`.github/workflows/self-test.yml`) installs plain `bats` via `apt-get`.
 | `generate-compliance-matrix.bats` | `scripts/generate-compliance-matrix.sh` | 4 |
 | `seal-evidence.bats` | `scripts/seal-evidence.sh` | 2 |
 
-## Coverage floor
+## Coverage floor (CI-enforced, blocking)
 
-**Floor: >= 12 behavioral assertions across the suite. Current: 23 `@test`
-cases** (each asserts an exit code and/or an output substring), well above the
-floor. The floor is a *minimum*, not a target — adding a script behavior should
-add a test. CI does **not** auto-enforce the count today (bats has no built-in
-count gate); the floor is enforced by review of this table. A quick local count:
+**Floor: >= 12 behavioral `@test` cases across the suite. Current: 23** (each
+asserts an exit code and/or an output substring), well above the floor.
+
+### Why a `@test`-count floor and not kcov/bashcov line coverage
+
+`kcov` and `bashcov` (the usual ways to get *line* coverage of bash) are **not
+installed** in this project's CI or local sandbox, and we deliberately do **not**
+add them: bash line-coverage of `run`-wrapped subprocess invocations is noisy and
+fragile (it under-counts code executed inside the called script's own subshell and
+over-counts trivial glue), and it would add a heavyweight, flaky dependency to the
+quality gate. Instead the floor is a **minimum count of behavioral assertions** —
+the thing that actually matters for these guard scripts is that each fail-closed
+path is probed, and each `@test` here asserts a real exit code / output substring
+(see the table above and the per-test header comments citing the script line each
+targets).
+
+### How the floor is enforced — a real exit gate, not review
+
+The floor is enforced by a **blocking CI step** in
+`.github/workflows/self-test.yml` ("bats coverage floor (T-81, blocking)") that
+counts `^@test` lines and **exits non-zero** when the count drops below the floor
+(or when the suite is absent entirely). It is no longer "enforced by review of this
+table". A regression that deletes tests below the floor turns the self-test job
+red. The exact command CI runs (also runnable locally):
 
 ```bash
-grep -rhc '^@test' tests/bats/*.bats | paste -sd+ | bc   # -> 23
+COUNT="$(grep -rhc '^@test' tests/bats/*.bats | awk '{s+=$1} END{print s+0}')"
+echo "${COUNT}"            # -> 23
+test "${COUNT}" -ge 12     # the blocking assertion (exit 1 below the floor)
 ```
+
+The floor is a *minimum*, not a target — adding a script behavior should add a test.
 
 The chosen behaviors are the ones an auditor or attacker would probe first:
 
@@ -61,13 +84,15 @@ own quality gate. The relevant steps:
     sudo apt-get install -y bats
     bats --version
 
-- name: bats tests/bats (T-81)
+- name: bats coverage floor (T-81, blocking)
+  env:
+    BATS_TEST_FLOOR: "12"
   run: |
-    if [ -d tests/bats ] && compgen -G 'tests/bats/*.bats' > /dev/null; then
-      bats tests/bats
-    else
-      echo "::warning::T-81 bats suite not present yet"
-    fi
+    COUNT="$(grep -rhc '^@test' tests/bats/*.bats | awk '{s+=$1} END{print s+0}')"
+    test "${COUNT}" -ge "${BATS_TEST_FLOOR}"   # exit 1 below the floor
+
+- name: bats tests/bats (T-81)
+  run: bats tests/bats
 ```
 
 A failed `@test` turns the `bats tests/bats` step red, which fails the

@@ -1,13 +1,12 @@
 {
   "schema": "cyberforge-compliance-status/v1",
-  "generated_at": "2026-06-17T14:57:48Z",
+  "generated_at": "2026-06-18T10:41:41Z",
   "overall_status": "FAIL",
-  "blocking_failures": 1,
+  "blocking_failures": 4,
   "missing_verdicts": [],
   "matrix": {
-    "blocking_failures": 0,
-    "source": "compliance-matrix.json",
-    "note": "compliance-matrix.json absent (content gate not run)"
+    "blocking_failures": 19,
+    "source": "compliance-matrix.json"
   },
   "controls": [
     {
@@ -30,7 +29,7 @@
         "maintaining_entity_lei_pending": true,
         "schema_violations": 0,
         "completeness_violations": 0,
-        "register_age_days": 94,
+        "register_age_days": 95,
         "blocking_problem_count": 0
       },
       "threshold": {
@@ -39,7 +38,7 @@
         "completeness_violations": 0,
         "register_age_days_max": 365
       },
-      "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 94d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
+      "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 95d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
       "source_file": "roi-validation.json"
     },
     {
@@ -48,9 +47,9 @@
       "label": "Processor DPA freshness (RODO Art.28)",
       "status": "PASS",
       "tier": "BLOCKING",
-      "measured": 1,
+      "measured": 2,
       "threshold": 92,
-      "detail": "vendor register last updated 2026-06-16 (1 days ago); limit 92 days",
+      "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days",
       "source_file": "dpa-compliance-check.json"
     },
     {
@@ -89,8 +88,8 @@
       "status": "PASS",
       "tier": "BLOCKING",
       "measured": {
-        "management_review_age_days": 94,
-        "training_record_age_days": 94,
+        "management_review_age_days": 95,
+        "training_record_age_days": 95,
         "board_approval_signoff": true,
         "training_attendees_recorded": 0
       },
@@ -130,7 +129,7 @@
         "rule": "every 'Next Due' >= today (no overdue access review)",
         "max_days_overdue": 0
       },
-      "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 90d out)",
+      "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 89d out)",
       "source_file": "access-review.json"
     },
     {
@@ -169,12 +168,418 @@
       "detail": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')",
       "source_file": "restore-test.json",
       "remediation": "Conduct a successful restore test and record it in docs/runbooks/restore-test-log.yaml."
+    },
+    {
+      "control": "C.VEX",
+      "task": "T-116",
+      "label": "OpenVEX exploitability triage (CRA vuln-handling / NIS2 21.2)",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "verdict not present in this context: vex-triage.json (not required here; recorded, does not trip the gate)",
+      "source_file": "vex-triage.json",
+      "remediation": "Re-run generate-vex.py against the released image digest; give every non-affected statement a CISA-category justification.",
+      "notes": [
+        "not-produced",
+        "optional-in-this-context"
+      ]
+    },
+    {
+      "control": "D.RISK",
+      "task": "T-30",
+      "label": "Residual-risk statement / accepted-risk register (ISO 27001 Cl.6, DORA Art.6)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "open_count": 1,
+        "violations": 0
+      },
+      "threshold": "every Active acceptance has a named approver, named owner, justification, and a future expiry within 12 months of approval",
+      "detail": "1 open accepted risk(s); all bounded with named approver + justification + future expiry (<=12mo)",
+      "source_file": "residual-risk.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "B.SCOPE",
+      "task": "T-120",
+      "label": "Scope & applicability determination (DORA/NIS2/CRA/RODO)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "regimes": 4,
+        "violations": 0,
+        "applies": {
+          "DORA": false,
+          "NIS2-KSC": false,
+          "CRA": true,
+          "RODO": true
+        }
+      },
+      "threshold": "schema-valid; DORA/NIS2-KSC/CRA/RODO each with applies + non-empty rationale + clause/legal basis; named approver + dated determination",
+      "detail": "scope & applicability determination complete: 4 regimes each with applies + rationale + clause/legal basis; approved_by='Szymon Mytych', dated 2026-06-16. NOTE: structural completeness + ownership verified; legal correctness of the determination is EVIDENCE-ONLY (named-officer attestation).",
+      "source_file": "scope-determination.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "C.THREAT",
+      "task": "T-115",
+      "label": "STRIDE threat-model validation (NIS2 21.2.e / ISO 8.25 / SSDF PW.1)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "threats": 43,
+        "stride_categories": [
+          "D",
+          "E",
+          "I",
+          "R",
+          "S",
+          "T"
+        ],
+        "stride_coverage": 6,
+        "gaps": 8,
+        "version": "1.0.0",
+        "reviewed_date": "2026-06-16",
+        "age_days": 2,
+        "review_window_days": 180,
+        "violations": 0
+      },
+      "threshold": "schema-complete threats (each with id,stride,component,threat,mitigation,status,residual + traceability); >= 6 STRIDE categories; reviewed within review_window_days (<= 366)",
+      "detail": "threat model v1.0.0: 43 threats, STRIDE 6/6 categories, 8 gaps; reviewed 2026-06-16 (2d ago, window 180d). NOTE: structural completeness + coverage + freshness verified; that each control fully mitigates its threat is an EVIDENCE-ONLY human assertion.",
+      "source_file": "threat-model-validation.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "C.RUNTIME",
+      "task": "T-118",
+      "label": "Runtime-hardening posture vs IaC (NIS2 21.2 / CIS)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "runs_as_non_root": true,
+        "user": "65532",
+        "privileged": false,
+        "ingress_ports": [
+          3000
+        ],
+        "ingress_external": true,
+        "resource_limits": {
+          "cpu": "0.25",
+          "memory": "0.5Gi",
+          "max_replicas": 3
+        },
+        "managed_identity": "SystemAssigned",
+        "read_only_rootfs": "platform-managed",
+        "seccomp_runtime_default": "platform-managed",
+        "controls": {
+          "run_as_non_root": "MET",
+          "seccomp_runtime_default": "INDETERMINATE",
+          "read_only_rootfs": "INDETERMINATE",
+          "privileged_false": "MET",
+          "no_host_namespaces": "MET",
+          "no_host_path_volume": "MET",
+          "resource_limits_set": "MET",
+          "least_privilege_ingress": "MET",
+          "managed_identity": "MET"
+        },
+        "iac_parse_error": null,
+        "platform": "Azure Container Apps (not Kubernetes; no PSS/securityContext)"
+      },
+      "threshold": {
+        "runs_as_non_root": true,
+        "non_root_user": "non-zero/non-root UID"
+      },
+      "detail": "runtime hardening posture consistent with IaC: non-root USER 65532 (BLOCKING invariant MET); ingress ports [3000]; identity SystemAssigned; platform-managed/not-IaC-expressible (INDETERMINATE, NOT fabricated): ['read_only_rootfs', 'seccomp_runtime_default']. NOTE: declared posture only \u2014 a live runtime scan + continuous drift alerting are TARGET-STATE (runtime-hardening.md \u00a76).",
+      "source_file": "runtime-hardening.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "C.CLOUD",
+      "task": "T-117",
+      "label": "Cloud-posture (CSPM) statement (CIS Azure Foundations)",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "verdict not present in this context: cloud-posture-validation.json (not required here; recorded, does not trip the gate)",
+      "source_file": "cloud-posture-validation.json",
+      "remediation": "Run a live CSPM scan producing cloud-posture.json; continuous scan + drift alerting are TARGET-STATE.",
+      "notes": [
+        "not-produced",
+        "optional-in-this-context"
+      ]
+    },
+    {
+      "control": "C.SOA",
+      "task": "T-30b",
+      "label": "ISO 27001 SoA maturity score (computed, not asserted)",
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": {
+        "overall_level": "L1",
+        "dimension_levels": {
+          "evidence_production": "L1",
+          "build_integrity": "L3",
+          "scanning": "L3",
+          "compliance_mapping": "L3",
+          "integrity": "L1"
+        }
+      },
+      "threshold": {
+        "target": "L3 (strong)",
+        "ceiling": "L5 (state-of-the-art)"
+      },
+      "detail": "computed pack maturity = L1 (lowest of evidence_production=L1, build_integrity=L3, scanning=L3, compliance_mapping=L3, integrity=L1); weakest dimension(s): evidence_production, integrity. Headline maturity is the COMPUTED level, not a hardcoded L5 (corrects struktura \u00a713 overclaim).",
+      "source_file": "soa-maturity.json",
+      "remediation": "Strengthen the weakest SoA dimension(s) toward the L3 target (score is informational; it never blocks).",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "D.SCM",
+      "task": "T-119",
+      "label": "Source-control config drift (desired vs live branch protection)",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "verdict not present in this context: source-control-evidence.json (not required here; recorded, does not trip the gate)",
+      "source_file": "source-control-evidence.json",
+      "remediation": "Provide a GitHub token so export-github-security-config.sh can read live branch protection; reconcile drift vs branch-protection.json.",
+      "notes": [
+        "not-produced",
+        "optional-in-this-context"
+      ]
+    },
+    {
+      "control": "X.CROSSWALK",
+      "task": "T-102",
+      "label": "Multi-framework regulatory crosswalk (derived)",
+      "status": "PASS",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "derived view present: crosswalk.json (informational; not a pass/fail control)",
+      "source_file": "crosswalk.json",
+      "notes": [
+        "informational"
+      ]
+    },
+    {
+      "control": "X.GAP",
+      "task": "T-103",
+      "label": "Machine-readable gap register (derived)",
+      "status": "PASS",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "derived view present: gap-register.json (informational; not a pass/fail control)",
+      "source_file": "gap-register.json",
+      "notes": [
+        "informational"
+      ]
+    },
+    {
+      "control": "C.9.PENTEST",
+      "task": "G1",
+      "label": "Penetration testing (independent, >= annual, signed, findings retested)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": {
+        "status": "not-conducted",
+        "last_qualifying_test_date": null,
+        "qualifying_reports": 0,
+        "total_reports": 0,
+        "rejections": []
+      },
+      "threshold": {
+        "max_age_days": 365,
+        "tester_independence": true,
+        "scope": "non-empty",
+        "signed_report": "present",
+        "crit_high_findings": "remediation-tracked",
+        "min_qualifying_reports": 1
+      },
+      "detail": "FAIL: no penetration test on record (DORA/NIS2 C.9)",
+      "source_file": "pentest-report.json",
+      "remediation": "Commission an independent penetration test, record the signed report in docs/governance/pentest-report.yaml, and track Critical/High findings to retested closure.",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "C.9.TLPT",
+      "task": "G2",
+      "label": "DORA Threat-Led Penetration Testing (TLPT)",
+      "status": "PASS",
+      "tier": "EVIDENCE-ONLY",
+      "measured": {
+        "in_scope": false,
+        "entity": "CyberForge",
+        "classification": "ICT third-party service provider (not a DORA-identified significant financial entity)",
+        "determination_date": "2026-06-18",
+        "tlpt_conducted": false
+      },
+      "threshold": {
+        "in_scope": "applicability determination only"
+      },
+      "detail": "TLPT not mandatory for current entity classification (documented determination). CyberForge: ICT third-party service provider (not a DORA-identified significant financial entity). Rationale: CyberForge is an ICT third-party service provider and has not been identified by any competent authority as a financial entity significant for TLPT purposes under DORA Art. 26(8). The mandatory triennial TLPT obligation (DORA Art. 26-27, RTS 2025/1190) therefore does not currently apply. This determination is reviewed whenever the entity's classification or a client contractual requirement changes; should the entity become in scope, in_scope is set to true and a real TLPT engagement is recorded under `tlpt` before this control can pass.",
+      "source_file": "tlpt-record.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "E.1.ICTRISK",
+      "task": "G3",
+      "label": "ICT risk-management framework + annual review (DORA Art.6 / NIS2 21(2)(a))",
+      "status": "INDETERMINATE",
+      "tier": "BLOCKING",
+      "measured": {
+        "missing_sections": [],
+        "review_date": null
+      },
+      "threshold": {
+        "max_age_days": 365,
+        "required_sections": [
+          "governance/ownership",
+          "risk appetite/tolerance",
+          "methodology reference",
+          "control-framework reference",
+          "review cadence"
+        ]
+      },
+      "detail": "INDETERMINATE: framework present with all required sections but no parseable 'Last Reviewed:' date (seed records 'pending initial management review') \u2014 cannot assess annual review freshness (DORA Art.6 / NIS2 Art.21(2)(a) (ICT risk-management framework + annual review))",
+      "source_file": "ict-risk-framework.json",
+      "remediation": "Hold the initial management review of docs/governance/ict-risk-management-framework.md and record a true ISO date + named approver in the 'Last Reviewed:' field.",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "E.2.ASSETMAP",
+      "task": "G4",
+      "label": "Asset / dependency & critical-function map (DORA Art.8)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "critical_functions_total": 5,
+        "high_criticality_functions": 4,
+        "assets_total": 23,
+        "assets_missing_owner": 0,
+        "schema_violations": 0,
+        "completeness_violations": 0,
+        "blocking_problem_count": 0
+      },
+      "threshold": {
+        "schema_violations": 0,
+        "completeness_violations": 0,
+        "min_supporting_assets_per_function": 1,
+        "rto_rpo_required_for": [
+          "high"
+        ]
+      },
+      "detail": "asset map OK: 5 critical functions (4 high, all with RTO+RPO) mapped onto 23 assets; every asset owned + classified; references resolve",
+      "source_file": "asset-map.json",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "E.4.RESILIENCE",
+      "task": "G5",
+      "label": "Digital operational resilience testing programme (DORA Art.24-25)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": {
+        "scenarios_total": 5,
+        "required_classes": [
+          "backup-restore",
+          "failover",
+          "DR-drill",
+          "dependency-outage",
+          "tabletop"
+        ],
+        "classes_present": [
+          "DR-drill",
+          "backup-restore",
+          "dependency-outage",
+          "failover",
+          "tabletop"
+        ],
+        "missing_classes": [],
+        "conducted_in_cadence": 0,
+        "pending_count": 5,
+        "pending": [
+          "RT-01 (backup-restore): never conducted (last_run null)",
+          "RT-02 (failover): never conducted (last_run null)",
+          "RT-03 (DR-drill): never conducted (last_run null)",
+          "RT-04 (dependency-outage): never conducted (last_run null)",
+          "RT-05 (tabletop): never conducted (last_run null)"
+        ],
+        "uncovered_required_classes": [
+          "backup-restore",
+          "failover",
+          "DR-drill",
+          "dependency-outage",
+          "tabletop"
+        ]
+      },
+      "threshold": {
+        "required_classes": [
+          "backup-restore",
+          "failover",
+          "DR-drill",
+          "dependency-outage",
+          "tabletop"
+        ],
+        "per_scenario": "last_run.outcome=='success' AND age<=cadence_days",
+        "min_conducted_per_class": 1
+      },
+      "detail": "FAIL: pending scenarios: RT-01 (backup-restore): never conducted (last_run null); RT-02 (failover): never conducted (last_run null); RT-03 (DR-drill): never conducted (last_run null); RT-04 (dependency-outage): never conducted (last_run null); RT-05 (tabletop): never conducted (last_run null)",
+      "source_file": "resilience-programme.json",
+      "remediation": "Conduct each required resilience scenario class (backup-restore, failover, DR-drill, dependency-outage, tabletop) on cadence and record last_run in docs/runbooks/resilience-testing-programme.yaml.",
+      "notes": [
+        "part-c/d"
+      ]
+    },
+    {
+      "control": "A.7.7.ACCESSLOG",
+      "task": "G6",
+      "label": "Tamper-evident evidence-store access log (SPEC \u00a77 item 7)",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "measured": {
+        "present": false,
+        "entries": 0
+      },
+      "threshold": {
+        "present": true,
+        "non_empty": true,
+        "hash_chain": "verifies (prev_hash links, entry_hash recomputes, seq contiguous)"
+      },
+      "detail": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/access-log.jsonl: no live evidence-store access log (needs Azure Storage diagnostic logs -> immutable container); cannot verify access trail",
+      "source_file": "access-log-posture.json",
+      "remediation": "Provision Azure Storage diagnostic settings on the evidence container routed to an immutable (WORM) log container, and export the hash-chained access-log.jsonl into the pack.",
+      "notes": [
+        "part-c/d"
+      ]
     }
   ],
   "summary": {
-    "pass": 7,
-    "fail": 1,
-    "indeterminate": 1,
-    "evidence_only": 1
+    "pass": 15,
+    "fail": 4,
+    "indeterminate": 6,
+    "evidence_only": 9
   }
 }

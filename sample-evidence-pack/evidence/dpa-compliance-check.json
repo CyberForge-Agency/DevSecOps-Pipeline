@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-06-17T14:57:47Z",
+  "generated_at": "2026-06-18T10:41:38Z",
   "description": "DPA compliance verification for pipeline third-party processors",
   "vendor_risk_register_ref": "docs/governance/vendor-risk-register.md",
   "last_reviewed": "2026-06-16",
@@ -7,22 +7,22 @@
   "envelope": {
     "status": "PASS",
     "tier": "BLOCKING",
-    "measured": 1,
+    "measured": 2,
     "threshold": 92,
-    "detail": "vendor register last updated 2026-06-16 (1 days ago); limit 92 days",
+    "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days",
     "tool_version": null,
     "validator": "libcompliance",
-    "checked_at": "2026-06-17T14:57:47Z"
+    "checked_at": "2026-06-18T10:41:38Z"
   },
   "freshness": {
     "status": "PASS",
     "tier": "BLOCKING",
-    "measured": 1,
+    "measured": 2,
     "threshold": 92,
-    "detail": "vendor register last updated 2026-06-16 (1 days ago); limit 92 days",
+    "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days",
     "tool_version": null,
     "validator": "libcompliance",
-    "checked_at": "2026-06-17T14:57:47Z"
+    "checked_at": "2026-06-18T10:41:38Z"
   },
   "retention_policy": {
     "evidence_pack_retention_days": 1825,
@@ -45,7 +45,7 @@
         "detail": "GitHub (Microsoft): DPA status ACTIVE (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       },
       "dpa_url": "https://github.com/customer-terms/github-data-protection-agreement"
     },
@@ -64,7 +64,7 @@
         "detail": "Microsoft Azure: DPA status ACTIVE (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       },
       "dpa_url": "https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA"
     },
@@ -83,7 +83,7 @@
         "detail": "Sigstore (Linux Foundation): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -101,7 +101,7 @@
         "detail": "OWASP Foundation: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -119,7 +119,7 @@
         "detail": "Aqua Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -137,7 +137,7 @@
         "detail": "Bridgecrew (Palo Alto Networks): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -155,7 +155,7 @@
         "detail": "Anchore: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -173,7 +173,7 @@
         "detail": "OxSecurity: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -191,7 +191,7 @@
         "detail": "Mend (formerly WhiteSource): DPA status COVERED_BY_GITHUB_DPA (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     },
     {
@@ -209,7 +209,7 @@
         "detail": "Truffle Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
         "tool_version": null,
         "validator": "check_dpa_validator",
-        "checked_at": "2026-06-17T14:57:47Z"
+        "checked_at": "2026-06-18T10:41:38Z"
       }
     }
   ]

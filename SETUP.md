@@ -373,3 +373,51 @@ Fix:
 - The pipeline is **compliance-enabling**, not full DORA/NIS2/ISO/SOC2 compliance by itself
 - Phase F workstreams (SIEM, incident reporting, IAM governance, BC/DR, supplier risk, ISMS/SOC2 docs) are still required for production readiness
 - See `docs/README.md` for the full documentation map
+
+## 8.1 Network-Hardened Evidence Storage (Opt-In, T-106)
+
+The evidence storage account ships **demo-friendly by default**: public network
+access is enabled and the storage firewall is left on the provider default
+(`default_action = "Allow"`). The base demo path (`infra/main.tf` passes
+`network_hardened = false`) is unchanged.
+
+For regulated clients, set `network_hardened = true` on the `storage` module.
+When enabled, the module (`infra/modules/storage/main.tf`):
+
+- sets `public_network_access_enabled = false` (disables public access), and
+- emits a deny-by-default firewall: `network_rules { default_action = "Deny", bypass = ["AzureServices"] }`.
+
+Without the `network_rules` block, disabling public access alone would NOT give a
+deny-by-default posture, because azurerm defaults `default_action` to `Allow`.
+Both controls together deliver "trusted Azure services + explicit allowlist only".
+
+### Allowlist variables (applied only when `network_hardened = true`)
+
+| Variable | Type | Purpose |
+| --- | --- | --- |
+| `network_allowed_ip_rules` | `list(string)` | Public IPv4 addresses / CIDRs allowed through the firewall (azurerm rejects /31 and /32 — use bare IPs for single hosts). |
+| `network_allowed_subnet_ids` | `list(string)` | VNet subnet resource IDs (with the `Microsoft.Storage` service endpoint) allowed through the firewall. |
+| `private_endpoint_subnet_id` | `string` | If non-empty, provisions a blob private endpoint in this subnet. Empty (default) creates none. |
+
+Empty allowlists mean **deny everything except the AzureServices bypass** — so when
+hardened, you must explicitly allowlist a trusted IP/CIDR or VNet subnet, or use a
+private endpoint, or the account becomes unreachable from general networks.
+
+### CI runner reachability (important)
+
+With `network_hardened = true`, the **CI runner must reach the storage account
+over a trusted path** or the Phase 6 evidence upload (`az storage blob upload
+--auth-mode login`) will fail with an authorization/network error. Choose one:
+
+- run the upload from a self-hosted runner inside an allowlisted VNet subnet
+  (listed in `network_allowed_subnet_ids`) or behind the private endpoint, or
+- add the runner's egress public IP/CIDR to `network_allowed_ip_rules`.
+
+The `AzureServices` bypass alone does **not** cover GitHub-hosted runner egress.
+
+### Private endpoint DNS
+
+Setting `private_endpoint_subnet_id` creates the private endpoint only. The
+private DNS zone (`privatelink.blob.core.windows.net`) and zone group are
+environment-specific and are **not** created by this module — wire them per
+environment so the storage hostname resolves to the private IP.

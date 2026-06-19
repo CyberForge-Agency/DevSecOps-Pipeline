@@ -56,7 +56,15 @@ set -euo pipefail
 #       identity mismatch, or a log bound to a different digest now FAILs the row;
 #       an unmeasurable verify is INDETERMINATE, never a silent PASS. Tier BLOCKING.
 #       (T-16; blueprint/04 §3.4; spec Part C.12/H.4)
-#   * ISO A.8.4/A.8.9/A.8.25 + SOC2 CC6.1/CC8.1 + NIS2 21.2.e + RODO Art.30
+#   * ISO A.8.25 secure-design (validator-id: threat-model ->
+#       validators/threat_model.py) parses the structured STRIDE threat model
+#       (threat-model.yaml copied into the evidence dir) and asserts it is
+#       schema-complete (every threat traced to a control_ref/gap_ref), spans the
+#       full STRIDE set, and was reviewed within the freshness window — the spec
+#       Part C.1 PASS criterion + §4 "single stale doc" rejection trigger, NOT a
+#       file-presence check. A missing/empty/stale model FAILs or is INDETERMINATE,
+#       never a silent PASS. Tier BLOCKING. (T-115; spec Part C.1; §4 Plan stage)
+#   * ISO A.8.4/A.8.9 + SOC2 CC6.1/CC8.1 + NIS2 21.2.e + RODO Art.30
 #       (validator-id: pipeline-gates) parse pipeline-run.json and assert (a) every
 #       recorded gate result == "success" (a gate "failure" -> FAIL; "unknown"/
 #       "skipped" -> INDETERMINATE) AND (b) the run SHA matches the DEPLOYED
@@ -142,9 +150,28 @@ dedicated_module_for() {
     sca-scan)          printf '%s' "${SCRIPT_DIR}/validators/dora_16_1_c.py" ;;
     sbom-supply-chain) printf '%s' "${SCRIPT_DIR}/validators/nis2_21_2_d.py" ;;
     crypto-signing)    printf '%s' "${SCRIPT_DIR}/validators/nis2_21_2_h.py" ;;
+    threat-model)      printf '%s' "${SCRIPT_DIR}/validators/threat_model.py" ;;
     *)                 printf '' ;;
   esac
 }
+
+# T-115: the secure-design row (ISO A.8.25 / NIS2 Art.21.2.e) routes through the
+# dedicated threat_model.py content validator (mirroring how DORA 16.1.c routes
+# through dora_16_1_c.py). UNLIKE the other dedicated modules, threat_model.py is
+# invoked with a YAML *file path* (not an evidence-dir) plus an optional --out:
+#
+#     python3 scripts/validators/threat_model.py <threat-model.yaml> --out /dev/null
+#
+# so the orchestrator must pass the threat-model artifact INSIDE the evidence dir
+# (make-sample-pack.sh copies docs/security/threat-model.yaml to
+# <evidence-dir>/threat-model.yaml) rather than the evidence-dir itself. We pass
+# --out /dev/null so the row does not write a side-file into the evidence dir
+# (the integration phase owns artifact generation); the envelope still prints to
+# stdout exactly like every other dedicated module. A missing/empty threat-model
+# YAML yields INDETERMINATE (BLOCKING), never a silent PASS — the validator's own
+# honesty rule, not a file-presence check. The TOOL_VERSIONS_FILE-independent
+# tool_version (pyyaml) is parsed by the validator itself.
+THREAT_MODEL_FILE="${THREAT_MODEL_FILE:-${EVIDENCE_DIR}/threat-model.yaml}"
 
 # row <framework-article> <requirement> <evidence-label> <validator-id>
 #   Invokes the python content validator for one row, then merges the human-facing
@@ -161,7 +188,11 @@ row() {
   local envelope dedicated
   dedicated="$(dedicated_module_for "${validator_id}")"
   set +e
-  if [ -n "${dedicated}" ]; then
+  if [ "${validator_id}" = "threat-model" ]; then
+    # T-115: threat_model.py takes a YAML file path (the artifact copied into the
+    # evidence dir) + --out, NOT an evidence-dir. See dedicated_module_for note.
+    envelope="$(python3 "${dedicated}" "${THREAT_MODEL_FILE}" --out /dev/null 2>/dev/null)"
+  elif [ -n "${dedicated}" ]; then
     envelope="$(python3 "${dedicated}" "${EVIDENCE_DIR}" 2>/dev/null)"
   else
     envelope="$(python3 "${VALIDATOR}" "${validator_id}" "${EVIDENCE_DIR}" 2>/dev/null)"
@@ -309,7 +340,7 @@ NIS2_ROWS="$(
 ISO_ROWS="$(
   row "A.8.4" "Access to source code" "pipeline-run.json" "pipeline-gates"; printf ',\n'
   row "A.8.9" "Configuration management" "pipeline-run.json" "pipeline-gates"; printf ',\n'
-  row "A.8.25" "Secure SDLC" "pipeline-run.json" "pipeline-gates"; printf ',\n'
+  row "A.8.25" "Secure SDLC (threat model)" "threat-model.yaml" "threat-model"; printf ',\n'
   row "A.8.28" "Secure coding" "security-report.json" "vuln-scan"
 )"
 SOC2_ROWS="$(
@@ -324,6 +355,25 @@ RODO_ROWS="$(
   row "Art.25" "Data protection by design" "data-flow-diagram.json" "data-flow"; printf ',\n'
   row "Art.28" "Processor agreements" "dpa-compliance-check.json" "dpa-register"; printf ',\n'
   row "Art.30" "Records of processing" "pipeline-run.json" "pipeline-gates"
+)"
+# Part-G governance / operational-resilience controls (C.9 / E.1 / E.2 / E.4 /
+# A.7.7). Each routes through a DEDICATED file-driven validator (check_pentest.py
+# etc.) whose T-33 envelope is emitted into the evidence dir BEFORE this matrix
+# runs (make-sample-pack.sh / evidence-pack.yml), then READ BACK here by the
+# matrix_rows.py dispatch id — mirroring how dora_16_1_c / threat-model route to
+# dedicated validators, except these read the already-sealed envelope (single
+# source of truth). BLOCKING where the obligation is mandatory; TLPT is dynamic
+# (EVIDENCE-ONLY out-of-scope, BLOCKING when in scope) and access-log is
+# EVIDENCE-ONLY. Honest defaults flow straight through (pentest FAIL, ICT-risk
+# INDETERMINATE, resilience FAIL, access-log INDETERMINATE, asset-map PASS,
+# TLPT documented-out-of-scope PASS/EVIDENCE-ONLY).
+GOVERNANCE_ROWS="$(
+  row "DORA Art.24-26 / NIS2 21(2)(e) / ISO A.8.8" "Penetration testing (independent, >= annual, signed, findings retested)" "pentest-report.json" "pentest"; printf ',\n'
+  row "DORA Art.26-27 / RTS (EU) 2025/1190" "DORA Threat-Led Penetration Testing (TLPT)" "tlpt-record.json" "tlpt"; printf ',\n'
+  row "DORA Art.6 / NIS2 21(2)(a) / ISO Cl.6.1,8.2" "ICT risk-management framework + annual review" "ict-risk-framework.json" "ict-risk-framework"; printf ',\n'
+  row "DORA Art.8" "Asset / dependency & critical-function map" "asset-map.json" "asset-map"; printf ',\n'
+  row "DORA Art.24-25" "Digital operational resilience testing programme" "resilience-programme.json" "resilience-programme"; printf ',\n'
+  row "SPEC §7 item 7 / ISO A.8.15,A.5.28 / DORA Art.9(3)" "Tamper-evident evidence-store access log" "access-log-posture.json" "access-log"
 )"
 
 # Assemble the matrix JSON (blocking_failures is finalised by python below).
@@ -347,6 +397,9 @@ ${SOC2_ROWS}
     ],
     "RODO": [
 ${RODO_ROWS}
+    ],
+    "GOVERNANCE": [
+${GOVERNANCE_ROWS}
     ]
   }
 }

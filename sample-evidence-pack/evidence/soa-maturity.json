@@ -18,7 +18,7 @@
   "detail": "computed pack maturity = L1 (lowest of evidence_production=L1, build_integrity=L3, scanning=L3, compliance_mapping=L3, integrity=L1); weakest dimension(s): evidence_production, integrity. Headline maturity is the COMPUTED level, not a hardcoded L5 (corrects struktura \u00a713 overclaim).",
   "tool_version": null,
   "validator": "soa_maturity",
-  "checked_at": "2026-06-17T14:57:50Z",
+  "checked_at": "2026-06-18T10:41:41Z",
   "overall_level": "L1",
   "weakest_dimensions": [
     "evidence_production",
@@ -51,7 +51,7 @@
       "detail": "no pipeline-emitted evidence artifacts found in evidence dir",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T14:57:50Z",
+      "checked_at": "2026-06-18T10:41:41Z",
       "level": 1,
       "anchors": {
         "L1": "Manual, screenshots",
@@ -71,7 +71,7 @@
       "detail": "SBOM per release present (no signed provenance bundle detected)",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T14:57:50Z",
+      "checked_at": "2026-06-18T10:41:41Z",
       "level": 3,
       "anchors": {
         "L1": "Build runs",
@@ -91,7 +91,7 @@
       "detail": "scanner + SCA output present (SAST/SCA/container scans produced results); not advanced to L5 \u2014 VEX/Scorecard/digest-pinned-toolchain artifacts not present in this evidence dir",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T14:57:50Z",
+      "checked_at": "2026-06-18T10:41:41Z",
       "level": 3,
       "anchors": {
         "L1": "SAST runs sometimes",
@@ -111,7 +111,7 @@
       "detail": "multi-framework control matrix present (crosswalk to 2-3 frameworks)",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T14:57:50Z",
+      "checked_at": "2026-06-18T10:41:41Z",
       "level": 3,
       "anchors": {
         "L1": "Spreadsheet of controls",
@@ -132,7 +132,7 @@
       "detail": "no signature/timestamp artifacts found \u2014 integrity at folder baseline",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T14:57:50Z",
+      "checked_at": "2026-06-18T10:41:41Z",
       "level": 1,
       "anchors": {
         "L1": "Files in a folder",

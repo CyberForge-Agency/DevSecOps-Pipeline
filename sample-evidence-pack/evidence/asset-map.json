@@ -1,0 +1,25 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "critical_functions_total": 5,
+    "high_criticality_functions": 4,
+    "assets_total": 23,
+    "assets_missing_owner": 0,
+    "schema_violations": 0,
+    "completeness_violations": 0,
+    "blocking_problem_count": 0
+  },
+  "threshold": {
+    "schema_violations": 0,
+    "completeness_violations": 0,
+    "min_supporting_assets_per_function": 1,
+    "rto_rpo_required_for": [
+      "high"
+    ]
+  },
+  "detail": "asset map OK: 5 critical functions (4 high, all with RTO+RPO) mapped onto 23 assets; every asset owned + classified; references resolve",
+  "tool_version": null,
+  "validator": "check_asset_map",
+  "checked_at": "2026-06-18T10:41:39Z"
+}

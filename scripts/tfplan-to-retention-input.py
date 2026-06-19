@@ -296,19 +296,27 @@ def load_plan(path: str) -> dict[str, Any]:
 
 
 def _opa_input(assessment: dict[str, Any]) -> dict[str, Any]:
-    """Project the assessment to exactly the fields retention-policy.rego reads."""
+    """Project the assessment to exactly the fields retention-policy.rego reads.
+
+    ``delete_after_days`` lets the rego apply the footgun guard (deny a lifecycle
+    delete shorter than the immutability period) while treating an absent delete
+    (recommended posture) as compliant — see retention-policy.rego (T-10/T-62).
+    """
     return {
         "retention_days": assessment["retention_days"],
         "worm_enabled": assessment["worm_enabled"],
         "deletion_schedule": assessment["deletion_schedule"],
+        "delete_after_days": assessment.get("delete_after_days"),
     }
 
 
 def build_envelope(assessment: dict[str, Any]) -> dict[str, Any]:
     """Build the T-33 BLOCKING envelope from an extracted assessment.
 
-    PASS iff retention_days >= 1825 AND worm_enabled AND a deletion schedule exists
-    (mirrors the rego ``compliant`` rule). A shortfall on any axis is a FAIL.
+    PASS iff retention_days >= 1825 AND worm_enabled AND no lifecycle delete fires
+    before the immutability period expires (mirrors the rego ``compliant`` rule,
+    T-10/T-62). An ABSENT lifecycle delete is compliant — deletion is governed by
+    the WORM/legal-hold window. Only a delete SHORTER than retention is a FAIL.
     """
     measured = assessment["retention_days"]
     base = lc.check_threshold(
@@ -329,8 +337,19 @@ def build_envelope(assessment: dict[str, Any]) -> dict[str, Any]:
         )
     if not assessment["worm_enabled"]:
         reasons.append("WORM immutability not enabled")
-    if not assessment["deletion_schedule"]:
-        reasons.append("no deletion schedule defined (RODO Art.5.1.e)")
+    # Footgun (T-10/T-62, T-105/T-52): only a lifecycle delete SHORTER than the
+    # immutability period is a violation. An absent delete (recommended posture)
+    # is compliant — deletion is governed by the WORM/legal-hold window.
+    delete_after = assessment.get("delete_after_days")
+    if (
+        isinstance(delete_after, int)
+        and not isinstance(delete_after, bool)
+        and 0 < delete_after < measured
+    ):
+        reasons.append(
+            f"lifecycle delete after {delete_after} days is shorter than the "
+            f"{measured}-day immutability period (would purge evidence before WORM expiry)"
+        )
 
     if base["status"] == lc.Status.INDETERMINATE:
         status = lc.Status.INDETERMINATE

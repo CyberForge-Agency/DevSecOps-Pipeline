@@ -1,14 +1,31 @@
 #!/usr/bin/env python3
-"""aggregate-compliance — the organizational compliance gate (task T-30).
+"""aggregate-compliance — the organizational compliance gate (tasks T-30/T-73).
 
-struktura §6 "bramka zgodności" requires the A.1–A.10 organizational-control
-verdicts to be aggregated into ONE state-of-compliance report with an overall
-PASS / FAIL decision, where a *missing or stale* evidence item yields FAIL with a
-concrete remediation pointer. Today the matrix gate (T-19) aggregates the
-*content* (build/scan) rows; this script is its organizational-layer twin: it
-runs each A.x validator (the same modules unit-tested under tests/compliance/),
-reads back every uniform T-33 envelope, folds in the content matrix's
-``blocking_failures`` count, and writes a single ``compliance-status.json``.
+struktura §6 "bramka zgodności" requires the organizational-control verdicts to
+be aggregated into ONE state-of-compliance report with an overall PASS / FAIL
+decision, where a *missing or stale* evidence item yields FAIL with a concrete
+remediation pointer. Today the matrix gate (T-19) aggregates the *content*
+(build/scan) rows; this script is its organizational-layer twin: it runs each A.x
+validator (the same modules unit-tested under tests/compliance/), reads back
+every uniform T-33 envelope, folds in the content matrix's ``blocking_failures``
+count, and writes a single ``compliance-status.json``.
+
+Aggregation scope (T-30/T-73 fix — closing the headline blind spot)
+-------------------------------------------------------------------
+The signed headline previously spanned ONLY A.1-A.10, so a FAILing Part-C control
+(e.g. ``soa-maturity.json`` shipping FAIL, a missing threat-model verdict, an
+unbounded accepted risk) was SEALED into the pack yet UNCOUNTED in the headline.
+The registry now ALSO ingests the Part C / Part D verdict artifacts the pipeline
+produces — VEX triage, residual-risk, scope/applicability, threat-model,
+runtime-hardening, cloud-posture, source-control drift, and the derived crosswalk
+/ gap register. Each artifact's OWN tier is respected: only BLOCKING verdicts
+count toward ``blocking_failures`` / flip overall to FAIL; EVIDENCE-ONLY
+measurements are recorded but never trip the gate; a missing *required* BLOCKING
+verdict is a fail-closed FAIL (never a silent pass). These Part-C/D rows are
+``aggregate_only`` — produced by OTHER pipeline steps, so this script only READS
+them (see ``PART_CD_CONTROLS``). INTEGRATION NOTE: those generators currently run
+AFTER the aggregator step, so the live pipeline must run a re-aggregation pass
+(or order the aggregator after Part C/D generation) for these rows to populate.
 
 Why this exists (closing the warn-only hole)
 --------------------------------------------
@@ -115,6 +132,22 @@ class Control:
     required: bool = True
     needs_tfplan: bool = False
     remediation: str = ""
+    # --- Part C/D scope extension (T-30/T-73 aggregation-scope fix) ---
+    # ``aggregate_only`` controls are READ-ONLY here: their verdict artifacts are
+    # produced by OTHER pipeline steps (the Part C/D generators in
+    # evidence-pack.yml / make-sample-pack.sh), so this aggregator NEVER invokes
+    # them — it only ingests the JSON they already wrote. This keeps the headline
+    # spanning the whole sealed pack without re-running (and possibly clobbering)
+    # those generators with the wrong argv.
+    aggregate_only: bool = False
+    # ``informational`` controls (crosswalk, gap register) are DERIVED views with
+    # no ``{status,tier}`` envelope. They are recorded as present/absent at the
+    # EVIDENCE-ONLY tier and NEVER trip the gate (no envelope is not a FAIL here).
+    informational: bool = False
+    # Tier override for aggregate_only/informational rows whose artifact may be
+    # absent or carries no envelope: this is the tier USED FOR MISSING-VERDICT
+    # bookkeeping only. When the artifact IS present, its OWN envelope tier wins.
+    default_tier: str = BLOCKING
 
 
 # Fixed expected-verdict registry (A.1–A.10). A.5 (retention vs Terraform plan)
@@ -200,6 +233,238 @@ CONTROLS: list[Control] = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# Part C / Part D verdict registry (T-30/T-73 aggregation-scope fix)
+# ---------------------------------------------------------------------------
+# The signed headline (compliance-status.json) previously spanned ONLY A.1-A.10,
+# so a FAILing Part-C control (e.g. soa-maturity.json shipping FAIL, or a missing
+# threat-model verdict) was SEALED into the pack yet UNCOUNTED in the headline.
+# These controls close that gap: the aggregator now ALSO ingests the Part-C/D
+# verdict artifacts the pipeline produces.
+#
+# Honesty rules preserved here:
+#   * Each artifact's OWN envelope tier wins (read from {status,tier}); only
+#     BLOCKING verdicts count toward blocking_failures / flip overall to FAIL.
+#     EVIDENCE-ONLY measurements (SoA maturity, design-stage cloud posture) are
+#     RECORDED with their number but NEVER trip the gate.
+#   * A MISSING *required* BLOCKING verdict is itself a FAIL — identical fail-
+#     closed handling to the A.x rows (you cannot pass a control you never
+#     measured). Never a silent PASS, never a fabricated verdict.
+#   * Artifacts that legitimately may be absent in a given context are marked
+#     required=False with the reason on the row (digest-bound VEX with no image
+#     digest; source-control drift needing live GitHub config; informational
+#     derived views). Absent => recorded INDETERMINATE/EVIDENCE-ONLY, not FAIL.
+#
+# All of these are ``aggregate_only`` — produced by the Part C/D steps in
+# evidence-pack.yml (and make-sample-pack.sh), so the aggregator only READS them.
+# INTEGRATION NOTE: those generators run AFTER the current aggregator step, so a
+# re-aggregation pass (or moving the aggregator after Part C/D generation) is
+# required for these rows to be populated in the live pack — see the module
+# docstring / the structured report's integration note.
+PART_CD_CONTROLS: list[Control] = [
+    Control(
+        # T-116 — OpenVEX exploitability triage, digest-bound. BLOCKING per the
+        # vex.py validator. NOT required: generate-vex.py refuses without a real
+        # sha256 image digest (exit 2), so on a digest-less context the verdict
+        # legitimately does not exist (mirrors A.9's deploy-time-only handling).
+        id="C.VEX", task="T-116",
+        label="OpenVEX exploitability triage (CRA vuln-handling / NIS2 21.2)",
+        out_name="vex-triage.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=BLOCKING,
+        remediation="Re-run generate-vex.py against the released image digest; "
+                    "give every non-affected statement a CISA-category justification.",
+    ),
+    Control(
+        # T-30b — residual-risk statement from the exception register. BLOCKING:
+        # an accepted risk without a named approver / future expiry is a real gap.
+        id="D.RISK", task="T-30",
+        label="Residual-risk statement / accepted-risk register (ISO 27001 Cl.6, DORA Art.6)",
+        out_name="residual-risk.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Bound every Active acceptance in docs/compliance/exception-register.md "
+                    "with a named approver, owner, justification and future expiry (<=12mo).",
+    ),
+    Control(
+        # T-120 — machine-validated scope & applicability determination. BLOCKING:
+        # an undetermined regulatory scope is a documented rejection trigger.
+        id="B.SCOPE", task="T-120",
+        label="Scope & applicability determination (DORA/NIS2/CRA/RODO)",
+        out_name="scope-determination.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Complete docs/governance/applicability.yaml: each regime needs "
+                    "applies + rationale + clause/legal basis + named approver + date.",
+    ),
+    Control(
+        # T-115 — validated STRIDE threat model. BLOCKING: schema completeness +
+        # STRIDE coverage + freshness are measured; a missing verdict means the
+        # first DevSecOps stage (Plan / threat-model) is unanswered.
+        id="C.THREAT", task="T-115",
+        label="STRIDE threat-model validation (NIS2 21.2.e / ISO 8.25 / SSDF PW.1)",
+        out_name="threat-model-validation.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Fix schema/coverage/freshness in the threat model so "
+                    "threat_model.py PASSes (every threat traced to a control_ref).",
+    ),
+    Control(
+        # T-118 — Azure Container Apps runtime-hardening posture. BLOCKING on the
+        # non-root invariant (a root container stops seal/deploy).
+        id="C.RUNTIME", task="T-118",
+        label="Runtime-hardening posture vs IaC (NIS2 21.2 / CIS)",
+        out_name="runtime-hardening.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Reconcile the runtime posture with the Dockerfile/Terraform; "
+                    "the non-root USER invariant is BLOCKING.",
+    ),
+    Control(
+        # T-117 — CIS-mapped cloud posture (CSPM). EVIDENCE-ONLY when no live scan
+        # exists (honest design-stage INDETERMINATE; a present scan with a CRITICAL
+        # is BLOCKING per the artifact's own tier). NOT required: absent until a
+        # real CSPM scan runs — recorded as EVIDENCE-ONLY, never a fabricated PASS.
+        id="C.CLOUD", task="T-117",
+        label="Cloud-posture (CSPM) statement (CIS Azure Foundations)",
+        out_name="cloud-posture-validation.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=EVIDENCE_ONLY,
+        remediation="Run a live CSPM scan producing cloud-posture.json; "
+                    "continuous scan + drift alerting are TARGET-STATE.",
+    ),
+    Control(
+        # ISO 27001 Statement-of-Applicability maturity SCORE. EVIDENCE-ONLY: a
+        # maturity score is a measured fact, not a pass/fail gate (struktura §13
+        # de-overclaim). A FAIL here (e.g. computed L1 < L3 target) is RECORDED in
+        # the headline but does NOT trip the gate — its tier is EVIDENCE-ONLY.
+        id="C.SOA", task="T-30b",
+        label="ISO 27001 SoA maturity score (computed, not asserted)",
+        out_name="soa-maturity.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=EVIDENCE_ONLY,
+        remediation="Strengthen the weakest SoA dimension(s) toward the L3 target "
+                    "(score is informational; it never blocks).",
+    ),
+    Control(
+        # T-119 — live source-control config drift. BLOCKING tier in the artifact,
+        # but NOT required here: it needs live GitHub branch-protection config; with
+        # no token the validator HONESTLY returns INDETERMINATE (never a fake PASS),
+        # and the workflow degrades on PR. Absent => recorded, not a FAIL.
+        id="D.SCM", task="T-119",
+        label="Source-control config drift (desired vs live branch protection)",
+        out_name="source-control-evidence.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=BLOCKING,
+        remediation="Provide a GitHub token so export-github-security-config.sh can "
+                    "read live branch protection; reconcile drift vs branch-protection.json.",
+    ),
+    Control(
+        # T-102/T-103 — DERIVED multi-framework crosswalk. Informational: no
+        # {status,tier} envelope (it is a mapping view), recorded present/absent at
+        # EVIDENCE-ONLY tier; never trips the gate.
+        id="X.CROSSWALK", task="T-102",
+        label="Multi-framework regulatory crosswalk (derived)",
+        out_name="crosswalk.json", argv_template=[],
+        aggregate_only=True, required=False, informational=True,
+        default_tier=EVIDENCE_ONLY,
+        remediation="Regenerate via derive-crosswalk-and-gaps.py from this run's verdicts.",
+    ),
+    Control(
+        # T-103/T-109 — DERIVED machine-readable gap register. Informational view
+        # of every non-PASS control; recorded present/absent, never blocking.
+        id="X.GAP", task="T-103",
+        label="Machine-readable gap register (derived)",
+        out_name="gap-register.json", argv_template=[],
+        aggregate_only=True, required=False, informational=True,
+        default_tier=EVIDENCE_ONLY,
+        remediation="Regenerate via derive-crosswalk-and-gaps.py from this run's verdicts.",
+    ),
+    # ----------------------------------------------------------------------- #
+    # Part-G governance / operational-resilience controls (C.9 / E.1 / E.2 /  #
+    # E.4 / A.7.7). Each is produced by a DEDICATED file-driven validator      #
+    # (check_pentest.py etc.) run by the Part-G step in evidence-pack.yml /    #
+    # make-sample-pack.sh BEFORE the aggregator's --no-run pass, so they are   #
+    # aggregate_only here (READ, never re-run). Each artifact's OWN envelope    #
+    # tier wins: BLOCKING verdicts count toward blocking_failures; the         #
+    # EVIDENCE-ONLY ones (TLPT out-of-scope, access-log posture) are recorded  #
+    # but never trip the gate. Honest fail-closed for the required BLOCKING    #
+    # ones (a missing pentest/ict-risk/asset-map/resilience verdict is a FAIL).#
+    # ----------------------------------------------------------------------- #
+    Control(
+        # C.9 / G1 — independent penetration testing. BLOCKING and REQUIRED:
+        # a missing pentest verdict is an unmeasured mandatory control -> FAIL.
+        # Honest default of the seed is BLOCKING FAIL ("no pen test on record").
+        id="C.9.PENTEST", task="G1",
+        label="Penetration testing (independent, >= annual, signed, findings retested)",
+        out_name="pentest-report.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Commission an independent penetration test, record the signed "
+                    "report in docs/governance/pentest-report.yaml, and track "
+                    "Critical/High findings to retested closure.",
+    ),
+    Control(
+        # C.9 / G2 — DORA TLPT. Dynamic tier in the artifact (EVIDENCE-ONLY when
+        # the documented determination is out-of-scope, BLOCKING when in scope).
+        # NOT required here: a documented out-of-scope determination is the honest
+        # current state and is recorded; the artifact's own tier governs gating.
+        id="C.9.TLPT", task="G2",
+        label="DORA Threat-Led Penetration Testing (TLPT)",
+        out_name="tlpt-record.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=EVIDENCE_ONLY,
+        remediation="If a competent authority identifies the entity as significant "
+                    "for TLPT (DORA Art.26(8)), set in_scope:true in "
+                    "docs/governance/tlpt-record.yaml and record a conducted, "
+                    "external, authority-signed-off TLPT with closure.",
+    ),
+    Control(
+        # E.1 / G3 — ICT risk-management framework + annual review. BLOCKING and
+        # REQUIRED. Honest default INDETERMINATE until a real management review
+        # records a parseable date (no fabricated review date).
+        id="E.1.ICTRISK", task="G3",
+        label="ICT risk-management framework + annual review (DORA Art.6 / NIS2 21(2)(a))",
+        out_name="ict-risk-framework.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Hold the initial management review of "
+                    "docs/governance/ict-risk-management-framework.md and record a "
+                    "true ISO date + named approver in the 'Last Reviewed:' field.",
+    ),
+    Control(
+        # E.2 / G4 — asset / dependency & critical-function map. BLOCKING and
+        # REQUIRED. Honest PASS: real architectural data transcribed from the
+        # existing approved inventories (a missing owner/RTO would FAIL).
+        id="E.2.ASSETMAP", task="G4",
+        label="Asset / dependency & critical-function map (DORA Art.8)",
+        out_name="asset-map.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Keep docs/governance/asset-map.yaml in sync with the service/"
+                    "asset/vendor inventories; every asset needs an owner + "
+                    "classification and every high-criticality function an RTO+RPO.",
+    ),
+    Control(
+        # E.4 / G5 — digital operational resilience testing programme. BLOCKING
+        # and REQUIRED. Honest default FAIL until each required scenario class is
+        # conducted on cadence (no fabricated drill runs).
+        id="E.4.RESILIENCE", task="G5",
+        label="Digital operational resilience testing programme (DORA Art.24-25)",
+        out_name="resilience-programme.json", argv_template=[],
+        aggregate_only=True, required=True, default_tier=BLOCKING,
+        remediation="Conduct each required resilience scenario class (backup-restore, "
+                    "failover, DR-drill, dependency-outage, tabletop) on cadence and "
+                    "record last_run in docs/runbooks/resilience-testing-programme.yaml.",
+    ),
+    Control(
+        # A.7.7 / G6 — tamper-evident evidence-store access log. EVIDENCE-ONLY and
+        # NOT required: the live access log legitimately may be absent offline
+        # (no Azure Storage diagnostic logs / immutable container yet). Absent or
+        # present-empty => honest INDETERMINATE, never a fabricated access trail.
+        id="A.7.7.ACCESSLOG", task="G6",
+        label="Tamper-evident evidence-store access log (SPEC §7 item 7)",
+        out_name="access-log-posture.json", argv_template=[],
+        aggregate_only=True, required=False, default_tier=EVIDENCE_ONLY,
+        remediation="Provision Azure Storage diagnostic settings on the evidence "
+                    "container routed to an immutable (WORM) log container, and "
+                    "export the hash-chained access-log.jsonl into the pack.",
+    ),
+]
+
+# The full aggregation scope: A.1-A.10 organizational controls PLUS the Part C/D
+# verdicts. The headline overall + blocking_failures now span this whole set.
+ALL_CONTROLS: list[Control] = CONTROLS + PART_CD_CONTROLS
+
+
 @dataclass
 class Row:
     """An aggregated per-control result row written to compliance-status.json."""
@@ -283,7 +548,11 @@ def _aggregate(
     rows: list[Row] = []
     missing_required: list[str] = []
 
-    for control in CONTROLS:
+    for control in ALL_CONTROLS:
+        # ``required`` here drives MISSING-VERDICT handling: a missing required
+        # verdict is a fail-closed BLOCKING FAIL (A.x and required Part-C rows);
+        # a missing non-required verdict is recorded at the row's default_tier,
+        # never a silent PASS and never a FAIL.
         required = control.required or (control.needs_tfplan and have_tfplan)
         out_path = evidence_dir / control.out_name
 
@@ -301,6 +570,24 @@ def _aggregate(
                     notes=["deploy-time control"],
                 ))
                 continue
+            if not required:
+                # Part-C/D verdict legitimately absent in this context (digest-less
+                # VEX, no live CSPM scan, no GitHub token for source-control, or a
+                # derived informational view not yet generated). Record an honest
+                # INDETERMINATE — NEVER a fabricated PASS — but at the EVIDENCE-ONLY
+                # tier so a control that simply WASN'T MEASURED in this context does
+                # not trip the gate. (When the artifact IS present its own envelope
+                # tier wins, so a present BLOCKING control still gates normally.)
+                rows.append(Row(
+                    control.id, control.task, control.label,
+                    status=INDETERMINATE, tier=EVIDENCE_ONLY,
+                    measured=None, threshold=None,
+                    detail=f"verdict not present in this context: {control.out_name} "
+                           "(not required here; recorded, does not trip the gate)",
+                    source_file=control.out_name, remediation=control.remediation,
+                    notes=["not-produced", "optional-in-this-context"],
+                ))
+                continue
             missing_required.append(control.out_name)
             rows.append(Row(
                 control.id, control.task, control.label,
@@ -308,8 +595,21 @@ def _aggregate(
                 detail=f"required verdict file missing: {control.out_name} "
                        "(control was never measured)",
                 source_file=control.out_name,
-                remediation=control.remediation or "Produce the verdict by running the A.x validator.",
+                remediation=control.remediation or "Produce the verdict by running the validator.",
                 notes=["missing-verdict"],
+            ))
+            continue
+
+        # Informational derived views (crosswalk, gap register) carry no
+        # {status,tier} envelope — record present, EVIDENCE-ONLY, never blocking.
+        if control.informational:
+            rows.append(Row(
+                control.id, control.task, control.label,
+                status=PASS, tier=EVIDENCE_ONLY, measured=None, threshold=None,
+                detail=f"derived view present: {control.out_name} "
+                       "(informational; not a pass/fail control)",
+                source_file=control.out_name, remediation="",
+                notes=["informational"],
             ))
             continue
 
@@ -319,7 +619,8 @@ def _aggregate(
         except json.JSONDecodeError as exc:
             rows.append(Row(
                 control.id, control.task, control.label,
-                status=INDETERMINATE, tier=BLOCKING, measured=None, threshold=None,
+                status=INDETERMINATE, tier=control.default_tier,
+                measured=None, threshold=None,
                 detail=f"verdict file is not valid JSON: {exc}",
                 source_file=control.out_name, remediation=control.remediation,
                 notes=["unparseable-verdict"],
@@ -330,25 +631,31 @@ def _aggregate(
         if env is None:
             rows.append(Row(
                 control.id, control.task, control.label,
-                status=INDETERMINATE, tier=BLOCKING, measured=None, threshold=None,
+                status=INDETERMINATE, tier=control.default_tier,
+                measured=None, threshold=None,
                 detail="verdict file has no recognizable {status,tier} envelope",
                 source_file=control.out_name, remediation=control.remediation,
                 notes=["no-envelope"],
             ))
             continue
 
+        # The artifact's OWN envelope tier WINS — an EVIDENCE-ONLY artifact
+        # (SoA maturity, design-stage cloud posture) is recorded with its number
+        # but never trips the gate; only a BLOCKING artifact does.
         status = env.get("status", INDETERMINATE)
-        tier = env.get("tier", BLOCKING)
+        tier = env.get("tier", control.default_tier)
         rows.append(Row(
             control.id, control.task, control.label,
             status=status if status in (PASS, FAIL, INDETERMINATE) else INDETERMINATE,
-            tier=tier if tier in (BLOCKING, EVIDENCE_ONLY) else BLOCKING,
+            tier=tier if tier in (BLOCKING, EVIDENCE_ONLY) else control.default_tier,
             measured=env.get("measured"), threshold=env.get("threshold"),
             detail=env.get("detail", ""), source_file=control.out_name,
             remediation=control.remediation if status != PASS else "",
         ))
         if not required and control.needs_tfplan:
             rows[-1].notes.append("optional-in-evidence-pack")
+        elif control.aggregate_only:
+            rows[-1].notes.append("part-c/d")
 
     return rows, missing_required
 
@@ -479,7 +786,12 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     if not args.no_run:
+        # Only the A.1-A.10 organizational validators are RUN here. The Part C/D
+        # controls (PART_CD_CONTROLS) are ``aggregate_only`` — produced by other
+        # pipeline steps — so they are ingested in _aggregate(), never re-run.
         for control in CONTROLS:
+            if control.aggregate_only:
+                continue  # defensive: A.x rows are not aggregate_only, but be explicit
             if control.needs_tfplan and not have_tfplan:
                 continue  # A.9 only runs when a Terraform plan is available
             _run_validator(control, ctx, evidence_dir)

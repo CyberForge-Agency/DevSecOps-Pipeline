@@ -158,11 +158,13 @@ and the BLOCKING-vs-EVIDENCE-ONLY scope split.
 ## 6.5 Qualified trust services (eIDAS) — Polish providers
 
 > **TARGET-STATE.** The pipeline today timestamps with a **best-effort,
-> non-qualified RFC-3161** TSA — `seal-evidence.sh` Step 4 (lines 382–419) posts
-> the Merkle root, manifest, and PDF to `TSA_URL` (default
-> **`https://freetsa.org/tsr`**, `seal-evidence.sh:39`), and TSA unreachability is
-> a **soft** condition (recorded `rfc3161_unavailable`, not a hard fail —
-> `seal-evidence.sh:413–414`). README claims (`README.md:33,46`) describe these as
+> non-qualified RFC-3161** TSA — `seal-evidence.sh` Step 4 (lines 453–559, the
+> `rfc3161_stamp` function and its caller loop) posts the Merkle root, manifest,
+> and PDF to `TSA_URL` (default **`https://freetsa.org/tsr`**,
+> `seal-evidence.sh:75`), and a *single-artifact* TSA miss is a **soft** condition
+> (recorded `status=unavailable` / `rfc3161_unavailable`, not a hard fail —
+> `seal-evidence.sh:570–584`; note ZERO valid `.tsr` across all artifacts is a
+> hard fail at `seal-evidence.sh:586`). README claims (`README.md:33,48`) describe these as
 > "RFC-3161 timestamps" with **no qualified-QTS distinction**. A qualified eIDAS
 > QTS is **not yet wired** and is documented here as the upgrade path.
 

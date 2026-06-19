@@ -107,6 +107,7 @@ SECTION_ORDER: List[Tuple[str, str]] = [
     ("soa-maturity", "Statement of Applicability + Maturity Scores (Part D.3 / §9)"),
     ("scope-applicability", "Scope & Regulatory-Applicability Determination (Part B)"),
     ("scope", "Scope, Boundaries, Subservice Carve-Outs & CUECs"),
+    ("threat-model", "Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)"),
     ("attestation", "Management Attestation of Accuracy & Completeness"),
     ("ipe", "Methodology, Sampling & Population Statement (IPE)"),
     ("control-matrix", "Control-to-Evidence Cross-Reference Matrix"),
@@ -115,6 +116,7 @@ SECTION_ORDER: List[Tuple[str, str]] = [
     ("evidence-detail", "Per-Control Evidence Detail"),
     ("vuln-mgmt", "Vulnerability Management"),
     ("vex", "Vulnerability-Exploitability Exchange (VEX) Summary"),
+    ("runtime-hardening", "Runtime-Hardening Posture (Part C.15)"),
     ("change-approval", "Change & Approval Records"),
     ("exceptions", "Exceptions / Deviation Register"),
     ("residual-risk", "Risk-Acceptance & Residual-Risk Statement (Part J.2 / D.4)"),
@@ -1620,6 +1622,132 @@ def render_vex(ctx: Dict[str, Any]) -> str:
 """
 
 
+def _hardening_control_badge(state: Optional[str]) -> str:
+    """Render a runtime-hardening per-control state badge (MET / INDETERMINATE / NOT MET).
+
+    Mirrors the validator vocabulary: 'MET' is an honest pass, 'INDETERMINATE' is a control the IaC
+    cannot express on this platform (e.g. read-only rootfs on Azure Container Apps) — NOT a fail and
+    NOT fabricated as met. Anything else is shown as not-met."""
+    norm = (state or "").strip().upper()
+    if norm == "MET":
+        return '<span class="badge badge-pass">MET</span>'
+    if norm == "INDETERMINATE":
+        return '<span class="badge badge-indet">INDETERMINATE</span>'
+    if norm in ("NOT MET", "NOT_MET", "NOTMET", "FAIL", "FAILED"):
+        return '<span class="badge badge-fail">NOT MET</span>'
+    if norm:
+        return f'<span class="badge badge-unknown">{esc(norm)}</span>'
+    return '<span class="badge badge-unknown">&mdash;</span>'
+
+
+def render_runtime_hardening(ctx: Dict[str, Any]) -> str:
+    """Render the runtime-hardening least-privilege posture (Part C.15, T-118 render half).
+
+    Source: evidence/runtime-hardening.json — the validator envelope
+    {status,tier,measured,threshold,detail,tool_version} from scripts/validators/runtime_hardening.py.
+    The deployed app is an Azure Container App (NOT Kubernetes), so the honest artifact is a
+    least-privilege container/runtime posture statement (non-root user, no privileged mode, least-
+    privilege ingress, resource limits, managed identity) — never a fabricated k8s Pod-Security
+    'restricted' profile. Platform-managed controls the IaC cannot express are surfaced as
+    INDETERMINATE, not asserted. Provenance is read from the manifest, never hardcoded. An absent
+    artifact degrades honestly to 'Not available this run'."""
+    rh = ctx.get("runtime_hardening")
+    prov = _artifact_provenance(ctx, "runtime-hardening.json")
+
+    if not isinstance(rh, dict):
+        body = unavailable(
+            "runtime-hardening.json not provided "
+            "(run scripts/validators/runtime_hardening.py against the Dockerfile + IaC)")
+        return f"""
+<section class="section" id="runtime-hardening">
+  <h2>10b. Runtime-Hardening Posture (Part C.15)</h2>
+  {body}
+</section>
+"""
+
+    status = (rh.get("status") or "").strip().upper()
+    tier = rh.get("tier")
+    measured = rh.get("measured") if isinstance(rh.get("measured"), dict) else {}
+
+    verdict_block = (
+        "<p><strong>Validator verdict:</strong> "
+        f"{compliance_status_badge(status)} {tier_badge(tier)} "
+        f'<span class="small">{esc(rh.get("detail"))}</span></p>'
+    )
+
+    platform = measured.get("platform")
+    platform_block = (f'<p class="small">Platform: {esc(platform)}.</p>' if platform else "")
+
+    # Posture summary (measured key/values), surfaced verbatim from the artifact.
+    rl = measured.get("resource_limits") if isinstance(measured.get("resource_limits"), dict) else {}
+    ingress = measured.get("ingress_ports")
+    ingress_label = (", ".join(str(p) for p in ingress)
+                     if isinstance(ingress, list) and ingress else None)
+    summary_pairs: List[Tuple[str, Any]] = [
+        ("Runs as non-root", measured.get("runs_as_non_root")),
+        ("Runtime user (UID)", measured.get("user")),
+        ("Privileged", measured.get("privileged")),
+        ("Ingress ports", ingress_label),
+        ("Ingress external", measured.get("ingress_external")),
+        ("Read-only rootfs", measured.get("read_only_rootfs")),
+        ("Seccomp (runtime default)", measured.get("seccomp_runtime_default")),
+        ("Managed identity", measured.get("managed_identity")),
+        ("CPU limit", rl.get("cpu")),
+        ("Memory limit", rl.get("memory")),
+        ("Max replicas", rl.get("max_replicas")),
+        ("Tool", rh.get("tool_version")),
+    ]
+    summary_cells = "".join(
+        f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
+        for k, v in summary_pairs if v is not None
+    )
+    summary_block = (f'<div class="kv">{summary_cells}</div>' if summary_cells else "")
+
+    # Per-control table from measured.controls (MET / INDETERMINATE / NOT MET), driven by the artifact.
+    controls = measured.get("controls") if isinstance(measured.get("controls"), dict) else {}
+    controls_block = ""
+    if controls:
+        crows = "".join(
+            "<tr>"
+            f'<td class="mono">{esc(name)}</td>'
+            f'<td>{_hardening_control_badge(str(state))}</td>'
+            "</tr>"
+            for name, state in sorted(controls.items())
+        )
+        controls_block = (
+            "<h3>10b.1 Per-control runtime posture</h3>"
+            "<table><thead><tr><th>Control</th><th>State</th></tr></thead>"
+            f"<tbody>{crows}</tbody></table>"
+        )
+
+    parse_err = measured.get("iac_parse_error")
+    parse_block = (
+        f'<p class="small"><strong>IaC parse error:</strong> {esc(parse_err)}.</p>'
+        if parse_err else "")
+
+    return f"""
+<section class="section" id="runtime-hardening">
+  <h2>10b. Runtime-Hardening Posture (Part C.15)</h2>
+  <p>The spec's Part C.15 row requires a least-privilege runtime. The deployed app is an Azure
+  Container App (not Kubernetes), so the honest evidence is a container/runtime least-privilege
+  posture statement — non-root user, no privileged mode, least-privilege ingress, resource limits,
+  managed identity — derived from the Dockerfile + Terraform by
+  <code>scripts/validators/runtime_hardening.py</code> (BLOCKING on "runs as non-root"). This is NOT
+  a fabricated k8s Pod-Security "restricted" claim; platform-managed controls the IaC cannot express
+  are shown as <span class="badge badge-indet">INDETERMINATE</span>, never asserted. Provenance:
+  {provenance_badge(prov)}.</p>
+  {verdict_block}
+  {platform_block}
+  {summary_block}
+  {controls_block}
+  {parse_block}
+  <p class="small"><strong>Honesty:</strong> this is the DECLARED posture consistent with the IaC.
+  A live runtime scan + continuous drift alerting are TARGET-STATE (runtime-hardening.md §6); this
+  section asserts only what the build-time configuration provably sets.</p>
+</section>
+"""
+
+
 def render_scope(ctx: Dict[str, Any]) -> str:
     return """
 <section class="section" id="scope">
@@ -1650,6 +1778,211 @@ def render_scope(ctx: Dict[str, Any]) -> str:
     <li>The relying party MUST re-validate the evidence pack on retrieval (re-hash + Merkle compare + cosign/RFC-3161 verify).</li>
     <li>The relying party MUST confirm the deployed digest matches the digest on the cover before relying on any control claim.</li>
   </ul>
+</section>
+"""
+
+
+def _artifact_provenance(ctx: Dict[str, Any], *names: str) -> Optional[str]:
+    """Resolve the manifest-recorded provenance flag for one of the named artifacts.
+
+    Provenance is read from the manifest's per-artifact `provenance` field (the same source the
+    matrix/tamper rows use) — never hardcoded. Returns None when the artifact is not in the
+    manifest, so the caller renders an UNTAGGED badge rather than overclaiming live/static."""
+    idx = ctx.get("artifact_index") or {}
+    for name in names:
+        art = idx.get(name)
+        if isinstance(art, dict) and art.get("provenance"):
+            return art.get("provenance")
+    return None
+
+
+def render_threat_model(ctx: Dict[str, Any]) -> str:
+    """Render the STRIDE threat-model secure-design evidence (Part C.1, T-115 render half).
+
+    Sources:
+      - evidence/threat-model.yaml  — the structured, per-feature STRIDE model (threats[] with
+        id/stride/component/threat/mitigation/status/residual + traceability; gaps[]; version;
+        reviewed_date).
+      - evidence/threat-model-validation.json — the validator envelope
+        {status,tier,measured,threshold,detail,tool_version} from scripts/validators/threat_model.py.
+
+    Provenance is taken from the manifest's per-artifact flag (never hardcoded). When neither
+    artifact is present the section degrades honestly to 'Not available this run'; GAP rows are shown
+    as target-state, never claimed as achieved, mirroring the model's own honesty caveat."""
+    tm = ctx.get("threat_model")
+    val = ctx.get("threat_model_validation")
+    prov = _artifact_provenance(ctx, "threat-model.yaml", "threat-model-validation.json")
+
+    if not isinstance(tm, dict) and not isinstance(val, dict):
+        body = unavailable(
+            "threat-model.yaml / threat-model-validation.json not provided "
+            "(run scripts/validators/threat_model.py and include the model in the pack)")
+        return f"""
+<section class="section" id="threat-model">
+  <h2>4a. Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)</h2>
+  {body}
+</section>
+"""
+
+    # Validator verdict block (from the shared T-33 envelope). Read, never recomputed.
+    verdict_block = ""
+    if isinstance(val, dict):
+        status = (val.get("status") or "").strip().upper()
+        tier = val.get("tier")
+        measured = val.get("measured") if isinstance(val.get("measured"), dict) else {}
+        verdict_block = (
+            "<p><strong>Validator verdict:</strong> "
+            f"{compliance_status_badge(status)} {tier_badge(tier)} "
+            f'<span class="small">{esc(val.get("detail"))}</span></p>'
+        )
+        meta_pairs: List[Tuple[str, Any]] = [
+            ("Model version", measured.get("version") or (tm or {}).get("version")),
+            ("Reviewed", measured.get("reviewed_date") or (tm or {}).get("reviewed_date")),
+            ("Age (days)", measured.get("age_days")),
+            ("Review window (days)", measured.get("review_window_days")
+             or (tm or {}).get("review_window_days")),
+            ("Threats", measured.get("threats")),
+            ("STRIDE coverage", measured.get("stride_coverage")),
+            ("Open gaps", measured.get("gaps")),
+            ("Tool", val.get("tool_version")),
+        ]
+        meta_cells = "".join(
+            f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
+            for k, v in meta_pairs if v is not None
+        )
+        if meta_cells:
+            verdict_block += f'<div class="kv">{meta_cells}</div>'
+
+    # STRIDE-category coverage tally + per-status tally, derived from the model (or, as a fallback,
+    # from the validator's measured map). Never hardcoded.
+    threats = tm.get("threats") if isinstance(tm, dict) and isinstance(
+        tm.get("threats"), list) else []
+    stride_vocab = tm.get("stride_categories") if isinstance(tm, dict) and isinstance(
+        tm.get("stride_categories"), dict) else {}
+    by_stride: Dict[str, int] = {}
+    by_status: Dict[str, int] = {}
+    for t in threats:
+        if not isinstance(t, dict):
+            continue
+        s = str(t.get("stride") or "").strip() or "?"
+        by_stride[s] = by_stride.get(s, 0) + 1
+        st = str(t.get("status") or "").strip() or "UNSPECIFIED"
+        by_status[st] = by_status.get(st, 0) + 1
+
+    coverage_block = ""
+    if by_stride:
+        cov_cells = ""
+        for code in sorted(by_stride):
+            label = stride_vocab.get(code, code) if isinstance(stride_vocab, dict) else code
+            cov_cells += f'<div class="k">{esc(code)} — {esc(label)}</div><div>{esc(by_stride[code])}</div>'
+        coverage_block = (
+            "<h3>4a.1 STRIDE coverage (threats per category)</h3>"
+            f'<div class="kv">{cov_cells}</div>'
+        )
+    elif isinstance(val, dict):
+        measured = val.get("measured") if isinstance(val.get("measured"), dict) else {}
+        cats = measured.get("stride_categories")
+        if isinstance(cats, list) and cats:
+            coverage_block = (
+                "<h3>4a.1 STRIDE coverage</h3>"
+                f'<p class="small">Categories covered (from validator): '
+                f'{esc(", ".join(str(c) for c in cats))} '
+                f'({esc(measured.get("stride_coverage"))}/6).</p>'
+            )
+
+    status_block = ""
+    if by_status:
+        st_cells = "".join(
+            f'<div class="k">{esc(k)}</div><div>{esc(v)}</div>'
+            for k, v in sorted(by_status.items())
+        )
+        status_block = (
+            "<h3>4a.2 Threats by mitigation status</h3>"
+            f'<div class="kv">{st_cells}</div>'
+            '<p class="small">GAP rows are target-state (not achieved); PARTIAL rows carry a '
+            'residual-risk note. MITIGATED is a human-reviewed assertion that the named control '
+            'addresses the threat — the validator proves schema/coverage/freshness, not real-world '
+            'efficacy.</p>'
+        )
+
+    # Per-threat table (capped to keep the section readable; note any truncation).
+    detail_block = ""
+    if threats:
+        shown = threats[:60]
+        rows = ""
+        for t in shown:
+            if not isinstance(t, dict):
+                continue
+            trace = t.get("control_ref") or t.get("gap_ref")
+            rows += (
+                "<tr>"
+                f'<td class="mono">{esc(t.get("id"))}</td>'
+                f'<td>{esc(t.get("stride"))}</td>'
+                f'<td class="small">{esc(t.get("component"))}</td>'
+                f'<td class="small">{esc(t.get("threat"))}</td>'
+                f'<td class="small">{esc(t.get("mitigation"))}</td>'
+                f'<td>{esc(t.get("status"))}</td>'
+                f'<td class="small">{esc(t.get("residual"))}</td>'
+                f'<td class="mono small">{esc(trace)}</td>'
+                "</tr>"
+            )
+        trunc = (f'<p class="small">Showing 60 of {len(threats)} threats; the complete model is '
+                 f'hashed into the §17 tamper-evidence appendix.</p>'
+                 if len(threats) > 60 else "")
+        detail_block = (
+            "<h3>4a.3 Per-feature STRIDE threats</h3>"
+            "<table><thead><tr><th>ID</th><th>STRIDE</th><th>Component</th><th>Threat</th>"
+            "<th>Mitigation</th><th>Status</th><th>Residual</th><th>Trace</th>"
+            f"</tr></thead><tbody>{rows}</tbody></table>{trunc}"
+        )
+
+    # Open-gap register (target-state), surfaced honestly so it is never read as achieved.
+    gaps = tm.get("gaps") if isinstance(tm, dict) and isinstance(tm.get("gaps"), list) else []
+    gap_block = ""
+    if gaps:
+        grows = ""
+        for g in gaps:
+            if not isinstance(g, dict):
+                continue
+            grows += (
+                "<tr>"
+                f'<td class="mono">{esc(g.get("id"))}</td>'
+                f'<td class="small">{esc(g.get("element"))}</td>'
+                f'<td>{esc(g.get("stride"))}</td>'
+                f'<td class="small">{esc(g.get("action"))}</td>'
+                f'<td class="small">{esc(g.get("tracking"))}</td>'
+                "</tr>"
+            )
+        gap_block = (
+            "<h3>4a.4 Open gap register (target-state)</h3>"
+            "<table><thead><tr><th>Gap</th><th>Element</th><th>STRIDE</th><th>Planned action</th>"
+            f"<th>Tracking</th></tr></thead><tbody>{grows}</tbody></table>"
+        )
+
+    methodology = (tm or {}).get("methodology")
+    source_doc = (tm or {}).get("source_document")
+
+    return f"""
+<section class="section" id="threat-model">
+  <h2>4a. Threat Model (STRIDE) — Secure-Design Evidence (Part C.1)</h2>
+  <p>The structured, per-feature STRIDE threat model is the answer to the first DevSecOps stage
+  ("Plan / threat-model") and the spec's Part C.1 secure-design row (NIS2 21(2)(e); DORA RTS
+  2024/1774; ISO 8.25; SSDF PW.1). The model is rendered here from the signed
+  <code>threat-model.yaml</code> committed-to by the Merkle root; the validator
+  (<code>scripts/validators/threat_model.py</code>) FAILs the pipeline on a schema-incomplete entry,
+  insufficient STRIDE coverage, or a stale review date. Provenance:
+  {provenance_badge(prov)}.</p>
+  {f'<p class="small">Methodology: {esc(methodology)}. Source of truth: {esc(source_doc)}.</p>'
+     if methodology or source_doc else ''}
+  {verdict_block}
+  {coverage_block}
+  {status_block}
+  {detail_block}
+  {gap_block}
+  <p class="small"><strong>Honesty:</strong> the validator proves the model is structurally complete,
+  STRIDE-covered, and freshly reviewed. That each named control <em>actually and fully</em> mitigates
+  its threat in production is an EVIDENCE-ONLY human assertion, not something the pipeline proves; GAP
+  rows are target-state and are never claimed as achieved.</p>
 </section>
 """
 
@@ -2525,6 +2858,7 @@ SECTION_RENDERERS = {
     "soa-maturity": render_soa_maturity,
     "scope-applicability": render_scope_applicability,
     "scope": render_scope,
+    "threat-model": render_threat_model,
     "attestation": render_attestation,
     "ipe": render_ipe,
     "control-matrix": render_control_matrix,
@@ -2533,6 +2867,7 @@ SECTION_RENDERERS = {
     "evidence-detail": render_evidence_detail,
     "vuln-mgmt": render_vuln_mgmt,
     "vex": render_vex,
+    "runtime-hardening": render_runtime_hardening,
     "change-approval": render_change_approval,
     "exceptions": render_exceptions,
     "residual-risk": render_residual_risk,
@@ -2596,6 +2931,10 @@ def build_document(args: argparse.Namespace) -> str:
     scope_determination = load_json(evidence_path("scope-determination.json", args.scope_determination))
     vex_doc = load_json(evidence_path("vex.openvex.json", args.vex))
     residual_risk = load_json(evidence_path("residual-risk.json", args.residual_risk))
+    threat_model = load_yaml(evidence_path("threat-model.yaml", args.threat_model))
+    threat_model_validation = load_json(
+        evidence_path("threat-model-validation.json", args.threat_model_validation))
+    runtime_hardening = load_json(evidence_path("runtime-hardening.json", args.runtime_hardening))
     applicability_yaml = load_yaml(args.applicability)
 
     report_html = read_text(args.report_html)
@@ -2628,6 +2967,9 @@ def build_document(args: argparse.Namespace) -> str:
         "applicability_yaml": applicability_yaml,
         "vex_doc": vex_doc,
         "residual_risk": residual_risk,
+        "threat_model": threat_model,
+        "threat_model_validation": threat_model_validation,
+        "runtime_hardening": runtime_hardening,
         "artifacts": get_artifacts(manifest),
         "artifact_index": artifact_index(manifest),
         "evidence_dir": args.evidence_dir,
@@ -2696,6 +3038,12 @@ def selftest() -> int:
                  "mime": "application/json", "source": "syft", "provenance": "live"},
                 {"path": "dpa-compliance-check.json", "sha256": "c" * 64, "size": 30,
                  "mime": "application/json", "source": "manual", "provenance": "static"},
+                {"path": "threat-model.yaml", "sha256": "d" * 64, "size": 40,
+                 "mime": "application/x-yaml", "source": "manual", "provenance": "static"},
+                {"path": "threat-model-validation.json", "sha256": "e" * 64, "size": 50,
+                 "mime": "application/json", "source": "threat_model", "provenance": "live"},
+                {"path": "runtime-hardening.json", "sha256": "1" * 64, "size": 60,
+                 "mime": "application/json", "source": "runtime_hardening", "provenance": "live"},
             ],
             "merkle_root": "f" * 64,
             "merkle_algorithm": "RFC6962-SHA256",
@@ -2834,6 +3182,64 @@ def selftest() -> int:
             "    clause_basis: DORA Art.28\n",
             encoding="utf-8")
 
+        # T-115 / T-118 render artifacts: STRIDE threat model + validator envelope, runtime-hardening.
+        tm_p = tmp_path / "threat-model.yaml"
+        tm_p.write_text(
+            'version: "1.0.0"\n'
+            'reviewed_date: "2026-05-15"\n'
+            "review_window_days: 180\n"
+            'methodology: "STRIDE-per-element"\n'
+            'source_document: "docs/security/threat-model.md"\n'
+            "stride_categories:\n"
+            '  S: "Spoofing"\n  T: "Tampering"\n'
+            "threats:\n"
+            "  - id: T-F1-S\n    stride: S\n    component: F1 Items API\n"
+            "    threat: Anonymous caller acts as a legitimate user.\n"
+            "    mitigation: Demo API intentionally unauthenticated; no PII.\n"
+            "    status: GAP\n    residual: Unauthenticated read/write; ephemeral store.\n"
+            "    gap_ref: G-01\n"
+            "  - id: T-F1-T\n    stride: T\n    component: F1 Items API\n"
+            "    threat: Malicious payload alters server state.\n"
+            "    mitigation: Input validated at boundary (items.ts:18-22).\n"
+            "    status: MITIGATED\n    residual: Low after validation.\n"
+            "    control_ref: app/src/routes/items.ts:18\n"
+            "gaps:\n"
+            "  - id: G-01\n    element: F1 Items API\n    stride: S\n"
+            "    action: Add authn/authz before any real-data use\n"
+            "    tracking: Demo limitation (no PII today)\n",
+            encoding="utf-8")
+        tmv_p = tmp_path / "threat-model-validation.json"
+        tmv_p.write_text(json.dumps({
+            "status": "PASS", "tier": "BLOCKING",
+            "measured": {"threats": 2, "stride_categories": ["S", "T"], "stride_coverage": 2,
+                         "gaps": 1, "version": "1.0.0", "reviewed_date": "2026-05-15",
+                         "age_days": 15, "review_window_days": 180, "violations": 0},
+            "threshold": "schema-complete threats; >= 2 STRIDE; reviewed within window",
+            "detail": "threat model v1.0.0: 2 threats, STRIDE 2 categories, 1 gap; reviewed 15d ago.",
+            "tool_version": "pyyaml 6.0.3", "validator": "threat_model",
+            "checked_at": "2026-05-30T12:00:00Z",
+        }), encoding="utf-8")
+        rhard_p = tmp_path / "runtime-hardening.json"
+        rhard_p.write_text(json.dumps({
+            "status": "PASS", "tier": "BLOCKING",
+            "measured": {
+                "runs_as_non_root": True, "user": "65532", "privileged": False,
+                "ingress_ports": [3000], "ingress_external": True,
+                "resource_limits": {"cpu": "0.25", "memory": "0.5Gi", "max_replicas": 3},
+                "managed_identity": "SystemAssigned",
+                "read_only_rootfs": "platform-managed",
+                "seccomp_runtime_default": "platform-managed",
+                "controls": {"run_as_non_root": "MET", "privileged_false": "MET",
+                             "read_only_rootfs": "INDETERMINATE",
+                             "least_privilege_ingress": "MET"},
+                "iac_parse_error": None,
+                "platform": "Azure Container Apps (not Kubernetes; no PSS/securityContext)"},
+            "threshold": {"runs_as_non_root": True},
+            "detail": "runtime hardening consistent with IaC: non-root USER 65532 (BLOCKING MET).",
+            "tool_version": "python 3.14.5", "validator": "runtime_hardening",
+            "checked_at": "2026-05-30T12:00:00Z",
+        }), encoding="utf-8")
+
         args = argparse.Namespace(
             evidence_dir=str(tmp_path),
             manifest=str(man_p),
@@ -2845,6 +3251,9 @@ def selftest() -> int:
             scope_determination=str(scope_p),
             vex=str(vex_p),
             residual_risk=str(rr_p),
+            threat_model=str(tm_p),
+            threat_model_validation=str(tmv_p),
+            runtime_hardening=str(rhard_p),
             applicability=str(appl_p),
             governance_dir=None,
             exception_register=str(exc_p),
@@ -2938,6 +3347,28 @@ def selftest() -> int:
         check("EX-001" in doc and "DORA Art. 5(2)" in doc,
               "residual-risk open acceptance / board tolerance not rendered")
 
+        # 13b-2. T-115 threat-model render: section present, real STRIDE entries from the YAML,
+        #        GAP shown as target-state, validator verdict + manifest-driven provenance surfaced.
+        check('id="threat-model"' in doc, "threat-model section missing")
+        check("STRIDE" in doc, "threat-model STRIDE wording missing")
+        check("T-F1-S" in doc and "T-F1-T" in doc, "threat-model real threat rows not rendered")
+        check("Open gap register" in doc and "G-01" in doc,
+              "threat-model open-gap (target-state) register not rendered")
+        check("Validator verdict" in doc, "threat-model validator verdict not surfaced")
+        # Provenance is read from the manifest flag (validation artifact tagged live), not hardcoded.
+        check("LIVE / MEASURED" in doc, "threat-model live provenance badge missing")
+
+        # 13b-3. T-118 runtime-hardening render: section present, real measured posture from JSON,
+        #        non-root surfaced, INDETERMINATE (not fabricated) shown, honest no-k8s-PSS wording.
+        check('id="runtime-hardening"' in doc, "runtime-hardening section missing")
+        check("65532" in doc, "runtime-hardening non-root UID not rendered")
+        check("Azure Container Apps" in doc, "runtime-hardening platform (Azure CA) not rendered")
+        check("INDETERMINATE" in doc and "badge-indet" in doc,
+              "runtime-hardening platform-managed INDETERMINATE control not surfaced")
+        check("Pod-Security" in doc or "Pod Security" in doc,
+              "runtime-hardening must explicitly disclaim a fabricated k8s PSS claim")
+        check("run_as_non_root" in doc, "runtime-hardening per-control table not rendered")
+
         # 13c. T-117 relabel: no implied LIVE cloud/drift posture (design-stage only).
         check("design-stage (no live scan)" in doc or "no live scan" in doc,
               "T-117 relabel missing: break-glass must say no live drift/posture scan")
@@ -2953,6 +3384,9 @@ def selftest() -> int:
             scope_determination=str(tmp_path / "nope-scope.json"),
             vex=str(tmp_path / "nope-vex.json"),
             residual_risk=str(tmp_path / "nope-rr.json"),
+            threat_model=str(tmp_path / "nope-tm.yaml"),
+            threat_model_validation=str(tmp_path / "nope-tmv.json"),
+            runtime_hardening=str(tmp_path / "nope-rh.json"),
             applicability=str(tmp_path / "nope-appl.yaml"),
             governance_dir=None, exception_register=None, control_owners=None,
         )
@@ -3007,6 +3441,15 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     p.add_argument("--residual-risk", dest="residual_risk", default=None,
                    help="Residual-risk / risk-acceptance output (residual-risk.json). Defaults to "
                         "<evidence-dir>/residual-risk.json.")
+    p.add_argument("--threat-model", dest="threat_model", default=None,
+                   help="Structured STRIDE threat model (threat-model.yaml). Defaults to "
+                        "<evidence-dir>/threat-model.yaml.")
+    p.add_argument("--threat-model-validation", dest="threat_model_validation", default=None,
+                   help="Threat-model validator envelope (threat-model-validation.json). Defaults to "
+                        "<evidence-dir>/threat-model-validation.json.")
+    p.add_argument("--runtime-hardening", dest="runtime_hardening", default=None,
+                   help="Runtime-hardening posture validator output (runtime-hardening.json). "
+                        "Defaults to <evidence-dir>/runtime-hardening.json.")
     p.add_argument("--applicability", dest="applicability",
                    default="/home/xrne/Dokumenty/CyberForge/Pipeline/docs/governance/applicability.yaml",
                    help="Maintained applicability.yaml (source rationale text for the scope section).")

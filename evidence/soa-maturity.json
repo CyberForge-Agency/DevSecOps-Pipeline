@@ -4,10 +4,10 @@
   "measured": {
     "overall_level": "L1",
     "dimension_levels": {
-      "evidence_production": "L4",
-      "build_integrity": "L3",
-      "scanning": "L3",
-      "compliance_mapping": "L3",
+      "evidence_production": "L1",
+      "build_integrity": "L1",
+      "scanning": "L1",
+      "compliance_mapping": "L1",
       "integrity": "L1"
     }
   },
@@ -15,13 +15,17 @@
     "target": "L3 (strong)",
     "ceiling": "L5 (state-of-the-art)"
   },
-  "detail": "computed pack maturity = L1 (lowest of evidence_production=L4, build_integrity=L3, scanning=L3, compliance_mapping=L3, integrity=L1); weakest dimension(s): integrity. Headline maturity is the COMPUTED level, not a hardcoded L5 (corrects struktura \u00a713 overclaim).",
+  "detail": "computed pack maturity = L1 (lowest of evidence_production=L1, build_integrity=L1, scanning=L1, compliance_mapping=L1, integrity=L1); weakest dimension(s): build_integrity, compliance_mapping, evidence_production, integrity, scanning. Headline maturity is the COMPUTED level, not a hardcoded L5 (corrects struktura \u00a713 overclaim).",
   "tool_version": null,
   "validator": "soa_maturity",
-  "checked_at": "2026-06-17T07:44:06Z",
+  "checked_at": "2026-06-18T09:36:10Z",
   "overall_level": "L1",
   "weakest_dimensions": [
-    "integrity"
+    "build_integrity",
+    "compliance_mapping",
+    "evidence_production",
+    "integrity",
+    "scanning"
   ],
   "soa": {
     "total_controls_parsed": 93,
@@ -35,90 +39,90 @@
     },
     "applicable": 83,
     "not_applicable": 10,
-    "implemented": 58,
-    "partially_implemented": 21,
+    "implemented": 57,
+    "partially_implemented": 22,
     "planned": 4,
     "unparsed_status": 0,
-    "implementation_rate_applicable": 0.8253
+    "implementation_rate_applicable": 0.8193
   },
   "dimensions": {
     "evidence_production": {
-      "status": "PASS",
+      "status": "FAIL",
       "tier": "EVIDENCE-ONLY",
-      "measured": "L4",
+      "measured": "L1",
       "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
-      "detail": "pipeline emits a manifest + rendered board report; capped at L4 \u2014 L5 needs a QUALIFIED timestamp (QTS) at production, but the demo TSA (freetsa) is non-qualified",
+      "detail": "no pipeline-emitted evidence artifacts found in evidence dir",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T07:44:06Z",
-      "level": 4,
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
       "anchors": {
         "L1": "Manual, screenshots",
         "L3": "Pipeline emits artifacts",
         "L5": "Every artifact auto-signed + QTS + Rekor at production"
       },
       "evidence": {
-        "manifest": true,
-        "pdf_report": true
+        "manifest": false,
+        "pdf_report": false
       }
     },
     "build_integrity": {
-      "status": "PASS",
+      "status": "FAIL",
       "tier": "EVIDENCE-ONLY",
-      "measured": "L3",
+      "measured": "L1",
       "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
-      "detail": "SBOM per release present (no signed provenance bundle detected)",
+      "detail": "no SBOM found; build integrity at baseline",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T07:44:06Z",
-      "level": 3,
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
       "anchors": {
         "L1": "Build runs",
         "L3": "SBOM per release",
         "L5": "SLSA Build L3, non-falsifiable provenance, reproducible"
       },
       "evidence": {
-        "sbom": true,
+        "sbom": false,
         "provenance": false
       }
     },
     "scanning": {
-      "status": "PASS",
+      "status": "FAIL",
       "tier": "EVIDENCE-ONLY",
-      "measured": "L3",
+      "measured": "L1",
       "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
-      "detail": "scanner + SCA output present (SAST/SCA/container scans produced results); not advanced to L5 \u2014 VEX/Scorecard/digest-pinned-toolchain artifacts not present in this evidence dir",
+      "detail": "no scan results found in evidence dir",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T07:44:06Z",
-      "level": 3,
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
       "anchors": {
         "L1": "SAST runs sometimes",
         "L3": "SAST/DAST/SCA/IaC/container all gate",
         "L5": "+ VEX triage, OpenSSF Scorecard, digest-pinned toolchain"
       },
       "evidence": {
-        "security_report": true,
-        "sca_results": true
+        "security_report": false,
+        "sca_results": false
       }
     },
     "compliance_mapping": {
-      "status": "PASS",
+      "status": "FAIL",
       "tier": "EVIDENCE-ONLY",
-      "measured": "L3",
+      "measured": "L1",
       "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
-      "detail": "multi-framework control matrix present (crosswalk to 2-3 frameworks)",
+      "detail": "no compliance-matrix artifact in evidence dir \u2014 mapping at spreadsheet baseline (SoA exists as the source document)",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T07:44:06Z",
-      "level": 3,
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
       "anchors": {
         "L1": "Spreadsheet of controls",
         "L3": "Crosswalk to 2-3 frameworks",
         "L5": "One evidence -> all frameworks, auto-generated, gap-tracked live"
       },
       "evidence": {
-        "compliance_matrix": true,
+        "compliance_matrix": false,
         "oscal": false,
         "soa_structurally_complete": true
       }
@@ -131,7 +135,7 @@
       "detail": "no signature/timestamp artifacts found \u2014 integrity at folder baseline",
       "tool_version": null,
       "validator": "soa_maturity",
-      "checked_at": "2026-06-17T07:44:06Z",
+      "checked_at": "2026-06-18T09:36:10Z",
       "level": 1,
       "anchors": {
         "L1": "Files in a folder",
@@ -145,6 +149,6 @@
       }
     }
   },
-  "evidence_dir": "sample-evidence-pack/evidence",
+  "evidence_dir": "evidence",
   "soa_source": "docs/governance/statement-of-applicability.md"
 }

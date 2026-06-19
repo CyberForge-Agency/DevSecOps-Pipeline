@@ -1,6 +1,6 @@
 {
   "schema": "cyberforge-regulatory-crosswalk/v1",
-  "generated_at": "2026-06-17T14:57:49Z",
+  "generated_at": "2026-06-18T10:41:40Z",
   "description": "Multi-framework crosswalk (spec 5.2 / struktura D.2): one evidence item -> many framework clauses. Derived by grouping the content-validated compliance matrix rows + the A.1-A.10 organizational-control verdicts by evidence artifact. A clause is 'satisfied' only when present AND PASS; no verdicts are recomputed here.",
   "source": {
     "matrix": "compliance-matrix.json",
@@ -8,6 +8,7 @@
   },
   "frameworks_covered": [
     "DORA",
+    "GOVERNANCE",
     "ISO",
     "ISO27001",
     "NIS2",
@@ -43,12 +44,6 @@
           "satisfied": false
         },
         {
-          "label": "ISO27001 A.8.25",
-          "framework": "ISO27001",
-          "status": "INDETERMINATE",
-          "satisfied": false
-        },
-        {
           "label": "SOC2 CC6.1",
           "framework": "SOC2",
           "status": "INDETERMINATE",
@@ -75,7 +70,7 @@
         "SOC2"
       ],
       "satisfied_count": 0,
-      "total_count": 8
+      "total_count": 7
     },
     {
       "evidence": "access-review.json",
@@ -407,6 +402,38 @@
       "total_count": 2
     },
     {
+      "evidence": "access-log-posture.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE SPEC §7 item 7 / ISO A.8.15,A.5.28 / DORA Art.9(3)",
+          "framework": "GOVERNANCE",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "asset-map.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE DORA Art.8",
+          "framework": "GOVERNANCE",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
+      ],
+      "satisfied_count": 1,
+      "total_count": 1
+    },
+    {
       "evidence": "data-flow-diagram.json",
       "clauses": [
         {
@@ -418,6 +445,54 @@
       ],
       "frameworks": [
         "RODO"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "ict-risk-framework.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE DORA Art.6 / NIS2 21(2)(a) / ISO Cl.6.1,8.2",
+          "framework": "GOVERNANCE",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "pentest-report.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE DORA Art.24-26 / NIS2 21(2)(e) / ISO A.8.8",
+          "framework": "GOVERNANCE",
+          "status": "FAIL",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "resilience-programme.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE DORA Art.24-25",
+          "framework": "GOVERNANCE",
+          "status": "FAIL",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
       ],
       "satisfied_count": 0,
       "total_count": 1
@@ -436,6 +511,38 @@
         "DORA"
       ],
       "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "threat-model.yaml",
+      "clauses": [
+        {
+          "label": "ISO27001 A.8.25",
+          "framework": "ISO27001",
+          "status": "INDETERMINATE",
+          "satisfied": false
+        }
+      ],
+      "frameworks": [
+        "ISO27001"
+      ],
+      "satisfied_count": 0,
+      "total_count": 1
+    },
+    {
+      "evidence": "tlpt-record.json",
+      "clauses": [
+        {
+          "label": "GOVERNANCE DORA Art.26-27 / RTS (EU) 2025/1190",
+          "framework": "GOVERNANCE",
+          "status": "PASS",
+          "satisfied": true
+        }
+      ],
+      "frameworks": [
+        "GOVERNANCE"
+      ],
+      "satisfied_count": 1,
       "total_count": 1
     },
     {

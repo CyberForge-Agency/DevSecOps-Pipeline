@@ -18,7 +18,10 @@
         "Phase 2: Build & Scan / Dependency Scan (Trivy SCA)",
         "Phase 2: Build & Scan / SAST (CodeQL)",
         "Phase 2: Build & Scan / Unit Tests + Coverage",
-        "Phase 2: Build & Scan / Docker Build + Image Scan + SBOM"
+        "Phase 2: Build & Scan / Docker Build + Image Scan + SBOM",
+        "Policy Test (OPA) / opa test + opa fmt",
+        "Self-Test (pipeline quality gate) / opa test + pin-audit + pytest + bats",
+        "OpenSSF Scorecard / Scorecard analysis"
       ]
     },
     "required_signatures": true,

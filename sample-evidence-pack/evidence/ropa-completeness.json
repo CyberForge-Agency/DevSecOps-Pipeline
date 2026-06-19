@@ -10,5 +10,5 @@
   "detail": "RoPA present and complete: 3 processing activities satisfy RODO Art.30; DPIA determination='not-required'. NOTE: completeness verified, factual truth of recorded content is EVIDENCE-ONLY.",
   "tool_version": "jsonschema 4.26.0",
   "validator": "validate-ropa",
-  "checked_at": "2026-06-17T14:57:47Z"
+  "checked_at": "2026-06-18T10:41:38Z"
 }

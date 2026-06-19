@@ -111,7 +111,30 @@ variable "lock_worm" {
 variable "network_hardened" {
   type        = bool
   default     = false
-  description = "Disable public network access and require private endpoints / explicit IP rules for regulated clients."
+  description = "Disable public network access AND apply a deny-by-default network_rules firewall (bypass = AzureServices, plus the explicit IP/subnet allowlist below) so the account is reachable only via private endpoints / allowlisted paths. Default false keeps the demo-friendly public + Allow default."
+}
+
+# Allowlists applied ONLY when var.network_hardened = true (otherwise ignored,
+# since the network_rules block is not emitted). Empty defaults mean: deny all
+# except the AzureServices bypass — so an operator must explicitly allowlist a
+# trusted IP/CIDR or a VNet subnet (or use a private endpoint) to reach the
+# account when hardened.
+variable "network_allowed_ip_rules" {
+  type        = list(string)
+  default     = []
+  description = "Public IPv4 addresses / CIDR ranges allowed through the storage firewall when network_hardened = true. azurerm rejects /31 and /32 — use bare IPs for single hosts. Ignored when network_hardened = false."
+}
+
+variable "network_allowed_subnet_ids" {
+  type        = list(string)
+  default     = []
+  description = "VNet subnet resource IDs (with the Microsoft.Storage service endpoint) allowed through the storage firewall when network_hardened = true. Ignored when network_hardened = false."
+}
+
+variable "private_endpoint_subnet_id" {
+  type        = string
+  default     = ""
+  description = "If set (non-empty), provision a private endpoint for the blob sub-resource in this subnet (recommended companion to network_hardened). Empty (default) creates no private endpoint, keeping the demo path unchanged. Private DNS zone wiring is environment-specific and not created by this module — see SETUP.md §8.1."
 }
 
 variable "replication_type" {

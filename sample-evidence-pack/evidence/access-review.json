@@ -13,8 +13,8 @@
     "rule": "every 'Next Due' >= today (no overdue access review)",
     "max_days_overdue": 0
   },
-  "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 90d out)",
+  "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 89d out)",
   "tool_version": null,
   "validator": "check-access-reviews",
-  "checked_at": "2026-06-17T14:57:48Z"
+  "checked_at": "2026-06-18T10:41:39Z"
 }

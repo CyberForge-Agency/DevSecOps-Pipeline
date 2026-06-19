@@ -108,6 +108,63 @@ def _bad_gates(d):
     _write(d, "pipeline-run.json", {"gates": {"build": "success", "scan": "failure"}})
 
 
+# Part-G governance controls (C.9 / E.1 / E.2 / E.4 / A.7.7) read back an already-
+# emitted T-33 envelope from the evidence dir (the dedicated validator is the single
+# source of truth), so the matrix fixtures here just write a PASS / FAIL envelope to
+# the expected artifact name. The empty-dir case (missing artifact) is exercised
+# generically -> INDETERMINATE, never a silent PASS.
+def _envelope(status, tier, detail="", measured=None):
+    # A PASS envelope must carry a real measured value (the matrix reader passes it
+    # straight through; test_blocking_rows_pass_on_good_evidence asserts measured is
+    # not None on a PASS). A FAIL/INDETERMINATE may carry a measured fact or None.
+    if measured is None and status == "PASS":
+        measured = {"qualifying": 1}
+    return {"status": status, "tier": tier, "measured": measured, "threshold": None,
+            "detail": detail, "tool_version": None, "validator": "dedicated",
+            "checked_at": "2026-06-18T00:00:00Z"}
+
+
+def _good_pentest(d):
+    _write(d, "pentest-report.json", _envelope("PASS", "BLOCKING", "fresh signed pentest"))
+
+
+def _bad_pentest(d):  # honest default: no pen test on record -> FAIL
+    _write(d, "pentest-report.json", _envelope("FAIL", "BLOCKING", "no pentest on record"))
+
+
+def _good_ict(d):
+    _write(d, "ict-risk-framework.json", _envelope("PASS", "BLOCKING", "reviewed in cadence"))
+
+
+def _bad_ict(d):  # honest default: pending initial review -> INDETERMINATE handled by empty test;
+    _write(d, "ict-risk-framework.json", _envelope("FAIL", "BLOCKING", "stale review"))
+
+
+def _good_asset_map(d):
+    _write(d, "asset-map.json", _envelope("PASS", "BLOCKING", "complete asset map"))
+
+
+def _bad_asset_map(d):
+    _write(d, "asset-map.json", _envelope("FAIL", "BLOCKING", "asset missing owner"))
+
+
+def _good_resilience(d):
+    _write(d, "resilience-programme.json", _envelope("PASS", "BLOCKING", "all classes conducted"))
+
+
+def _bad_resilience(d):  # honest default: no drill conducted -> FAIL
+    _write(d, "resilience-programme.json", _envelope("FAIL", "BLOCKING", "no drill conducted"))
+
+
+# EVIDENCE-ONLY Part-G readers: only a good builder (a FAIL/INDET never breaks build).
+def _good_tlpt(d):
+    _write(d, "tlpt-record.json", _envelope("PASS", "EVIDENCE-ONLY", "documented out-of-scope"))
+
+
+def _good_access_log(d):
+    _write(d, "access-log-posture.json", _envelope("PASS", "EVIDENCE-ONLY", "chain verifies"))
+
+
 # EVIDENCE-ONLY validators: only a good builder (a FAIL/INDET never breaks build).
 def _good_anomaly(d):
     _write(d, "pipeline-run.json", {"pipeline": {"run_id": "run-123"}})
@@ -129,11 +186,19 @@ BLOCKING_CASES = {
     "sbom-supply-chain": (_good_sbom, _bad_sbom),
     "crypto-signing": (_good_crypto, _bad_crypto),
     "pipeline-gates": (_good_gates, _bad_gates),
+    # Part-G governance/resilience BLOCKING controls (read back dedicated envelopes)
+    "pentest": (_good_pentest, _bad_pentest),
+    "ict-risk-framework": (_good_ict, _bad_ict),
+    "asset-map": (_good_asset_map, _bad_asset_map),
+    "resilience-programme": (_good_resilience, _bad_resilience),
 }
 EVIDENCE_ONLY_CASES = {
     "anomaly-detection": _good_anomaly,
     "dpa-register": _good_dpa,
     "data-flow": _good_data_flow,
+    # Part-G EVIDENCE-ONLY controls
+    "tlpt": _good_tlpt,
+    "access-log": _good_access_log,
 }
 
 ALL_IDS = sorted({*BLOCKING_CASES, *EVIDENCE_ONLY_CASES})

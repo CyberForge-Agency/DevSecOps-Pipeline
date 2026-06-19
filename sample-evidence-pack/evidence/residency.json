@@ -1,0 +1,33 @@
+{
+  "schema": "cyberforge.residency/v1",
+  "azure_region": "polandcentral",
+  "azure_region_geography": "Poland (Warsaw)",
+  "data_location": "EU/EEA \u2014 Poland",
+  "transfer_basis": "intra-EU",
+  "transfer_mechanism": null,
+  "subprocessors_outside_eea": false,
+  "data_plane_stages": [
+    "azure-container-registry",
+    "azure-container-apps",
+    "azure-key-vault",
+    "evidence-worm-blob"
+  ],
+  "egress_to_confirm": [
+    {
+      "stage": "github-actions-runner",
+      "reason": "build/scan + security-gate execute on GitHub-hosted runners; commit metadata contains PII",
+      "status": "confirm-per-engagement"
+    }
+  ],
+  "retention_days": 1825,
+  "source_of_truth": {
+    "region": "infra/variables.tf:var.location",
+    "applied_region": "terraform output / azurerm_resource_group.this.location"
+  },
+  "applied_region": "not-applied (offline sample-pack run)",
+  "confirm_before_signoff": [
+    "applied region matches azure_region",
+    "no sub-processor egresses EU/EEA (or transfer_mechanism recorded)",
+    "GitHub Actions runner residency confirmed or SCCs-covered"
+  ]
+}

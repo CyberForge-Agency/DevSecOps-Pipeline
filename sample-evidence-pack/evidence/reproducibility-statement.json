@@ -1,0 +1,42 @@
+{
+  "schema": "cyberforge.reproducibility-statement/v1",
+  "generated_at": "2026-06-18T10:41:41Z",
+  "git_commit": "849dd9414409bc92cfa3a1788a0a21536a133a3b",
+  "git_ref": "unknown",
+  "expected_image_digest": null,
+  "base_image": "cgr.dev/chainguard/node:latest@sha256:045335a479d6c59bab89e3caaaf9ed2aed5528d92e2431a3e2afcbf258dba9a6",
+  "base_image_pinned_by_digest": true,
+  "builder_base_pinned_by_digest": false,
+  "dependency_lock": "app/package-lock.json (npm ci, --ignore-scripts)",
+  "build_inputs": {
+    "deterministic": [
+      "GIT_SHA",
+      "GIT_REF",
+      "BUILD_TIME",
+      "REPOSITORY",
+      "WORKFLOW_REF"
+    ],
+    "non_deterministic": [
+      "RUN_ID",
+      "RUN_NUMBER"
+    ]
+  },
+  "rebuild_procedure": "docs/reproducibility.md \u00a73 / scripts/verify-reproducibility.sh --rebuild",
+  "rebuilt_image_digest": null,
+  "digest_match_demonstrated": false,
+  "verdict": "DESIGN-ONLY",
+  "byte_reproducibility_status": "TARGET-STATE",
+  "open_blockers": [
+    "RUN_ID/RUN_NUMBER baked into image (app/Dockerfile:23-25) \u2014 per-run non-determinism",
+    "no SOURCE_DATE_EPOCH / BuildKit rewrite-timestamp \u2014 layer mtimes non-deterministic",
+    "builder/deps base node:20-alpine pinned by tag, not digest (app/Dockerfile:2,35)",
+    "no independent rebuild recorded yet (digest_match_demonstrated=false)"
+  ],
+  "slsa_note": "SLSA does not require verified reproducible builds; this is a corroborating control (slsa.dev/spec/v1.0/faq).",
+  "spec_refs": [
+    "Part I.4",
+    "\u00a77.6",
+    "Appendix X.3",
+    "struktura \u00a711.7"
+  ]
+}

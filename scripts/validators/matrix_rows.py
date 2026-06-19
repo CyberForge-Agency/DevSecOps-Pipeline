@@ -434,6 +434,139 @@ def data_flow(evidence_dir: Path) -> Envelope:
 
 
 # --------------------------------------------------------------------------- #
+# Part-G governance controls (C.9 / E.1 / E.2 / E.4 / A.7.7) — envelope readers #
+# --------------------------------------------------------------------------- #
+# These six controls each have a DEDICATED file-driven validator
+# (check_pentest.py / check_tlpt.py / check_ict_risk_framework.py /
+# check_asset_map.py / check_resilience_programme.py / check_access_log.py) that
+# is run BEFORE the matrix by make-sample-pack.sh / evidence-pack.yml and emits
+# its T-33 envelope into the evidence dir (pentest-report.json, tlpt-record.json,
+# ict-risk-framework.json, asset-map.json, resilience-programme.json,
+# access-log-posture.json). Unlike the build/scan rows above, the matrix does NOT
+# re-derive these verdicts from raw inputs; it READS BACK the already-emitted
+# envelope (mirroring how aggregate-compliance.py ingests the aggregate_only Part
+# C/D verdicts). This keeps a single source of truth: the dedicated validator is
+# the only place the threshold lives, so the matrix row can never disagree with
+# the sealed artifact. A missing/empty/unparseable artifact -> INDETERMINATE at
+# the recorded tier (never a silent PASS); a present envelope's OWN status+tier
+# wins so the honest FAIL/INDETERMINATE/PASS flows straight through.
+
+
+def _read_emitted_envelope(
+    evidence_dir: Path, artifact: str, *, default_tier: str, label: str,
+) -> Envelope:
+    """Read back a dedicated validator's already-emitted T-33 envelope.
+
+    Honest semantics identical to the rest of this module: a missing/empty/{}-only
+    artifact yields INDETERMINATE (we measured nothing) at ``default_tier`` — never a
+    silent PASS. When the envelope is present its OWN status+tier are authoritative
+    (the dedicated validator is the single source of the threshold), so a BLOCKING
+    FAIL/INDETERMINATE or an EVIDENCE-ONLY measurement flows through unchanged.
+    """
+    data, err = lc.load_json(evidence_dir / artifact)
+    if err is not None:
+        return lc.envelope(
+            lc.Status.INDETERMINATE, default_tier,
+            measured=None, threshold={"artifact": artifact},
+            detail=f"{label}: {err} (run the dedicated validator to emit {artifact})",
+        )
+    if not isinstance(data, dict) or "status" not in data or "tier" not in data:
+        return lc.envelope(
+            lc.Status.INDETERMINATE, default_tier,
+            measured=None, threshold={"artifact": artifact},
+            detail=f"{label}: {artifact} has no recognizable {{status,tier}} envelope",
+        )
+    status = data.get("status")
+    tier = data.get("tier")
+    return lc.envelope(
+        status if status in lc.Status.ALL else lc.Status.INDETERMINATE,
+        tier if tier in lc.Tier.ALL else default_tier,
+        measured=data.get("measured"),
+        threshold=data.get("threshold"),
+        detail=data.get("detail", ""),
+        tool_version=data.get("tool_version"),
+        validator=data.get("validator") or label,
+    )
+
+
+def pentest(evidence_dir: Path) -> Envelope:
+    """C.9 — independent penetration testing (BLOCKING). Reads pentest-report.json.
+
+    Emitted by check_pentest.py. Honest default: FAIL until a fresh, independent,
+    signed report with remediation-tracked Critical/High findings exists (DORA
+    Art.24-26 / NIS2 21(2)(e) / ISO 27001 A.8.8).
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "pentest-report.json",
+        default_tier=lc.Tier.BLOCKING, label="check_pentest",
+    )
+
+
+def tlpt(evidence_dir: Path) -> Envelope:
+    """C.9 — DORA Threat-Led Penetration Testing (dynamic tier). Reads tlpt-record.json.
+
+    Emitted by check_tlpt.py. EVIDENCE-ONLY when the documented determination is
+    out-of-scope (in_scope:false); BLOCKING (and honest FAIL until conducted) when
+    in_scope flips true. The artifact's own tier is authoritative.
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "tlpt-record.json",
+        default_tier=lc.Tier.EVIDENCE_ONLY, label="check_tlpt",
+    )
+
+
+def ict_risk_framework(evidence_dir: Path) -> Envelope:
+    """E.1 — ICT risk-management framework + annual review (BLOCKING). Reads ict-risk-framework.json.
+
+    Emitted by check_ict_risk_framework.py. Honest default: INDETERMINATE until a
+    real management review records a parseable date (DORA Art.6 / NIS2 21(2)(a)).
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "ict-risk-framework.json",
+        default_tier=lc.Tier.BLOCKING, label="check_ict_risk_framework",
+    )
+
+
+def asset_map(evidence_dir: Path) -> Envelope:
+    """E.2 — asset / dependency & critical-function map (BLOCKING). Reads asset-map.json.
+
+    Emitted by check_asset_map.py. PASS when the map is real, complete (every asset
+    owned + classified, high-criticality functions carry RTO+RPO) architectural data
+    (DORA Art.8); a missing owner / RTO would FAIL.
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "asset-map.json",
+        default_tier=lc.Tier.BLOCKING, label="check_asset_map",
+    )
+
+
+def resilience_programme(evidence_dir: Path) -> Envelope:
+    """E.4 — digital operational resilience testing programme (BLOCKING). Reads resilience-programme.json.
+
+    Emitted by check_resilience_programme.py. Honest default: FAIL until each
+    required scenario class (backup-restore, failover, DR-drill, dependency-outage,
+    tabletop) is conducted on cadence (DORA Art.24-25).
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "resilience-programme.json",
+        default_tier=lc.Tier.BLOCKING, label="check_resilience_programme",
+    )
+
+
+def access_log(evidence_dir: Path) -> Envelope:
+    """A.7.7 — tamper-evident evidence-store access log (EVIDENCE-ONLY). Reads access-log-posture.json.
+
+    Emitted by check_access_log.py. Honest default: INDETERMINATE until a live,
+    non-empty, hash-chain-verified access log exists (SPEC §7 item 7; ISO A.8.15 /
+    A.5.28; DORA Art.9(3)). A present-but-broken chain is FAIL (tamper evidence).
+    """
+    return _read_emitted_envelope(
+        evidence_dir, "access-log-posture.json",
+        default_tier=lc.Tier.EVIDENCE_ONLY, label="check_access_log",
+    )
+
+
+# --------------------------------------------------------------------------- #
 # Dispatch table — stable validator-ids -> check function                      #
 # --------------------------------------------------------------------------- #
 # The orchestrator (generate-compliance-matrix.sh) references these ids only;
@@ -458,6 +591,19 @@ DISPATCH: dict[str, Callable[[Path], Envelope]] = {
     "dpa-register": dpa_register,
     # data-flow-diagram.json — RODO 25 (EVIDENCE-ONLY)
     "data-flow": data_flow,
+    # --- Part-G governance controls (read back dedicated-validator envelopes) ---
+    # pentest-report.json — C.9 penetration testing (BLOCKING)
+    "pentest": pentest,
+    # tlpt-record.json — C.9 DORA TLPT (dynamic tier: EVIDENCE-ONLY/BLOCKING)
+    "tlpt": tlpt,
+    # ict-risk-framework.json — E.1 ICT risk-management framework (BLOCKING)
+    "ict-risk-framework": ict_risk_framework,
+    # asset-map.json — E.2 asset/dependency & critical-function map (BLOCKING)
+    "asset-map": asset_map,
+    # resilience-programme.json — E.4 resilience testing programme (BLOCKING)
+    "resilience-programme": resilience_programme,
+    # access-log-posture.json — A.7.7 tamper-evident access log (EVIDENCE-ONLY)
+    "access-log": access_log,
 }
 
 

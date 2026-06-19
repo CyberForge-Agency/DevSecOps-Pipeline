@@ -1349,7 +1349,7 @@ function renderSigning() {
   const img = DATA.pipeline.image_uri || '';
   const dig = DATA.pipeline.image_digest || '';
   $('cosignCmd').textContent =
-    `cosign verify \\\n  --certificate-identity-regexp='https://github.com/${repo}/' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
+    `cosign verify \\\n  --certificate-identity-regexp='^https://github.com/${repo}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
   $('cosignRaw').textContent = c.raw || '(no log captured)';
   $('provExcerpt').textContent = DATA.provenance_excerpt || '(no provenance captured)';
 }

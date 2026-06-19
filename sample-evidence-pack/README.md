@@ -45,7 +45,7 @@ works:
 | # | Component | File(s) in `evidence/` | Spec part | Status in this demo |
 |---|-----------|------------------------|-----------|---------------------|
 | 1 | **Board report (PDF)** | `audit-document.html`, `evidence-report.html` (+ `evidence-report.pdf.MISSING`) | Part 0.2 | **HTML present; PDF/A PENDING** (WeasyPrint absent offline → honest `.MISSING` marker; CI renders the PDF/A-3b) |
-| 2 | **Artifact manifest** | `manifest.json`, `manifest.sha256`, `merkle-root.txt` | Part 0.1 | **Present** (RFC-6962 Merkle root `41519b3f…`, rendered from `merkle-root.txt` by the reproducer — cannot drift) |
+| 2 | **Artifact manifest** | `manifest.json`, `manifest.sha256`, `merkle-root.txt` | Part 0.1 | **Present** (RFC-6962 Merkle root `2ca49f9c…`, rendered from `merkle-root.txt` by the reproducer — cannot drift) |
 | 3 | **Scan results** | `trivy-sca-results.json`, `trivy-results.sarif` | §X.1 / Part C | **Present** (real Trivy scan of the demo app) |
 | 4 | **SBOM** | `sbom.cyclonedx.json` | Part C.10 | **Present** (real CycloneDX, 70 components) |
 | 5 | **Control matrix** | `compliance-matrix.json` | Part D.1 | **Present** (content-validated DORA/NIS2/GDPR/CRA/ISO/SOC2) |

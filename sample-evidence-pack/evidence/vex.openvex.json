@@ -1,8 +1,8 @@
 {
   "@context": "https://openvex.dev/ns/v0.2.0",
-  "@id": "https://cyberforge.agency/vex/sha256-20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+  "@id": "https://cyberforge.agency/vex/sha256-8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
   "author": "CyberForge Security Team <security@cyberforge.agency>",
-  "timestamp": "2026-06-17T14:57:50Z",
+  "timestamp": "2026-06-18T10:41:41Z",
   "version": 1,
   "tooling": "cyberforge/generate-vex 1.0 (OpenVEX 0.2.0)",
   "statements": [
@@ -12,24 +12,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "component_not_present",
       "impact_statement": "glibc advisory applied to the old Debian-based distroless base. The Wolfi-based cgr.dev/chainguard/node image uses musl/Wolfi packaging and does not ship the affected glibc component, so the vulnerable component is not present.",
@@ -41,24 +41,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL). Not a suppression \u2014 the vulnerable package version is absent from the released image.",
@@ -70,24 +70,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).",
@@ -99,24 +99,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "OpenSSL libssl3 advisory resolved by the base-image migration to cgr.dev/chainguard/node (Wolfi ships fixed OpenSSL).",
@@ -128,24 +128,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "OpenSSL advisory previously waived on the Debian-based distroless base; resolved by the migration to cgr.dev/chainguard/node which ships fixed OpenSSL.",
@@ -157,24 +157,24 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "fixed",
       "justification": "vulnerable_code_not_present",
       "impact_statement": "OpenSSL libssl3 advisory present only in the legacy gcr.io/distroless/nodejs20-debian12 base. The runtime base was migrated to cgr.dev/chainguard/node (Wolfi), which ships the patched OpenSSL package; the vulnerable code is no longer present in the released image.",
@@ -187,12 +187,12 @@
       },
       "products": [
         {
-          "@id": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266",
+          "@id": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
           "identifiers": {
-            "purl": "pkg:oci/cyberforge-demo/app@sha256:20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "purl": "pkg:oci/cyberforge-demo/app@sha256:8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "hashes": {
-            "sha256": "20ff6c273a40bf34ec5362c1cc2cb8d9784bd937d8787927971c77638fa40266"
+            "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791"
           },
           "subcomponents": [
             {
@@ -201,13 +201,13 @@
             {
               "@id": "sbom:sbom.cyclonedx.json",
               "identifiers": {
-                "sbom_serial": "urn:uuid:07269ecb-8d76-42e7-9499-f365250f835a"
+                "sbom_serial": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a"
               }
             }
           ]
         }
       ],
-      "timestamp": "2026-06-17T14:57:50Z",
+      "timestamp": "2026-06-18T10:41:41Z",
       "status": "under_investigation",
       "status_notes": "Reported by the scanner; not yet triaged in docs/governance/vex-justifications.yaml."
     }

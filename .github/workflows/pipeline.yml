@@ -90,6 +90,11 @@ jobs:
       image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
       image_digest: ${{ needs.build-and-scan.outputs.image_digest }}
       environment: ${{ inputs.deploy_environment || 'staging' }}
+      # Forward build-and-scan's MEASURED gate inputs so the OPA deployment gate
+      # admits on real scan/coverage numbers (T-03/T-63). deploy.yml re-measures
+      # from artifacts as a fail-closed fallback when these are empty.
+      critical_cves: ${{ needs.build-and-scan.outputs.critical_cves }}
+      coverage_pct: ${{ needs.build-and-scan.outputs.coverage_pct }}
 
   # ============================================
   # Phase 5: DAST (main branch only, after deploy)

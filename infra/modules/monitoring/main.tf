@@ -29,11 +29,11 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "deployment_failures" 
   enabled             = true
   tags                = var.tags
 
-  scopes                   = [var.log_analytics_workspace_id]
-  evaluation_frequency     = "PT5M"
-  window_duration          = "PT15M"
-  target_resource_types    = ["Microsoft.OperationalInsights/workspaces"]
-  skip_query_validation    = false
+  scopes                = [var.log_analytics_workspace_id]
+  evaluation_frequency  = "PT5M"
+  window_duration       = "PT15M"
+  target_resource_types = ["Microsoft.OperationalInsights/workspaces"]
+  skip_query_validation = false
 
   criteria {
     query = <<-KQL
@@ -70,11 +70,11 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "error_spikes" {
   enabled             = true
   tags                = var.tags
 
-  scopes                   = [var.log_analytics_workspace_id]
-  evaluation_frequency     = "PT5M"
-  window_duration          = "PT10M"
-  target_resource_types    = ["Microsoft.OperationalInsights/workspaces"]
-  skip_query_validation    = false
+  scopes                = [var.log_analytics_workspace_id]
+  evaluation_frequency  = "PT5M"
+  window_duration       = "PT10M"
+  target_resource_types = ["Microsoft.OperationalInsights/workspaces"]
+  skip_query_validation = false
 
   criteria {
     query = <<-KQL
@@ -112,11 +112,11 @@ resource "azurerm_monitor_scheduled_query_rules_alert_v2" "image_pull_failures" 
   enabled             = true
   tags                = var.tags
 
-  scopes                   = [var.log_analytics_workspace_id]
-  evaluation_frequency     = "PT5M"
-  window_duration          = "PT15M"
-  target_resource_types    = ["Microsoft.OperationalInsights/workspaces"]
-  skip_query_validation    = false
+  scopes                = [var.log_analytics_workspace_id]
+  evaluation_frequency  = "PT5M"
+  window_duration       = "PT15M"
+  target_resource_types = ["Microsoft.OperationalInsights/workspaces"]
+  skip_query_validation = false
 
   criteria {
     query = <<-KQL

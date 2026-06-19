@@ -1,10 +1,13 @@
 {
-  "status": "INDETERMINATE",
+  "status": "FAIL",
   "tier": "BLOCKING",
-  "measured": null,
+  "measured": {
+    "regimes": 4,
+    "violations": 27
+  },
   "threshold": "schema-valid; DORA/NIS2-KSC/CRA/RODO each with applies + non-empty rationale + clause/legal basis; named approver + dated determination",
-  "detail": "applicability load failed: /tmp/tmp.6Jo2E4K0g8/bad-applic.yaml: invalid YAML (while parsing a block mapping\n  in \"<unicode string>\", line 84, column 5:\n        name: \"Digital Operational Resil ... \n        ^\nexpected <block end>, but found '<scalar>'\n  in \"<unicode string>\", line 88, column 7:\n          DORA (Reg. (EU) 2022/2554) binds ... \n          ^)",
+  "detail": "scope determination incomplete: (root): Additional properties are not allowed ('approved_by', 'determination_date' were unexpected); (root): 'schema_version' is a required property; (root): 'entity' is a required property; (root): 'determination' is a required property; regimes/CRA: 'name' is a required property; regimes/CRA: 'clause_basis' is a required property (+21 more)",
   "tool_version": "jsonschema 4.26.0",
   "validator": "applicability",
-  "checked_at": "2026-06-17T07:44:33Z"
+  "checked_at": "2026-06-18T09:36:27Z"
 }

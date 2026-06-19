@@ -78,13 +78,18 @@ jobs:
 
       - name: Job Summary
         if: always()
+        env:
+          # Route the (untrusted) target URL through an env var instead of
+          # expanding ${{ inputs.target_url }} directly into the shell script
+          # body — defense-in-depth against script injection (T-07). The value
+          # is appended below with printf, never interpolated into a command.
+          TARGET_URL: ${{ inputs.target_url }}
         run: |
           HC_COUNT="${{ steps.zap-summary.outputs.high_critical_count }}"
           cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
           ## DAST (OWASP ZAP Baseline Scan)
-
-          **Target:** `${{ inputs.target_url }}`
           EOF
+          printf '\n**Target:** `%s`\n' "$TARGET_URL" >> "$GITHUB_STEP_SUMMARY"
           python3 - <<'PY'
           import json, os
           from pathlib import Path

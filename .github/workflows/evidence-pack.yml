@@ -275,7 +275,7 @@ jobs:
       # dry-run pack still assembles. Honesty: a real BLOCKING fail (stale DPA
       # register, overdue access review, restore-test not conducted) SHOULD turn
       # this red on non-PR — do not weaken it to force green.
-      - name: Compliance gate — aggregate A.1-A.10 (signed, blocking on non-PR)
+      - name: Compliance gate — aggregate A.1-A.10 (interim; authoritative gate runs post-Part-C/D)
         env:
           IS_PR: ${{ github.event_name == 'pull_request' }}
           COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
@@ -284,6 +284,15 @@ jobs:
           set -uo pipefail
           # 1) Run + aggregate. Capture rc (non-zero = legitimate FAIL/INDET); the
           #    JSON is ALWAYS written so it can be sealed regardless of verdict.
+          #    ORDERING (T-30/T-73): this pass runs the A.1-A.10 organizational
+          #    validators, but the required Part-C/D verdicts (threat-model-validation,
+          #    runtime-hardening, residual-risk, scope-determination) are produced by
+          #    LATER steps, so they would read here as missing-verdict FAIL. This pass
+          #    is therefore INTERIM and NON-fatal; the AUTHORITATIVE signed gate runs
+          #    in the re-aggregation step AFTER Part-C/D generation (search T-30/T-73
+          #    re-aggregation below). We still sign this interim verdict so the A.x
+          #    organizational verdict is always a signed artifact even if a later step
+          #    aborts.
           set +e
           python3 scripts/aggregate-compliance.py evidence/
           AGG_RC=$?
@@ -345,18 +354,138 @@ jobs:
           ' evidence/compliance-status.json | while IFS= read -r row; do
             [ -n "${row}" ] && echo "::warning::compliance: ${row}"
           done
-          if [ "${AGG_RC}" -ne 0 ]; then
+          # INTERIM verdict only: the Part-C/D required verdicts are not yet produced,
+          # so a non-zero rc here is EXPECTED (missing-verdict on the not-yet-generated
+          # Part-C controls). We do NOT abort the job here — the authoritative gate is
+          # the post-Part-C/D re-aggregation step below, which DOES block on non-PR.
+          # The A.1-A.10 organizational subset is surfaced for visibility.
+          echo "interim compliance-status overall=${OVERALL} (authoritative gate runs post-Part-C/D)"
+          echo "| Stage | interim (pre-Part-C/D) |" >> "$GITHUB_STEP_SUMMARY"
+
+      # Part-G governance / operational-resilience controls (C.9 / E.1 / E.2 / E.4
+      # / A.7.7). Each runs its DEDICATED file-driven validator over the seeded
+      # governance/runbook input and emits its T-33 envelope INTO evidence/ so it
+      # is (a) read back by the compliance matrix row below (the matrix routes
+      # pentest/tlpt/ict-risk-framework/asset-map/resilience-programme/access-log
+      # validator-ids to these sealed envelopes) AND (b) ingested by the post-
+      # Part-C/D re-aggregation gate, AND (c) leaf-hashed into manifest.json + the
+      # RFC-6962 Merkle root + sealed. This runs BEFORE the matrix on purpose so the
+      # matrix sees the envelopes. MIRRORS the gen_artifact degrade-on-PR /
+      # fail-closed-non-PR pattern of the Part C/D steps.
+      #
+      # Honesty (HONESTY IS THE SPEC) — these are real, fail-closed controls that
+      # HONESTLY report their current state; NONE fabricates evidence:
+      #   * pentest      (BLOCKING)      FAIL — no pen test on record (DORA/NIS2 C.9)
+      #   * ict-risk     (BLOCKING)      INDETERMINATE — pending initial mgmt review
+      #   * resilience   (BLOCKING)      FAIL — no drill conducted yet (DORA 24-25)
+      #   * asset-map    (BLOCKING)      PASS — real architectural data (DORA Art.8)
+      #   * tlpt         (EVIDENCE-ONLY) PASS — documented out-of-scope determination
+      #   * access-log   (EVIDENCE-ONLY) INDETERMINATE — no live Azure diagnostic log
+      # The BLOCKING FAIL/INDETERMINATE rows are HONEST control gaps awaiting org-
+      # conducted evidence (identical to the A.10 restore-test) — do NOT weaken them
+      # to a fake PASS. On non-PR they fail the pack closed; on PR they warn so the
+      # dry-run pack still assembles.
+      - name: Generate Part-G governance/resilience evidence (C.9/E.1/E.2/E.4/A.7.7)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -uo pipefail
+          BLOCKING_FAIL=0
+
+          # gen_artifact <label> <out-file> <tier> <cmd...> — identical contract to
+          # the Part C/D steps: keep the JSON (sealed regardless of verdict), read
+          # back {status,tier}, flag a BLOCKING non-PASS for the gate below.
+          gen_artifact() {
+            local label="$1" out="$2" tier="$3"; shift 3
+            local rc=0
+            "$@" || rc=$?
+            if [ ! -s "${out}" ]; then
+              echo "::warning::${label}: generator produced no ${out} (rc=${rc})"
+              if [ "${tier}" = "BLOCKING" ]; then BLOCKING_FAIL=1; fi
+              return 0
+            fi
+            local art_status
+            art_status="$(jq -r '.status // (.envelope.status) // "UNKNOWN"' "${out}" 2>/dev/null || echo UNKNOWN)"
+            echo "${label}: status=${art_status} tier=${tier} -> ${out}"
+            if [ "${tier}" = "BLOCKING" ] && [ "${art_status}" != "PASS" ]; then
+              echo "::warning::${label} ${art_status} (BLOCKING): $(jq -r '.detail // .envelope.detail // ""' "${out}" 2>/dev/null)"
+              BLOCKING_FAIL=1
+            fi
+          }
+
+          # (1) C.9 — independent penetration testing (BLOCKING). Honest FAIL until a
+          #     fresh, independent, signed report with retested Critical/High findings.
+          gen_artifact "Penetration testing (C.9)" "evidence/pentest-report.json" "BLOCKING" \
+            python3 scripts/validators/check_pentest.py docs/governance/pentest-report.yaml \
+              --schema schemas/pentest-report.schema.json --out evidence/pentest-report.json
+
+          # (2) C.9 — DORA TLPT (dynamic tier; EVIDENCE-ONLY while out-of-scope is
+          #     documented, BLOCKING when in_scope flips true). Tier read from the
+          #     artifact's own envelope, so this passthrough records, never blocks,
+          #     the documented out-of-scope determination.
+          gen_artifact "DORA TLPT (C.9)" "evidence/tlpt-record.json" "EVIDENCE-ONLY" \
+            python3 scripts/validators/check_tlpt.py docs/governance/tlpt-record.yaml \
+              schemas/tlpt-record.schema.json --out evidence/tlpt-record.json
+
+          # (3) E.1 — ICT risk-management framework + annual review (BLOCKING). Honest
+          #     INDETERMINATE until a real management review records a parseable date.
+          gen_artifact "ICT risk framework (E.1)" "evidence/ict-risk-framework.json" "BLOCKING" \
+            python3 scripts/validators/check_ict_risk_framework.py \
+              docs/governance/ict-risk-management-framework.md \
+              --out evidence/ict-risk-framework.json
+
+          # (4) E.2 — asset / dependency & critical-function map (BLOCKING). PASS on
+          #     real architectural data; a missing owner / high-criticality RTO FAILs.
+          gen_artifact "Asset map (E.2)" "evidence/asset-map.json" "BLOCKING" \
+            python3 scripts/validators/check_asset_map.py docs/governance/asset-map.yaml \
+              --schema schemas/asset-map.schema.json --out evidence/asset-map.json
+
+          # (5) E.4 — digital operational resilience testing programme (BLOCKING).
+          #     Honest FAIL until each required scenario class is conducted on cadence.
+          gen_artifact "Resilience programme (E.4)" "evidence/resilience-programme.json" "BLOCKING" \
+            python3 scripts/validators/check_resilience_programme.py \
+              docs/runbooks/resilience-testing-programme.yaml \
+              --schema schemas/resilience-programme.schema.json \
+              --out evidence/resilience-programme.json
+
+          # (6) A.7.7 — tamper-evident evidence-store access log (EVIDENCE-ONLY). The
+          #     live log (evidence/access-log.jsonl) needs Azure Storage diagnostic
+          #     logs routed to an immutable container; absent it the validator HONESTLY
+          #     emits INDETERMINATE ("no live evidence-store access log"). We never
+          #     fabricate an access trail; the posture envelope is still sealed.
+          gen_artifact "Access log posture (A.7.7)" "evidence/access-log-posture.json" "EVIDENCE-ONLY" \
+            python3 scripts/validators/check_access_log.py evidence/access-log.jsonl \
+              --schema schemas/access-log-posture.schema.json \
+              --out evidence/access-log-posture.json
+
+          {
+            echo "## Part-G Governance/Resilience Evidence (C.9/E.1/E.2/E.4/A.7.7)"
+            echo ""
+            echo "| Artifact | Status |"
+            echo "|----------|--------|"
+            for f in pentest-report.json tlpt-record.json ict-risk-framework.json asset-map.json resilience-programme.json access-log-posture.json; do
+              if [ -s "evidence/${f}" ]; then
+                st="$(jq -r '.status // .envelope.status // "present"' "evidence/${f}" 2>/dev/null || echo present)"
+                echo "| \`${f}\` | ${st} |"
+              else
+                echo "| \`${f}\` | MISSING |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Block non-PR runs on a BLOCKING FAIL (honest fail-closed); warn on PR so
+          # the dry-run pack still assembles (matches the matrix/aggregate gates).
+          # NOTE: with the current honest seeds (no pen test, no resilience drill, no
+          # initial ICT-risk review on record) this step WILL flag a BLOCKING failure
+          # on non-PR — that is the CORRECT fail-closed behaviour, not a regression;
+          # it clears only when the org conducts and records the real evidence.
+          if [ "${BLOCKING_FAIL}" -ne 0 ]; then
             if [ "${IS_PR}" = "true" ]; then
-              echo "::warning::Compliance gate (T-30): ${OVERALL} — WARN only on PR (dry-run pack still assembled)"
-              echo "| Verdict | WARN (PR) |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::warning::Part-G governance/resilience evidence has a BLOCKING failure — WARN only on PR"
             else
-              echo "::error::Compliance gate (T-30) FAILED: overall=${OVERALL}, ${BLOCKING} BLOCKING control(s) not PASS"
-              echo "| Verdict | FAIL |" >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::Part-G governance/resilience evidence BLOCKING failure (pentest/ict-risk/resilience) — fail-closed on non-PR (awaiting org-conducted evidence)"
               exit 1
             fi
-          else
-            echo "Compliance gate (T-30) PASS: 0 BLOCKING failures"
-            echo "| Verdict | PASS |" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       # Compliance matrix (content-validated, T-12..T-18). The generator EXITS 1
@@ -536,6 +665,176 @@ jobs:
             else
               echo "::error::Part C/D evidence BLOCKING failure (VEX/residual-risk/scope) — fail-closed on non-PR"
               exit 1
+            fi
+          fi
+
+      # T-115 / T-117 / T-118 — the remaining spec Part C validators
+      # (threat_model.py, runtime_hardening.py, cloud_posture.py) were invoked by
+      # ZERO workflows; only the offline sample-pack maker ran them. This step
+      # wires them into the REAL evidence run so their envelopes are emitted into
+      # evidence/, leaf-hashed into manifest.json + the RFC-6962 Merkle root, and
+      # sealed (and, for the signed artifacts below, cosign-covered). It MIRRORS
+      # the gen_artifact pattern of the Part C/D step above: each generator ALWAYS
+      # keeps whatever JSON it produced (sealed regardless of verdict), the
+      # {status,tier} T-33 envelope is read back, and a BLOCKING FAIL surfaces and
+      # fails the job on non-PR (warn on PR). Inputs are the canonical governance
+      # docs that exist in the repo:
+      #   * threat_model      (BLOCKING)      docs/security/threat-model.yaml ->
+      #                                       evidence/threat-model-validation.json
+      #   * runtime_hardening (BLOCKING)      app/Dockerfile (+ container-apps TF) ->
+      #                                       evidence/runtime-hardening.json
+      #   * cloud_posture     (EVIDENCE-ONLY) evidence/cloud-posture.json if a live
+      #                                       CSPM scan landed, else honest design-stage
+      #                                       INDETERMINATE -> evidence/cloud-posture.json
+      # Honesty: cloud_posture is EVIDENCE-ONLY here — with no live CSPM scan it
+      # records "design-stage / not-yet-scanned" INDETERMINATE and NEVER fabricates
+      # a CIS PASS; a *present* scan with a CRITICAL finding would still record FAIL.
+      # threat_model + runtime_hardening are BLOCKING (stale/incomplete threat model
+      # or a root-running container SHOULD turn this red on non-PR — do not weaken).
+      - name: Generate Part C runtime/threat/cloud evidence (T-115/T-117/T-118)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -uo pipefail
+          BLOCKING_FAIL=0
+
+          # gen_artifact <label> <out-file> <tier> <cmd...> — identical contract to
+          # the Part C/D step above: keep the JSON, read back {status,tier}, flag a
+          # BLOCKING non-PASS. (Uses `art_status`, not `status`, to avoid clashes.)
+          gen_artifact() {
+            local label="$1" out="$2" tier="$3"; shift 3
+            local rc=0
+            "$@" || rc=$?
+            if [ ! -s "${out}" ]; then
+              echo "::warning::${label}: generator produced no ${out} (rc=${rc})"
+              if [ "${tier}" = "BLOCKING" ]; then BLOCKING_FAIL=1; fi
+              return 0
+            fi
+            local art_status
+            art_status="$(jq -r '.status // (.envelope.status) // "UNKNOWN"' "${out}" 2>/dev/null || echo UNKNOWN)"
+            echo "${label}: status=${art_status} tier=${tier} -> ${out}"
+            if [ "${tier}" = "BLOCKING" ] && [ "${art_status}" != "PASS" ]; then
+              echo "::warning::${label} ${art_status} (BLOCKING): $(jq -r '.detail // .envelope.detail // ""' "${out}" 2>/dev/null)"
+              BLOCKING_FAIL=1
+            fi
+          }
+
+          # (1) STRIDE threat model (T-115). The canonical machine-readable model is
+          #     docs/security/threat-model.yaml (DERIVED from threat-model.md). The
+          #     validator emits the BLOCKING T-33 envelope into evidence/.
+          gen_artifact "Threat model" "evidence/threat-model-validation.json" "BLOCKING" \
+            python3 scripts/validators/threat_model.py docs/security/threat-model.yaml \
+              --out evidence/threat-model-validation.json
+
+          # (2) Runtime-hardening posture (T-118). Reads app/Dockerfile (non-root USER
+          #     is the BLOCKING invariant) + the container-apps Terraform for posture
+          #     facts. Platform-not-expressible controls are recorded INDETERMINATE,
+          #     never fabricated as enforced.
+          gen_artifact "Runtime hardening" "evidence/runtime-hardening.json" "BLOCKING" \
+            python3 scripts/validators/runtime_hardening.py \
+              --dockerfile app/Dockerfile \
+              --out evidence/runtime-hardening.json
+
+          # (3) Cloud posture / CSPM (T-117). EVIDENCE-ONLY: if a live CSPM scan landed
+          #     a cloud-posture.json into evidence/ this parses it (PASS iff 0 CRITICAL),
+          #     otherwise it emits the honest design-stage / not-yet-scanned
+          #     INDETERMINATE — NEVER a fabricated CIS PASS. The envelope is written to
+          #     evidence/cloud-posture.json so it is sealed into the pack. (A live scan
+          #     artifact, if present from an upstream phase, would be at the same path;
+          #     the validator returns INDETERMINATE on a missing/empty scan, so writing
+          #     the envelope there is the honest design-stage product.)
+          gen_artifact "Cloud posture (CSPM)" "evidence/cloud-posture.json" "EVIDENCE-ONLY" \
+            python3 scripts/validators/cloud_posture.py evidence/cloud-posture.json \
+              --doc docs/compliance/cspm-posture.md \
+              --out evidence/cloud-posture.json
+
+          {
+            echo "## Part C Runtime/Threat/Cloud Evidence (T-115/T-117/T-118)"
+            echo ""
+            echo "| Artifact | Status |"
+            echo "|----------|--------|"
+            for f in threat-model-validation.json runtime-hardening.json cloud-posture.json; do
+              if [ -s "evidence/${f}" ]; then
+                st="$(jq -r '.status // .envelope.status // "present"' "evidence/${f}" 2>/dev/null || echo present)"
+                echo "| \`${f}\` | ${st} |"
+              else
+                echo "| \`${f}\` | MISSING |"
+              fi
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Block non-PR runs on a BLOCKING FAIL (honest fail-closed); warn on PR
+          # so the dry-run pack still assembles (matches the matrix/aggregate gates).
+          if [ "${BLOCKING_FAIL}" -ne 0 ]; then
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Part C runtime/threat/cloud evidence has a BLOCKING failure — WARN only on PR"
+            else
+              echo "::error::Part C runtime/threat/cloud evidence BLOCKING failure (threat-model/runtime-hardening) — fail-closed on non-PR"
+              exit 1
+            fi
+          fi
+
+      # T-55 — reproducibility statement (Evidence Pack Part I.4, spec §7.6, X.3).
+      # verify-reproducibility.sh --emit was invoked by NOTHING; this wires it into
+      # the evidence run so reproducibility-statement.json (schema
+      # cyberforge.reproducibility-statement/v1) lands in evidence/ BEFORE the
+      # manifest/Merkle + seal steps below and is hashed + sealed into the pack.
+      # It anchors to the normalized provenance bundle (evidence/provenance.intoto.jsonl,
+      # produced by the "Normalize provenance filename" step above) when present.
+      # Honesty: a byte-for-byte rebuild is NOT performed here (TARGET-STATE per
+      # docs/reproducibility.md §5), so the emitter records verdict DESIGN-ONLY
+      # (anchored, digest_match_demonstrated=false) or INDETERMINATE (no anchor) —
+      # both are honest non-findings and must NOT fail the job. Only a genuine
+      # MISMATCH (exit 1) is a real reproducibility finding and is surfaced as a
+      # BLOCKING fail on non-PR (warn on PR), exactly like the other gates here.
+      - name: Generate reproducibility statement (T-55)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+        run: |
+          set -uo pipefail
+          PROV_ARG=()
+          if [ -s evidence/provenance.intoto.jsonl ]; then
+            PROV_ARG=(--provenance evidence/provenance.intoto.jsonl)
+          fi
+          set +e
+          bash scripts/verify-reproducibility.sh \
+            "${PROV_ARG[@]}" \
+            --emit evidence/reproducibility-statement.json
+          REPRO_RC=$?
+          set -e
+          if [ ! -s evidence/reproducibility-statement.json ] \
+             || ! jq -e . evidence/reproducibility-statement.json >/dev/null 2>&1; then
+            echo "::warning::verify-reproducibility.sh produced no/invalid reproducibility-statement.json (rc=${REPRO_RC})"
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::reproducibility-statement.json missing or invalid — fail-closed on non-PR"
+              exit 1
+            fi
+            echo "::warning::reproducibility-statement.json missing/invalid — WARN only on PR"
+          else
+            REPRO_VERDICT="$(jq -r '.verdict // "UNKNOWN"' evidence/reproducibility-statement.json)"
+            REPRO_BYTE="$(jq -r '.byte_reproducibility_status // "UNKNOWN"' evidence/reproducibility-statement.json)"
+            echo "reproducibility: verdict=${REPRO_VERDICT} byte_reproducibility=${REPRO_BYTE} (rc=${REPRO_RC})"
+            {
+              echo "## Reproducibility Statement (T-55)"
+              echo ""
+              echo "| Metric | Value |"
+              echo "|--------|-------|"
+              echo "| Verdict | ${REPRO_VERDICT} |"
+              echo "| Byte reproducibility | ${REPRO_BYTE} |"
+              echo "| Event | ${{ github.event_name }} |"
+            } >> "$GITHUB_STEP_SUMMARY"
+            # rc 1 = MISMATCH (a real, recorded reproducibility finding) -> BLOCKING.
+            # rc 2 = INDETERMINATE (no anchor) and rc 0 = DESIGN-ONLY/MATCH are honest
+            # non-findings (byte-for-byte rebuild is TARGET-STATE) and must NOT fail.
+            if [ "${REPRO_RC}" -eq 1 ]; then
+              jq -r '.rebuilt_image_digest // ""' evidence/reproducibility-statement.json \
+                | sed 's/^/::warning::reproducibility (MISMATCH) rebuilt_digest=/' || true
+              if [ "${IS_PR}" = "true" ]; then
+                echo "::warning::Reproducibility MISMATCH — WARN only on PR"
+              else
+                echo "::error::Reproducibility MISMATCH (rebuilt digest != provenance digest) — fail-closed on non-PR"
+                exit 1
+              fi
             fi
           fi
 
@@ -992,6 +1291,93 @@ jobs:
             echo "::warning::residency.json missing/invalid — WARN only on PR"
           fi
 
+      # Authoritative compliance gate (T-30/T-73): the interim aggregation above ran
+      # BEFORE the Part-C/D verdicts existed. Now that VEX/SoA/residual-risk/scope/
+      # threat-model/runtime-hardening/cloud-posture/source-control/crosswalk/gap have
+      # all been produced, re-aggregate with --no-run (idempotent: it INGESTS the
+      # already-produced verdicts, it does NOT re-run validators) to write the FULL
+      # A.1-A.10 + Part-C/D compliance-status.json, RE-SIGN it (the interim signature
+      # was over the pre-Part-C verdict), and apply the BLOCKING gate. This is the
+      # honest fail-closed gate: any BLOCKING Part-C FAIL/INDETERMINATE or a real
+      # A.x failure turns it red on non-PR; EVIDENCE-ONLY rows never trip it. Do NOT
+      # weaken this — a genuine BLOCKING fail SHOULD block a release run.
+      - name: Compliance gate — re-aggregate A.1-A.10 + Part-C/D (signed, blocking on non-PR)
+        env:
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
+          COSIGN_ISSUER: https://token.actions.githubusercontent.com
+        run: |
+          set -uo pipefail
+          set +e
+          python3 scripts/aggregate-compliance.py evidence/ --no-run
+          AGG_RC=$?
+          set -e
+          if [ ! -s evidence/compliance-status.json ]; then
+            echo "::error::re-aggregation produced no compliance-status.json"
+            exit 1
+          fi
+          OVERALL="$(jq -r '.overall_status // "FAIL"' evidence/compliance-status.json)"
+          BLOCKING="$(jq -r '.blocking_failures // 0' evidence/compliance-status.json)"
+          echo "compliance-status (full) overall=${OVERALL} blocking_failures=${BLOCKING} (rc=${AGG_RC})"
+
+          # Re-sign the now-complete verdict (the interim bundle signed the pre-Part-C
+          # JSON; overwrite it so the sealed bundle commits to the FULL verdict).
+          COSIGN_OK=0
+          if command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle evidence/compliance-status.cosign.bundle \
+                evidence/compliance-status.json >/dev/null 2>/tmp/cosign-compliance2.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s evidence/compliance-status.cosign.bundle ]; then
+                COSIGN_OK=1
+                echo "cosign: re-signed full compliance-status.json -> compliance-status.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign re-sign attempt ${attempt}/5 for compliance-status.json failed (rc=${rc})"
+              tail -n 3 /tmp/cosign-compliance2.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign not available — compliance-status.json left unsigned"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ]; then
+            if [ "${IS_PR}" != "true" ]; then
+              echo "::error::cosign signing of compliance-status.json failed (required on non-PR)"
+              exit 1
+            fi
+            echo "::warning::cosign signing failed — continuing (PR dry-run)"
+          fi
+
+          {
+            echo "## Compliance Gate (T-30 — full A.1-A.10 + Part-C/D)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Overall | ${OVERALL} |"
+            echo "| Blocking failures | ${BLOCKING} |"
+            echo "| Event | ${{ github.event_name }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          jq -r '
+            .controls[] | select(.tier == "BLOCKING" and .status != "PASS")
+            | "\(.control) (\(.task)) \(.status): \(.detail)"
+          ' evidence/compliance-status.json | while IFS= read -r row; do
+            [ -n "${row}" ] && echo "::warning::compliance: ${row}"
+          done
+          if [ "${AGG_RC}" -ne 0 ]; then
+            if [ "${IS_PR}" = "true" ]; then
+              echo "::warning::Compliance gate (T-30): ${OVERALL} — WARN only on PR (dry-run pack still assembled)"
+              echo "| Verdict | WARN (PR) |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::error::Compliance gate (T-30) FAILED: overall=${OVERALL}, ${BLOCKING} BLOCKING control(s) not PASS"
+              echo "| Verdict | FAIL |" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          else
+            echo "Compliance gate (T-30) PASS: 0 BLOCKING failures"
+            echo "| Verdict | PASS |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       # Generate human-readable README for auditors
       - name: Generate evidence README
         run: |
@@ -1020,6 +1406,10 @@ jobs:
           | soa-maturity.json | ISO 27001 Statement-of-Applicability maturity | ISO 27001 Annex A |
           | residual-risk.json | Residual-risk statement (accepted-risk register) | ISO 27001 Cl.6, DORA Art.6 |
           | scope-determination.json | Scope & applicability determination | DORA/NIS2/CRA/RODO scope |
+          | threat-model-validation.json | STRIDE threat-model validation (structural completeness + freshness) | ISO 27001 A.8.25/A.8.27, spec Part C.1 |
+          | runtime-hardening.json | Runtime-hardening posture (non-root invariant + ACA least-privilege facts) | NIS2 Art.21.2, spec Part C.15 |
+          | cloud-posture.json | CSPM cloud-posture statement (design-stage / live-scan CRITICAL count) | NIS2 Art.21.2.f, spec Part C.14 |
+          | reproducibility-statement.json | Build reproducibility statement (pinned anchors; byte-for-byte TARGET-STATE) | DORA Art.28, SLSA, spec Part I.4 |
           | manifest.sha256 | SHA256 checksums | SOC 2 CC7.1 |
           EOFREADME
 
@@ -1368,6 +1758,10 @@ jobs:
               "soa-maturity.json": "ISO 27001 SoA maturity scoring",
               "residual-risk.json": "Residual-risk statement (accepted-risk register)",
               "scope-determination.json": "Scope & applicability determination",
+              "threat-model-validation.json": "STRIDE threat-model validation (T-115)",
+              "runtime-hardening.json": "Runtime-hardening posture (non-root invariant, T-118)",
+              "cloud-posture.json": "CSPM cloud-posture statement (T-117)",
+              "reproducibility-statement.json": "Build reproducibility statement (T-55)",
               "manifest.sha256": "SHA256 checksums",
               "evidence-report.html": "Human-readable HTML report",
               "README.md": "Evidence pack documentation",

@@ -58,6 +58,62 @@ fi
 say "A.1-A.10 organizational gate (honest verdict; FAIL is OK for the demo)"
 python3 "${S}/aggregate-compliance.py" "${EVID}" >/dev/null 2>&1 || true
 
+# Part-G — governance / operational-resilience controls (C.9 / E.1 / E.2 / E.4 /
+# A.7.7). Each runs its DEDICATED file-driven validator over the seeded governance/
+# runbook input and emits its T-33 envelope INTO ${EVID} so the artifact is hashed
+# into manifest.json + the RFC-6962 Merkle root AND read back by the matrix +
+# re-aggregation passes (single source of truth). This MUST run BEFORE the matrix
+# below so the matrix GOVERNANCE rows read the emitted envelopes (not INDETERMINATE
+# "artifact missing"). Honest seeds flow straight through:
+#   * pentest          -> BLOCKING FAIL  (no pen test on record)            exit 1
+#   * tlpt             -> EVIDENCE-ONLY PASS (documented out-of-scope)      exit 0
+#   * ict-risk         -> BLOCKING INDETERMINATE (pending initial review)   exit 2
+#   * asset-map        -> BLOCKING PASS (real architectural data)           exit 0
+#   * resilience       -> BLOCKING FAIL (no drill conducted yet)            exit 1
+#   * access-log       -> EVIDENCE-ONLY INDETERMINATE (no live diag log)    exit 0/2
+# `|| true` on the BLOCKING controls keeps the offline maker assembling the pack
+# (the honest non-PASS envelope is STILL written into ${EVID}); these are real
+# control gaps awaiting org-conducted evidence, exactly like the A.10 restore-test.
+say "Part-G governance/resilience controls (C.9/E.1/E.2/E.4/A.7.7) -> evidence/"
+GV="${S}/validators"
+python3 "${GV}/check_pentest.py" "${PIPELINE_DIR}/docs/governance/pentest-report.yaml" \
+  --schema "${PIPELINE_DIR}/schemas/pentest-report.schema.json" \
+  --out "${EVID}/pentest-report.json" >/dev/null 2>&1 \
+  || true   # honest BLOCKING FAIL (exit 1) — artifact still written
+[ -s "${EVID}/pentest-report.json" ] \
+  || echo "WARN: check_pentest produced no pentest-report.json (C.9 verdict missing)"
+python3 "${GV}/check_tlpt.py" "${PIPELINE_DIR}/docs/governance/tlpt-record.yaml" \
+  "${PIPELINE_DIR}/schemas/tlpt-record.schema.json" \
+  --out "${EVID}/tlpt-record.json" >/dev/null 2>&1 \
+  || echo "WARN: check_tlpt produced no tlpt-record.json (C.9 TLPT verdict missing)"
+python3 "${GV}/check_ict_risk_framework.py" \
+  "${PIPELINE_DIR}/docs/governance/ict-risk-management-framework.md" \
+  --out "${EVID}/ict-risk-framework.json" >/dev/null 2>&1 \
+  || true   # honest BLOCKING INDETERMINATE (exit 2) — artifact still written
+[ -s "${EVID}/ict-risk-framework.json" ] \
+  || echo "WARN: check_ict_risk_framework produced no ict-risk-framework.json (E.1 verdict missing)"
+python3 "${GV}/check_asset_map.py" "${PIPELINE_DIR}/docs/governance/asset-map.yaml" \
+  --schema "${PIPELINE_DIR}/schemas/asset-map.schema.json" \
+  --out "${EVID}/asset-map.json" >/dev/null 2>&1 \
+  || echo "WARN: check_asset_map produced no asset-map.json (E.2 verdict missing)"
+python3 "${GV}/check_resilience_programme.py" \
+  "${PIPELINE_DIR}/docs/runbooks/resilience-testing-programme.yaml" \
+  --schema "${PIPELINE_DIR}/schemas/resilience-programme.schema.json" \
+  --out "${EVID}/resilience-programme.json" >/dev/null 2>&1 \
+  || true   # honest BLOCKING FAIL (exit 1) — artifact still written
+[ -s "${EVID}/resilience-programme.json" ] \
+  || echo "WARN: check_resilience_programme produced no resilience-programme.json (E.4 verdict missing)"
+# A.7.7 — the live access log (evidence/access-log.jsonl) needs Azure Storage
+# diagnostic logs routed to an immutable container; offline it does NOT exist, so
+# the validator HONESTLY emits INDETERMINATE ("no live evidence-store access log").
+# We never fabricate an access trail; the posture envelope is still sealed.
+python3 "${GV}/check_access_log.py" "${EVID}/access-log.jsonl" \
+  --schema "${PIPELINE_DIR}/schemas/access-log-posture.schema.json" \
+  --out "${EVID}/access-log-posture.json" >/dev/null 2>&1 \
+  || true   # EVIDENCE-ONLY INDETERMINATE offline — artifact still written
+[ -s "${EVID}/access-log-posture.json" ] \
+  || echo "WARN: check_access_log produced no access-log-posture.json (A.7.7 posture missing)"
+
 say "content-validated control matrix"
 bash "${S}/generate-compliance-matrix.sh" "${EVID}" > "${EVID}/compliance-matrix.json" 2>/dev/null || true
 
@@ -79,6 +135,17 @@ python3 "${V}/runtime_hardening.py" --dockerfile "${PIPELINE_DIR}/app/Dockerfile
   --tf "${PIPELINE_DIR}/infra/modules/container-apps/main.tf" \
   --out "${EVID}/runtime-hardening.json" >/dev/null 2>&1 \
   || echo "WARN: runtime_hardening validator unavailable — runtime-hardening.json missing"
+# T-117 — CSPM / cloud-posture (Part C.14). OFFLINE there is NO live Azure scan and
+# NO scan artifact, so cloud_posture.py takes its HONEST design-stage path and emits
+# an EVIDENCE-ONLY INDETERMINATE ("design-stage / not-yet-scanned"). We point the
+# scan arg at a path that does NOT exist on purpose so it can never read a stale or
+# fabricated scan; this is the correct, non-fabricated CIS posture for an offline run.
+# The envelope is written as cloud-posture.json so the pack carries the Part C.14
+# artifact and it is Merkle-covered (it was absent from the pack entirely before).
+python3 "${V}/cloud_posture.py" "${EVID}/cloud-posture-scan.json" \
+  --doc "${PIPELINE_DIR}/docs/compliance/cspm-posture.md" \
+  --out "${EVID}/cloud-posture.json" >/dev/null 2>&1 \
+  || echo "WARN: cloud_posture validator unavailable — cloud-posture.json missing"
 # Part B / 0.4 — scope & applicability determination
 python3 "${V}/applicability.py" "${PIPELINE_DIR}/docs/governance/applicability.yaml" \
   "${PIPELINE_DIR}/schemas/applicability.schema.json" \
@@ -112,8 +179,128 @@ PY
 else
   echo "WARN: no SBOM — VEX is image/SBOM-bound, skipping vex.openvex.json (honest)"
 fi
+# T-35 — A.5 retention verdict (assert-retention). The organizational aggregator
+# (aggregate-compliance.py) intentionally omits A.5 from its STATIC set because A.5
+# is the deploy-time OPA retention gate (retention-policy.rego) that consumes a live
+# tfplan — but the SAMPLE PACK must still carry an A.5 verdict so the pack's
+# compliance set holds all 10 of A.1-A.10 (it was 9/10 without this). Offline, with
+# no tfplan JSON, we derive the HONEST verdict from the Terraform SOURCE defaults of
+# the storage module (immutability_period_days=1825, lock_worm=false) via --from-tf.
+# This is the real configured posture, NOT a fabricated PASS (the validator emits an
+# honest INDETERMINATE because WORM is retention-only / not irreversibly locked — a
+# documented owner decision, T-46). Written as retention-policy.json so it is part of
+# the Merkle-covered compliance set.
+python3 "${V}/assert-retention.py" --from-tf "${PIPELINE_DIR}/infra/modules/storage" \
+  --policy "${PIPELINE_DIR}/docs/governance/evidence-retention-policy.md" \
+  --out "${EVID}/retention-policy.json" >/dev/null 2>&1 \
+  || true   # honest INDETERMINATE (exit 2) is expected offline — the artifact is still written
+[ -s "${EVID}/retention-policy.json" ] \
+  || echo "WARN: assert-retention produced no retention-policy.json — A.5 verdict missing"
+
+# T-109 — data-residency assertion (Evidence Pack Part 6 / §6.4). Emits residency.json
+# recording the deployed Azure region + lawful-transfer basis. Offline there is NO
+# `terraform apply`, so we read the SINGLE residency control point var.location from
+# the Terraform SOURCE default (infra/variables.tf) rather than a live apply, and
+# record applied_region honestly as "not-applied (offline)". The schema + worked
+# values are the contract pre-described in docs/poland-residency-summary.pl.md §1.3.
+# Legal determinations (transfer_basis etc.) are EVIDENCE-ONLY confirm-before-signoff,
+# carried as documented, NOT auto-attested as a legal fact.
+RESIDENCY_REGION="$(python3 - "${PIPELINE_DIR}/infra/variables.tf" <<'PY'
+import re, sys
+try:
+    txt = open(sys.argv[1], encoding="utf-8").read()
+except OSError:
+    print("polandcentral"); sys.exit(0)
+# Extract the default of variable "location" (the residency control point).
+m = re.search(r'variable\s+"location"\s*\{.*?default\s*=\s*"([^"]+)"', txt, re.S)
+print(m.group(1) if m else "polandcentral")
+PY
+)"
+python3 - "${EVID}/residency.json" "${RESIDENCY_REGION}" <<'PY'
+import json, sys
+out, region = sys.argv[1], sys.argv[2]
+# Region -> human-readable geography / at-rest jurisdiction. polandcentral is the
+# only worked region; anything else is recorded faithfully but jurisdiction is left
+# for confirm-before-signoff rather than guessed.
+GEO = {"polandcentral": ("Poland (Warsaw)", "EU/EEA — Poland")}
+geography, data_location = GEO.get(
+    region, (f"{region} (confirm geography)", "confirm jurisdiction")
+)
+doc = {
+    "schema": "cyberforge.residency/v1",
+    "azure_region": region,
+    "azure_region_geography": geography,
+    "data_location": data_location,
+    "transfer_basis": "intra-EU",
+    "transfer_mechanism": None,
+    "subprocessors_outside_eea": False,
+    "data_plane_stages": [
+        "azure-container-registry",
+        "azure-container-apps",
+        "azure-key-vault",
+        "evidence-worm-blob",
+    ],
+    "egress_to_confirm": [
+        {
+            "stage": "github-actions-runner",
+            "reason": "build/scan + security-gate execute on GitHub-hosted runners; commit metadata contains PII",
+            "status": "confirm-per-engagement",
+        }
+    ],
+    "retention_days": 1825,
+    "source_of_truth": {
+        "region": "infra/variables.tf:var.location",
+        "applied_region": "terraform output / azurerm_resource_group.this.location",
+    },
+    # Honest offline note: no `terraform apply` ran in this offline maker, so the
+    # APPLIED region is not measured here — azure_region is the source-of-truth
+    # default (var.location), to be reconciled against the applied region at deploy.
+    "applied_region": "not-applied (offline sample-pack run)",
+    "confirm_before_signoff": [
+        "applied region matches azure_region",
+        "no sub-processor egresses EU/EEA (or transfer_mechanism recorded)",
+        "GitHub Actions runner residency confirmed or SCCs-covered",
+    ],
+}
+with open(out, "w", encoding="utf-8") as f:
+    json.dump(doc, f, indent=2)
+    f.write("\n")
+print(f">>> residency.json emitted (azure_region={region})")
+PY
+
+# T-55 — reproducibility statement (spec Part I.4). Generate via the real script's
+# --emit path. Offline there is no provenance and no docker rebuild, so the script
+# honestly records verdict DESIGN-ONLY with digest_match_demonstrated=false and
+# byte_reproducibility_status=TARGET-STATE. We anchor it to the REAL HEAD commit of
+# this repo (honest pinned input) when git is available, so the statement reflects
+# the actual commit the pack was built from rather than "unknown". The artifact
+# (with git_commit + rebuild_procedure) is what T-55 requires; the verdict is not faked.
+REPRO_COMMIT="$(git rev-parse HEAD 2>/dev/null || true)"
+if [ -n "${REPRO_COMMIT}" ]; then
+  bash "${S}/verify-reproducibility.sh" --git-commit "${REPRO_COMMIT}" \
+    --emit "${EVID}/reproducibility-statement.json" >/dev/null 2>&1 || true
+else
+  bash "${S}/verify-reproducibility.sh" \
+    --emit "${EVID}/reproducibility-statement.json" >/dev/null 2>&1 || true
+fi
+# INDETERMINATE (exit 2) / DESIGN-ONLY is the honest offline verdict; artifact still written.
+[ -s "${EVID}/reproducibility-statement.json" ] \
+  || echo "WARN: verify-reproducibility produced no reproducibility-statement.json (T-55)"
+
 # T-35 — copy the signed A.1-A.10 verdicts + compliance gate alongside (already in
 # ${EVID} from the seed + aggregate step: compliance-status.json is the gate).
+
+# Re-aggregation pass (T-30/T-73): the FIRST aggregate-compliance.py call above ran
+# BEFORE the Part-C/D verdicts (threat-model-validation.json, runtime-hardening.json,
+# residual-risk.json, scope-determination.json, vex/soa/cloud/source-control/crosswalk
+# /gap) were generated, so those REQUIRED BLOCKING rows would otherwise read as
+# missing-verdict FAIL. The aggregator is idempotent; re-run it now with --no-run so
+# it INGESTS the already-produced Part-C/D verdicts (it does NOT re-run validators)
+# and writes the full A.1-A.10 + Part-C/D compliance-status.json. Honest FAIL rows
+# (e.g. A.10 restore-test) are preserved — this only stops the FALSE missing-verdict
+# failures for controls that were simply generated after the first pass.
+say "re-aggregate A.1-A.10 + Part-C/D verdicts (idempotent --no-run pass)"
+python3 "${S}/aggregate-compliance.py" "${EVID}" --no-run >/dev/null 2>&1 || true
 
 say "interim manifest, then HTML reports"
 GENERATED_AT="${GENERATED_AT:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}" REPORT_ID="${REPORT_ID:-cyberforge-demo-$(date -u +%Y%m%d)}" \

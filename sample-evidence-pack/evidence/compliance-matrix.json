@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-06-17T14:57:48Z",
+  "generated_at": "2026-06-18T10:41:39Z",
   "schema": "cyberforge-compliance-matrix/v2-content-validated",
-  "blocking_failures": 16,
+  "blocking_failures": 19,
   "frameworks": {
     "DORA": [
       {
@@ -208,23 +208,15 @@
       },
       {
         "article": "A.8.25",
-        "requirement": "Secure SDLC",
-        "evidence": "pipeline-run.json",
-        "validator": "pipeline-gates",
+        "requirement": "Secure SDLC (threat model)",
+        "evidence": "threat-model.yaml",
+        "validator": "threat-model",
         "status": "INDETERMINATE",
         "tier": "BLOCKING",
-        "measured": {
-          "sha_binding": {
-            "status": "INDETERMINATE",
-            "run_sha": null,
-            "provenance_commit": null
-          }
-        },
-        "threshold": {
-          "all_gates": "success"
-        },
-        "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
-        "tool_version": null
+        "measured": false,
+        "threshold": true,
+        "detail": "threat model: file not found",
+        "tool_version": "pyyaml 6.0.3"
       },
       {
         "article": "A.8.28",
@@ -395,6 +387,178 @@
           "all_gates": "success"
         },
         "detail": "pipeline-run.json: /cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/pipeline-run.json: file not found; sha-binding: pipeline-run.json: missing",
+        "tool_version": null
+      }
+    ],
+    "GOVERNANCE": [
+      {
+        "article": "DORA Art.24-26 / NIS2 21(2)(e) / ISO A.8.8",
+        "requirement": "Penetration testing (independent, >= annual, signed, findings retested)",
+        "evidence": "pentest-report.json",
+        "validator": "pentest",
+        "status": "FAIL",
+        "tier": "BLOCKING",
+        "measured": {
+          "status": "not-conducted",
+          "last_qualifying_test_date": null,
+          "qualifying_reports": 0,
+          "total_reports": 0,
+          "rejections": []
+        },
+        "threshold": {
+          "max_age_days": 365,
+          "tester_independence": true,
+          "scope": "non-empty",
+          "signed_report": "present",
+          "crit_high_findings": "remediation-tracked",
+          "min_qualifying_reports": 1
+        },
+        "detail": "FAIL: no penetration test on record (DORA/NIS2 C.9)",
+        "tool_version": null
+      },
+      {
+        "article": "DORA Art.26-27 / RTS (EU) 2025/1190",
+        "requirement": "DORA Threat-Led Penetration Testing (TLPT)",
+        "evidence": "tlpt-record.json",
+        "validator": "tlpt",
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": {
+          "in_scope": false,
+          "entity": "CyberForge",
+          "classification": "ICT third-party service provider (not a DORA-identified significant financial entity)",
+          "determination_date": "2026-06-18",
+          "tlpt_conducted": false
+        },
+        "threshold": {
+          "in_scope": "applicability determination only"
+        },
+        "detail": "TLPT not mandatory for current entity classification (documented determination). CyberForge: ICT third-party service provider (not a DORA-identified significant financial entity). Rationale: CyberForge is an ICT third-party service provider and has not been identified by any competent authority as a financial entity significant for TLPT purposes under DORA Art. 26(8). The mandatory triennial TLPT obligation (DORA Art. 26-27, RTS 2025/1190) therefore does not currently apply. This determination is reviewed whenever the entity's classification or a client contractual requirement changes; should the entity become in scope, in_scope is set to true and a real TLPT engagement is recorded under `tlpt` before this control can pass.",
+        "tool_version": null
+      },
+      {
+        "article": "DORA Art.6 / NIS2 21(2)(a) / ISO Cl.6.1,8.2",
+        "requirement": "ICT risk-management framework + annual review",
+        "evidence": "ict-risk-framework.json",
+        "validator": "ict-risk-framework",
+        "status": "INDETERMINATE",
+        "tier": "BLOCKING",
+        "measured": {
+          "missing_sections": [],
+          "review_date": null
+        },
+        "threshold": {
+          "max_age_days": 365,
+          "required_sections": [
+            "governance/ownership",
+            "risk appetite/tolerance",
+            "methodology reference",
+            "control-framework reference",
+            "review cadence"
+          ]
+        },
+        "detail": "INDETERMINATE: framework present with all required sections but no parseable 'Last Reviewed:' date (seed records 'pending initial management review') \u2014 cannot assess annual review freshness (DORA Art.6 / NIS2 Art.21(2)(a) (ICT risk-management framework + annual review))",
+        "tool_version": null
+      },
+      {
+        "article": "DORA Art.8",
+        "requirement": "Asset / dependency & critical-function map",
+        "evidence": "asset-map.json",
+        "validator": "asset-map",
+        "status": "PASS",
+        "tier": "BLOCKING",
+        "measured": {
+          "critical_functions_total": 5,
+          "high_criticality_functions": 4,
+          "assets_total": 23,
+          "assets_missing_owner": 0,
+          "schema_violations": 0,
+          "completeness_violations": 0,
+          "blocking_problem_count": 0
+        },
+        "threshold": {
+          "schema_violations": 0,
+          "completeness_violations": 0,
+          "min_supporting_assets_per_function": 1,
+          "rto_rpo_required_for": [
+            "high"
+          ]
+        },
+        "detail": "asset map OK: 5 critical functions (4 high, all with RTO+RPO) mapped onto 23 assets; every asset owned + classified; references resolve",
+        "tool_version": null
+      },
+      {
+        "article": "DORA Art.24-25",
+        "requirement": "Digital operational resilience testing programme",
+        "evidence": "resilience-programme.json",
+        "validator": "resilience-programme",
+        "status": "FAIL",
+        "tier": "BLOCKING",
+        "measured": {
+          "scenarios_total": 5,
+          "required_classes": [
+            "backup-restore",
+            "failover",
+            "DR-drill",
+            "dependency-outage",
+            "tabletop"
+          ],
+          "classes_present": [
+            "DR-drill",
+            "backup-restore",
+            "dependency-outage",
+            "failover",
+            "tabletop"
+          ],
+          "missing_classes": [],
+          "conducted_in_cadence": 0,
+          "pending_count": 5,
+          "pending": [
+            "RT-01 (backup-restore): never conducted (last_run null)",
+            "RT-02 (failover): never conducted (last_run null)",
+            "RT-03 (DR-drill): never conducted (last_run null)",
+            "RT-04 (dependency-outage): never conducted (last_run null)",
+            "RT-05 (tabletop): never conducted (last_run null)"
+          ],
+          "uncovered_required_classes": [
+            "backup-restore",
+            "failover",
+            "DR-drill",
+            "dependency-outage",
+            "tabletop"
+          ]
+        },
+        "threshold": {
+          "required_classes": [
+            "backup-restore",
+            "failover",
+            "DR-drill",
+            "dependency-outage",
+            "tabletop"
+          ],
+          "per_scenario": "last_run.outcome=='success' AND age<=cadence_days",
+          "min_conducted_per_class": 1
+        },
+        "detail": "FAIL: pending scenarios: RT-01 (backup-restore): never conducted (last_run null); RT-02 (failover): never conducted (last_run null); RT-03 (DR-drill): never conducted (last_run null); RT-04 (dependency-outage): never conducted (last_run null); RT-05 (tabletop): never conducted (last_run null)",
+        "tool_version": null
+      },
+      {
+        "article": "SPEC \u00a77 item 7 / ISO A.8.15,A.5.28 / DORA Art.9(3)",
+        "requirement": "Tamper-evident evidence-store access log",
+        "evidence": "access-log-posture.json",
+        "validator": "access-log",
+        "status": "INDETERMINATE",
+        "tier": "EVIDENCE-ONLY",
+        "measured": {
+          "present": false,
+          "entries": 0
+        },
+        "threshold": {
+          "present": true,
+          "non_empty": true,
+          "hash_chain": "verifies (prev_hash links, entry_hash recomputes, seq contiguous)"
+        },
+        "detail": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/access-log.jsonl: no live evidence-store access log (needs Azure Storage diagnostic logs -> immutable container); cannot verify access trail",
         "tool_version": null
       }
     ]

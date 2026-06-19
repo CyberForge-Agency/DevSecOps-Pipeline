@@ -7,11 +7,29 @@ resource "azurerm_storage_account" "this" {
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
   # Network hardening: when var.network_hardened = true, disable public network
-  # access so the account is reachable only via private endpoints / explicit IP
-  # rules (regulated clients). Default false keeps the current public behavior —
-  # nothing changes unless opted in.
+  # access AND apply a deny-by-default network_rules block (below), so the account
+  # is reachable only via the trusted Azure-services bypass plus any explicit
+  # IP / subnet allowlist (var.network_allowed_ip_rules,
+  # var.network_allowed_subnet_ids). Default false keeps the current public
+  # behavior — public_network_access stays enabled and network_rules defaults to
+  # Allow — so nothing changes unless opted in.
   public_network_access_enabled = !var.network_hardened
   tags                          = var.tags
+
+  # Deny-by-default firewall, gated on var.network_hardened. The provider DEFAULTS
+  # default_action to "Allow", so without this block the "explicit IP rules only"
+  # posture would NOT hold even with public access disabled. The dynamic block
+  # emits network_rules ONLY when hardened, leaving the demo path on the provider
+  # default (Allow) and unchanged.
+  dynamic "network_rules" {
+    for_each = var.network_hardened ? [1] : []
+    content {
+      default_action             = "Deny"
+      bypass                     = ["AzureServices"]
+      ip_rules                   = var.network_allowed_ip_rules
+      virtual_network_subnet_ids = var.network_allowed_subnet_ids
+    }
+  }
 
   blob_properties {
     versioning_enabled = true
@@ -99,5 +117,34 @@ resource "azurerm_storage_management_policy" "lifecycle_retention" {
         delete_after_days_since_modification_greater_than = var.enable_lifecycle_delete ? var.immutability_period_days + var.delete_grace_days : null
       }
     }
+  }
+}
+
+# Optional private endpoint scaffolding (opt-in, off by default).
+#
+# When var.private_endpoint_subnet_id is set (non-empty), provision a private
+# endpoint for the blob sub-resource so the storage account is reachable over a
+# private IP inside the supplied subnet — the recommended companion to
+# network_hardened = true (which denies public/general network access). Left empty
+# (the default) this resource is NOT created, so the demo path is unchanged and
+# the module has no hard dependency on an existing VNet/subnet.
+#
+# NOTE: private DNS zone wiring (privatelink.blob.core.windows.net + an
+# azurerm_private_dns_zone_group) is environment-specific and intentionally NOT
+# created here; document/operate it per environment. Without it, name resolution
+# to the private IP must be handled by the caller's DNS. See SETUP.md §8.1.
+resource "azurerm_private_endpoint" "blob" {
+  count               = var.private_endpoint_subnet_id != "" ? 1 : 0
+  name                = "${var.storage_account_name}-blob-pe"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = var.private_endpoint_subnet_id
+  tags                = var.tags
+
+  private_service_connection {
+    name                           = "${var.storage_account_name}-blob-psc"
+    private_connection_resource_id = azurerm_storage_account.this.id
+    subresource_names              = ["blob"]
+    is_manual_connection           = false
   }
 }

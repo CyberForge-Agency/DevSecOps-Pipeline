@@ -172,11 +172,17 @@ def test_extract_compliant_plan():
     assert a["source"] == "plan"
 
 
-def test_opa_input_is_exactly_three_rego_fields():
+def test_opa_input_is_exactly_the_rego_fields():
     a = t24.extract(_compliant_plan())
     opa = t24._opa_input(a)
-    assert set(opa) == {"retention_days", "worm_enabled", "deletion_schedule"}
+    assert set(opa) == {
+        "retention_days",
+        "worm_enabled",
+        "deletion_schedule",
+        "delete_after_days",
+    }
     assert opa["retention_days"] == 1825
+    assert opa["delete_after_days"] == 1825
     assert opa["worm_enabled"] is True
 
 
@@ -253,8 +259,13 @@ def test_worm_disabled_fails_even_at_1825():
     assert lc.exit_code_for(env["status"], env["tier"]) == 1
 
 
-def test_missing_deletion_schedule_fails():
-    """WORM present at 1825 but no lifecycle delete rule -> FAIL (RODO Art.5.1.e)."""
+def test_missing_deletion_schedule_passes_under_worm():
+    """WORM present at 1825 with NO lifecycle delete -> PASS (T-10/T-62).
+
+    The recommended posture: deletion is governed by the WORM/legal-hold window,
+    not a lifecycle rule, so an absent delete is compliant (not a RODO violation —
+    storage limitation is met by the defined 1825-day retention period).
+    """
     plan = _compliant_plan()
     res = plan["planned_values"]["root_module"]["child_modules"][0]["resources"]
     plan["planned_values"]["root_module"]["child_modules"][0]["resources"] = [
@@ -262,9 +273,27 @@ def test_missing_deletion_schedule_fails():
     ]
     a = t24.extract(plan)
     assert a["deletion_schedule"] == ""
+    assert a["delete_after_days"] is None
+    env = t24.build_envelope(a)
+    assert env["status"] == lc.Status.PASS
+
+
+def test_short_lifecycle_delete_is_footgun_fail():
+    """A lifecycle delete SHORTER than the immutability period -> FAIL (T-10/T-62).
+
+    Such a delete would purge evidence before the WORM period expires.
+    """
+    plan = _compliant_plan()
+    res = plan["planned_values"]["root_module"]["child_modules"][0]["resources"]
+    for r in res:
+        if r["type"] == "azurerm_storage_management_policy":
+            base = r["values"]["rule"][0]["actions"][0]["base_blob"][0]
+            base["delete_after_days_since_modification_greater_than"] = 30
+    a = t24.extract(plan)
+    assert a["delete_after_days"] == 30
     env = t24.build_envelope(a)
     assert env["status"] == lc.Status.FAIL
-    assert "deletion schedule" in env["detail"]
+    assert "shorter than" in env["detail"]
 
 
 def test_disabled_lifecycle_rule_is_not_a_schedule():
@@ -324,7 +353,12 @@ def test_main_opa_input_mode_exit_zero(tmp_path, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     payload = json.loads(out)
-    assert set(payload) == {"retention_days", "worm_enabled", "deletion_schedule"}
+    assert set(payload) == {
+        "retention_days",
+        "worm_enabled",
+        "deletion_schedule",
+        "delete_after_days",
+    }
 
 
 def test_main_envelope_pass_exit_zero(tmp_path, capsys):

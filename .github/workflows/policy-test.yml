@@ -13,12 +13,9 @@
 #   push and pull_request so the policy tests gate both events independently and
 #   can be registered as a required status check in branch-protection.json (T-67).
 #
-# fmt note (honest): `opa fmt` is canonically TAB-indented; the committed policies
-#   use 2-space indentation, so `opa fmt -l` currently lists them. The policies are
-#   not editable from this change set, so the fmt step is ADVISORY (warn, never
-#   blocks) until they are reformatted to tabs. `opa test` is the BLOCKING gate —
-#   a broken rule turns this red. Flip the fmt step to blocking once the policies
-#   are `opa fmt`-clean (see follow-up).
+# fmt note: the policies are now `opa fmt`-clean (tab-indented, reformatted via
+#   `opa fmt -w policies/`), so BOTH gates are BLOCKING: `opa test` fails on a broken
+#   rule (PASS 14/14 today) and `opa fmt -l` fails the job on any formatting drift.
 
 name: "Policy Test (OPA)"
 
@@ -62,29 +59,27 @@ jobs:
       - name: opa test policies/
         run: opa test policies/ -v
 
-      # ADVISORY (see fmt note in the header): surfaces formatting drift without
-      # blocking, because the committed policies are 2-space-indented and not
-      # editable from this change set. The `|| true` keeps it non-blocking; the
-      # listing is still printed and summarized for visibility.
-      - name: opa fmt -l policies/ (advisory)
+      # BLOCKING (T-64): the policies are now `opa fmt`-clean (tab-indented), so any
+      # formatting drift fails the job and cannot land on main.
+      - name: opa fmt -l policies/ (blocking)
         run: |
           set -uo pipefail
-          UNFORMATTED="$(opa fmt -l policies/ || true)"
+          UNFORMATTED="$(opa fmt -l policies/)"
           {
             echo "## OPA Policy Self-Test (T-64)"
             echo ""
             if [ -n "${UNFORMATTED}" ]; then
-              echo ":warning: The following Rego files are not \`opa fmt\`-clean (tabs):"
+              echo ":x: The following Rego files are not \`opa fmt\`-clean (run \`opa fmt -w policies/\`):"
               echo ""
               echo '```'
               echo "${UNFORMATTED}"
               echo '```'
-              echo ""
-              echo "_Advisory only — reformat to tabs to make this a blocking gate._"
             else
               echo ":white_check_mark: All Rego policies are \`opa fmt\`-clean."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
           if [ -n "${UNFORMATTED}" ]; then
-            echo "::warning::opa fmt: unformatted Rego (advisory): ${UNFORMATTED}"
+            echo "::error::opa fmt: unformatted Rego — run 'opa fmt -w policies/':"
+            echo "${UNFORMATTED}"
+            exit 1
           fi

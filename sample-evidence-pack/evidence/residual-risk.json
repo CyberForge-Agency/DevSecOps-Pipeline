@@ -9,7 +9,7 @@
   "detail": "1 open accepted risk(s); all bounded with named approver + justification + future expiry (<=12mo)",
   "tool_version": null,
   "validator": "risk_acceptance",
-  "checked_at": "2026-06-17T14:57:49Z",
+  "checked_at": "2026-06-18T10:41:41Z",
   "register": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/compliance/exception-register.md",
   "errors": [],
   "residual_risk": {
@@ -20,7 +20,7 @@
     "soonest_expiry": {
       "id": "EXC-001",
       "expiry": "2026-09-15",
-      "days_to_expiry": 90
+      "days_to_expiry": 89
     },
     "open_risks": [
       {
@@ -31,7 +31,7 @@
         "owner": "Jan Kowalski",
         "approver": "Anna Nowak (CTO)",
         "expiry": "2026-09-15",
-        "days_to_expiry": 90,
+        "days_to_expiry": 89,
         "violations": []
       }
     ],
@@ -44,7 +44,7 @@
       "tolerance_document": "docs/governance/risk-acceptance-process.md",
       "risk_register": "docs/governance/risk-register.md"
     },
-    "statement": "As of 2026-06-17, 1 accepted ICT risk(s) remain open, each formally approved, justified, and time-bounded. Residual risk is asserted to remain within the board-approved risk tolerance (DORA Art. 5(2)); this statement is to be signed by the accountable officer at seal time.",
+    "statement": "As of 2026-06-18, 1 accepted ICT risk(s) remain open, each formally approved, justified, and time-bounded. Residual risk is asserted to remain within the board-approved risk tolerance (DORA Art. 5(2)); this statement is to be signed by the accountable officer at seal time.",
     "signed_by_accountable_officer": false
   }
 }

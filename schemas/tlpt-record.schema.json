@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberforge.dev/schemas/tlpt-record.schema.json",
+  "title": "DORA Threat-Led Penetration Testing (TLPT) Record",
+  "description": "Schema for the TLPT determination + record mandated by DORA Art.26-27 and Commission Delegated Regulation (EU) 2025/1190 (RTS specifying TLPT). TLPT (TIBER-EU aligned) is mandatory at least every 3 years ONLY for financial entities the competent authority identifies as significant for TLPT purposes (DORA Art.26(8) / RTS 2025/1190). This record therefore FIRST documents the entity's in-scope determination (in_scope) and, when in_scope==true, the actual TLPT engagement evidence. The applicability determination is itself the honest control: a documented out-of-scope rationale is EVIDENCE-ONLY (not a fabricated compliance pass), and an in-scope-but-not-yet-conducted entity HONESTLY FAILs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "entity",
+    "in_scope",
+    "scope_rationale"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "regulation": {
+      "type": "object",
+      "description": "Provenance of the regulatory mapping (informational).",
+      "properties": {
+        "framework": { "type": "string" },
+        "article": { "type": "string" },
+        "rts": { "type": "string" },
+        "methodology": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "entity": {
+      "type": "object",
+      "description": "The entity to which the TLPT determination applies.",
+      "additionalProperties": false,
+      "required": ["name", "classification"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "classification": {
+          "description": "Entity classification relevant to TLPT scoping, e.g. 'ICT third-party service provider', 'significant credit institution'.",
+          "type": "string",
+          "minLength": 1
+        },
+        "lei": { "type": ["string", "null"] }
+      }
+    },
+    "in_scope": {
+      "description": "True iff the competent authority has identified this entity as significant for TLPT purposes (DORA Art.26(8)). TLPT is mandatory only when true.",
+      "type": "boolean"
+    },
+    "scope_rationale": {
+      "description": "Documented determination of why the entity is / is not in scope. Mandatory in BOTH cases so the out-of-scope determination is itself auditable evidence, not a silent skip.",
+      "type": "string",
+      "minLength": 1
+    },
+    "determination_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "tlpt": {
+      "description": "The actual TLPT engagement record. Required content only when in_scope==true; left null / pending until a real test is conducted (do NOT fabricate).",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "conducted": { "type": "boolean" },
+        "test_date": {
+          "description": "ISO-8601 date the TLPT (active red-team phase) completed.",
+          "type": ["string", "null"],
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "external_testers": {
+          "description": "True iff the test was performed by external testers meeting RTS 2025/1190 requirements (DORA Art.27).",
+          "type": "boolean"
+        },
+        "testers": { "type": ["string", "null"] },
+        "authority_signoff": {
+          "description": "True iff the competent authority validated the scope / issued the attestation of TLPT completion (DORA Art.26(6)-(7)).",
+          "type": "boolean"
+        },
+        "authority": { "type": ["string", "null"] },
+        "closure_status": {
+          "description": "Remediation closure status of findings.",
+          "type": ["string", "null"],
+          "enum": ["open", "in_progress", "remediated", "closed", null]
+        },
+        "report_ref": { "type": ["string", "null"] }
+      }
+    }
+  }
+}
