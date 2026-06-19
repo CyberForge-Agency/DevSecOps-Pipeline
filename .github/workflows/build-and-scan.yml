@@ -39,11 +39,12 @@ on:
           Parsed from coverage/coverage-summary.json, not hardcoded (T-03).
         value: ${{ jobs.unit-tests.outputs.coverage_pct }}
 
+# Least privilege (OpenSSF Scorecard Token-Permissions): top-level is read-only;
+# each write scope is declared at the job level on the job(s) that use it
+# (security-events on the SARIF-upload job, id-token on the OIDC/build-push job).
 permissions:
   contents: read
   actions: read
-  security-events: write
-  id-token: write
 
 env:
   ACR_REGISTRY: ${{ vars.ACR_REGISTRY }}
@@ -54,6 +55,8 @@ jobs:
     name: "Dependency Scan (Trivy SCA)"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read        # actions/checkout; Trivy fs scan results go to an artifact, no SARIF upload / OIDC / push
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -195,6 +198,9 @@ jobs:
     name: "SAST (CodeQL)"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read           # actions/checkout + npm build context
+      security-events: write   # github/codeql-action/upload-sarif (Code Scanning upload)
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -477,6 +483,8 @@ jobs:
     name: "Unit Tests + Coverage"
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read        # actions/checkout + npm test; coverage report goes to an artifact only
     outputs:
       # coverage_pct is the SAME value enforced by the 80% gate below — the min
       # of line/branch/function/statement pct, parsed from coverage-summary.json.
@@ -599,6 +607,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [dependency-scan, codeql, unit-tests]
+    permissions:
+      contents: read        # actions/checkout
+      id-token: write       # azure/login OIDC to push the image to ACR (gated on inputs.push_image == 'true')
+    # NOTE: no `packages: write` — the image is pushed to Azure ACR via `az acr login`
+    # (Azure creds), not GHCR/GitHub Packages, so the GITHUB_TOKEN packages scope is not used.
     outputs:
       image_uri: ${{ steps.meta.outputs.image_uri }}
       image_digest: ${{ steps.build.outputs.digest }}
