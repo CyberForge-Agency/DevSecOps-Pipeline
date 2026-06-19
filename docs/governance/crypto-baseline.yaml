@@ -24,9 +24,13 @@
 min_tls_version: "TLS1_2"
 
 # Resource types whose `min_tls_version` is asserted against the floor above.
+# NOTE: azurerm_key_vault is intentionally NOT listed — Key Vault does not expose
+# `min_tls_version` in its Terraform schema; Azure enforces TLS 1.2+ for Key Vault
+# unconditionally (platform-negotiated, like the cipher floor below, so it is NOT
+# IaC-assertable — listing it only yields a false INDETERMINATE on min_tls_version=
+# None). Key Vault's posture is asserted under `key_management` instead.
 tls_resource_types:
   - azurerm_storage_account
-  - azurerm_key_vault
 
 # --- BLOCKING: at-rest encryption -------------------------------------------
 # Azure Storage applies service-side encryption (SSE) at rest unconditionally, so
