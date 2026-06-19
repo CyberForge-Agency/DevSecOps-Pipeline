@@ -1019,7 +1019,8 @@ fail-closed enforcement with a concrete remediation pointer, not a green-for-sho
 // ═══════════════════════════════════════════════════════════════════
 const DATA = JSON.parse(document.getElementById('evidence-data').textContent);
 const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl = u => { const s = String(u ?? '').trim(); return /^(https?:|mailto:|#|\/)/i.test(s) ? s : '#'; };
 
 // ── Tab switching ────────────────────────────────────────────────────
 document.querySelectorAll('.tab').forEach(t => {
@@ -1060,7 +1061,7 @@ function renderDashboard() {
   $('d-ref').textContent = p.ref;
   $('d-sha').textContent = p.sha;
   $('d-repo-link').textContent = p.repo;
-  $('d-repo-link').href = p.repo_url;
+  $('d-repo-link').href = safeUrl(p.repo_url);
   $('d-env').textContent = p.environment;
   $('d-imguri').textContent = p.image_uri;
   $('d-imgdigest').textContent = p.image_digest;
@@ -1076,7 +1077,7 @@ function renderDashboard() {
   const phaseRow = $('phaseRow');
   phaseRow.innerHTML = phaseKeys.map((k, i) => {
     const status = p.gates[k] || 'skipped';
-    return `<div class="ph-node"><div class="ph-circle ${status}">${i+1}</div><div class="ph-name">${phaseLabels[i]}</div><div class="ph-status ${status}">${status}</div></div>`;
+    return `<div class="ph-node"><div class="ph-circle ${esc(status)}">${i+1}</div><div class="ph-name">${phaseLabels[i]}</div><div class="ph-status ${esc(status)}">${esc(status)}</div></div>`;
   }).join('') + `<div class="ph-node"><div class="ph-circle success">6</div><div class="ph-name">Evidence Pack</div><div class="ph-status success">success</div></div>`;
 
   // KPI row
@@ -1092,7 +1093,7 @@ function renderDashboard() {
     {n: s.manifest_files, l: 'Manifested Files', cls: ''},
   ];
   $('kpiRow').innerHTML = kpis.map(k =>
-    `<div class="kpi ${k.cls}"><div class="kpi-num">${k.n}</div><div class="kpi-lbl">${k.l}</div>${k.sub?`<div class="kpi-sub">${k.sub}</div>`:''}</div>`
+    `<div class="kpi ${k.cls}"><div class="kpi-num">${esc(k.n)}</div><div class="kpi-lbl">${esc(k.l)}</div>${k.sub?`<div class="kpi-sub">${esc(k.sub)}</div>`:''}</div>`
   ).join('');
 
   // Donut for compliance
@@ -1106,7 +1107,7 @@ function renderDashboard() {
   // Per-framework bars
   $('fwBars').innerHTML = DATA.compliance.map(fw => {
     const p = fw.total ? (fw.passed*100/fw.total) : 0;
-    return `<div class="bar-row"><div class="bar-label">${fw.name}</div><div class="bar-track"><div class="bar-fill" style="width:${p}%;background:linear-gradient(90deg,var(--blue) 0%,var(--green) 100%)"></div></div><div class="bar-value">${fw.passed}/${fw.total}</div></div>`;
+    return `<div class="bar-row"><div class="bar-label">${esc(fw.name)}</div><div class="bar-track"><div class="bar-fill" style="width:${p}%;background:linear-gradient(90deg,var(--blue) 0%,var(--green) 100%)"></div></div><div class="bar-value">${esc(fw.passed)}/${esc(fw.total)}</div></div>`;
   }).join('');
 
   // Trivy bars
@@ -1114,7 +1115,7 @@ function renderDashboard() {
   function sevBars(counts) {
     const max = Math.max(1, ...Object.values(counts));
     return Object.entries(counts).map(([sev,n]) =>
-      `<div class="bar-row"><div class="bar-label">${sev}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:${sevColors[sev]||'var(--blue)'}"></div></div><div class="bar-value">${n}</div></div>`
+      `<div class="bar-row"><div class="bar-label">${esc(sev)}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:${sevColors[sev]||'var(--blue)'}"></div></div><div class="bar-value">${esc(n)}</div></div>`
     ).join('');
   }
   $('trivyBars').innerHTML = sevBars(DATA.trivy_sca.severity_count);
@@ -1145,7 +1146,7 @@ function renderVulns() {
   $('vulnEmpty').style.display = filtered.length ? 'none' : 'block';
   $('vulnRows').innerHTML = filtered.map((v, idx) => `
     <tr class="expander" data-idx="${idx}">
-      <td><span class="sev sev-${v.severity}">${v.severity}</span></td>
+      <td><span class="sev sev-${esc(v.severity)}">${esc(v.severity)}</span></td>
       <td><code>${esc(v.cve)}</code><span class="expand-icon">+</span></td>
       <td><code>${esc(v.package)}</code></td>
       <td><code>${esc(v.installed)}</code></td>
@@ -1155,7 +1156,7 @@ function renderVulns() {
     </tr>
     <tr class="detail-row" id="vd-${idx}"><td colspan="7"><div class="detail-content">
       <dl>
-        <dt>CVE</dt><dd><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.cve)}</a></dd>
+        <dt>CVE</dt><dd><a href="${esc(safeUrl(v.url))}" target="_blank" rel="noopener">${esc(v.cve)}</a></dd>
         <dt>Target</dt><dd><code>${esc(v.target)}</code></dd>
         <dt>CVSS Score</dt><dd>${esc(v.cvss||'n/a')}</dd>
         <dt>Published</dt><dd>${esc(v.published||'—')}</dd>
@@ -1188,16 +1189,16 @@ let sbomQ = '';
 function renderSbom() {
   const s = DATA.sbom;
   $('cnt-sbom').textContent = s.total;
-  $('sbomMeta').innerHTML = `<strong>${s.total}</strong> components · format <code>${esc(s.format)}</code>`;
+  $('sbomMeta').innerHTML = `<strong>${esc(s.total)}</strong> components · format <code>${esc(s.format)}</code>`;
   // Type breakdown
   $('sbomTypes').innerHTML = Object.entries(s.types).map(([t,n]) => {
     const pct = (n/s.total*100).toFixed(1);
-    return `<div class="bar-row"><div class="bar-label">${esc(t)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--blue)"></div></div><div class="bar-value">${n}</div></div>`;
+    return `<div class="bar-row"><div class="bar-label">${esc(t)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--blue)"></div></div><div class="bar-value">${esc(n)}</div></div>`;
   }).join('');
   // Licenses
   $('sbomLicenses').innerHTML = Object.entries(s.licenses).map(([l,n]) => {
     const max = Math.max(...Object.values(s.licenses), 1);
-    return `<div class="bar-row"><div class="bar-label">${esc(l)}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:var(--purple)"></div></div><div class="bar-value">${n}</div></div>`;
+    return `<div class="bar-row"><div class="bar-label">${esc(l)}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:var(--purple)"></div></div><div class="bar-value">${esc(n)}</div></div>`;
   }).join('') || '<p class="empty">No license metadata found.</p>';
   // Filter & render
   const filtered = s.components.filter(c => {
@@ -1218,7 +1219,7 @@ function renderDast() {
   $('zapTarget').textContent = z.target || '(unknown)';
   $('zapKpis').innerHTML = ['High','Medium','Low','Informational'].map(s => {
     const cls = s==='High'?'red':s==='Medium'?'amber':'';
-    return `<div class="kpi ${cls}"><div class="kpi-num">${z.severity_count[s]||0}</div><div class="kpi-lbl">${s}</div></div>`;
+    return `<div class="kpi ${cls}"><div class="kpi-num">${esc(z.severity_count[s]||0)}</div><div class="kpi-lbl">${esc(s)}</div></div>`;
   }).join('');
   const filtered = z.alerts.filter(a => {
     if (zapFilter.sev !== 'all' && a.risk !== zapFilter.sev) return false;
@@ -1227,11 +1228,11 @@ function renderDast() {
   });
   $('zapAlerts').innerHTML = filtered.length ? filtered.map((a,i) => `
     <div class="card">
-      <h3><span class="sev sev-${a.risk}">${a.risk}</span> ${esc(a.name)}</h3>
+      <h3><span class="sev sev-${esc(a.risk)}">${esc(a.risk)}</span> ${esc(a.name)}</h3>
       <table><tbody>
         <tr><td><strong>Confidence</strong></td><td>${esc(a.confidence)}</td></tr>
         ${a.cwe?`<tr><td><strong>CWE</strong></td><td><a href="https://cwe.mitre.org/data/definitions/${esc(a.cwe)}.html" target="_blank" rel="noopener">CWE-${esc(a.cwe)}</a></td></tr>`:''}
-        <tr><td><strong>Instances</strong></td><td>${a.count} (showing ${Math.min(a.instances.length,10)})</td></tr>
+        <tr><td><strong>Instances</strong></td><td>${esc(a.count)} (showing ${Math.min(a.instances.length,10)})</td></tr>
       </tbody></table>
       <h4>Description</h4>
       <p>${esc(a.desc)}</p>
@@ -1256,11 +1257,11 @@ let activeFw = null;
 function renderCompliance() {
   $('fwGrid').innerHTML = DATA.compliance.map(fw => {
     const cls = activeFw === fw.name ? 'active' : '';
-    return `<div class="fw-card ${cls}" data-fw="${esc(fw.name)}"><div class="fw-name">${esc(fw.name)}</div><div class="fw-cov">${fw.passed}/${fw.total}</div><div class="fw-lbl">controls</div></div>`;
+    return `<div class="fw-card ${cls}" data-fw="${esc(fw.name)}"><div class="fw-name">${esc(fw.name)}</div><div class="fw-cov">${esc(fw.passed)}/${esc(fw.total)}</div><div class="fw-lbl">controls</div></div>`;
   }).join('');
   $('fwControls').innerHTML = DATA.compliance.map(fw => `
     <div class="fw-controls ${activeFw===fw.name?'active':''}" data-fw="${esc(fw.name)}">
-      <h3>${esc(fw.name)} — ${fw.passed} of ${fw.total} controls satisfied</h3>
+      <h3>${esc(fw.name)} — ${esc(fw.passed)} of ${esc(fw.total)} controls satisfied</h3>
       <table><thead><tr><th>Article</th><th>Requirement</th><th>Evidence</th><th>Status</th></tr></thead><tbody>
         ${fw.controls.map(c => `<tr>
           <td><strong>${esc(c.article)}</strong></td>
@@ -1427,8 +1428,8 @@ function renderDataFlow() {
 // ── RAW ──────────────────────────────────────────────────────────────
 function renderRaw() {
   $('rawJson').textContent = JSON.stringify(DATA.pipeline, null, 2);
-  $('codeqlStat').innerHTML = `<strong>${DATA.codeql.findings.length}</strong> findings across <strong>${DATA.codeql.rules_count}</strong> rules`;
-  $('checkovStat').innerHTML = `<strong>${DATA.checkov.findings.length}</strong> findings across <strong>${DATA.checkov.rules_count}</strong> rules`;
+  $('codeqlStat').innerHTML = `<strong>${esc(DATA.codeql.findings.length)}</strong> findings across <strong>${esc(DATA.codeql.rules_count)}</strong> rules`;
+  $('checkovStat').innerHTML = `<strong>${esc(DATA.checkov.findings.length)}</strong> findings across <strong>${esc(DATA.checkov.rules_count)}</strong> rules`;
   const cov = DATA.coverage;
   $('coverageStat').innerHTML = cov.available ? `
     <table><tbody>

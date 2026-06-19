@@ -1,7 +1,7 @@
 {
   "schema": "cyberforge-evidence-manifest/v1",
-  "report_id": "cyberforge-demo-20260618",
-  "generated_at": "2026-06-18T10:41:41Z",
+  "report_id": "",
+  "generated_at": "1970-01-01T00:00:00Z",
   "git_sha": "",
   "image_digest": "",
   "period": {
@@ -83,8 +83,8 @@
     },
     {
       "path": "evidence-report.html",
-      "sha256": "5a0237877bbe88b11da8a8f7ba0d3ffce0b75148712f6046dd2ba011fe427278",
-      "size": 90561,
+      "sha256": "3a7991c071c6d6b6d1f7c908ac2071264e25ccdcdbca01c9c28801079f0d4d76",
+      "size": 91200,
       "mime": "text/html",
       "source": "asserted-document",
       "provenance": "static"
@@ -298,47 +298,9 @@
       "provenance": "live"
     }
   ],
-  "merkle_root": "2ca49f9ccaf8e8b83fd8769776e443b175cb9c89ddbe347694a5a4fd21fa3e65",
+  "merkle_root": "1b1fe388a79b3468ba04c2facbbf78001c409cac016029848d355b646860e84c",
   "merkle_algorithm": "RFC6962-SHA256",
-  "tooling": {
-    "qpdf": "skipped-preserves-pdfa",
-    "verapdf": "absent",
-    "cosign": "absent",
-    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)",
-    "pyhanko": "absent",
-    "weasyprint": "absent",
-    "gs": "10.07.1",
-    "pdfsig": "present",
-    "sha256sum": "sha256sum (GNU coreutils) 9.11\npresent(version-unknown)"
-  },
+  "tooling": {},
   "worm_state": "pending",
-  "signatures": {
-    "pdf_self": {
-      "sha256": "",
-      "status": "pdf-absent-degraded"
-    },
-    "verapdf": {
-      "status": "unavailable",
-      "reason": "tool-or-pdf-absent"
-    },
-    "cosign": {
-      "status": "unavailable"
-    },
-    "rfc3161": {
-      "merkle-root_tsr": "merkle-root.tsr",
-      "merkle-root_status": "stamped",
-      "manifest_tsr": "manifest.tsr",
-      "manifest_status": "stamped",
-      "qualified": false,
-      "provider": "freetsa.org (non-qualified, default)",
-      "ca_file": "<unset>",
-      "tsa_url": "https://freetsa.org/tsr",
-      "ca_shipped": false
-    },
-    "pades": {
-      "status": "unavailable",
-      "reason": "tool-or-pdf-absent",
-      "note": "external cosign+Rekor+RFC-3161 is the authoritative verification path"
-    }
-  }
+  "signatures": {}
 }
