@@ -45,7 +45,10 @@ RUN npm ci --omit=dev --ignore-scripts
 # -28387, -28388, -28389) and no rebuilt base available upstream. Chainguard's
 # node image ships fixed OpenSSL and scans 0 HIGH/CRITICAL.
 # Pinned by digest for reproducibility; bump via the same trivy-verified flow.
-FROM cgr.dev/chainguard/node:latest@sha256:045335a479d6c59bab89e3caaaf9ed2aed5528d92e2431a3e2afcbf258dba9a6
+# 2026-06-19: bumped to @e992bd (OpenSSL 3.6.3-r0) to clear HIGH CVE-2026-45447
+# (libcrypto3 / libssl3 3.6.2-r5) that failed the image scan; new digest verified
+# locally as 0 HIGH/CRITICAL.
+FROM cgr.dev/chainguard/node:latest@sha256:e992bdbbe830f1bead95583d62b79dec13f48ee291cc6761c147e4ed0dcbbcc1
 WORKDIR /app
 COPY --from=deps /deps/node_modules ./node_modules
 COPY --from=builder /build/dist ./dist
