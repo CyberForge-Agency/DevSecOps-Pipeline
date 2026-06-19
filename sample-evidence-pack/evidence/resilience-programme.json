@@ -1,0 +1,53 @@
+{
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "measured": {
+    "scenarios_total": 5,
+    "required_classes": [
+      "backup-restore",
+      "failover",
+      "DR-drill",
+      "dependency-outage",
+      "tabletop"
+    ],
+    "classes_present": [
+      "DR-drill",
+      "backup-restore",
+      "dependency-outage",
+      "failover",
+      "tabletop"
+    ],
+    "missing_classes": [],
+    "conducted_in_cadence": 0,
+    "pending_count": 5,
+    "pending": [
+      "RT-01 (backup-restore): never conducted (last_run null)",
+      "RT-02 (failover): never conducted (last_run null)",
+      "RT-03 (DR-drill): never conducted (last_run null)",
+      "RT-04 (dependency-outage): never conducted (last_run null)",
+      "RT-05 (tabletop): never conducted (last_run null)"
+    ],
+    "uncovered_required_classes": [
+      "backup-restore",
+      "failover",
+      "DR-drill",
+      "dependency-outage",
+      "tabletop"
+    ]
+  },
+  "threshold": {
+    "required_classes": [
+      "backup-restore",
+      "failover",
+      "DR-drill",
+      "dependency-outage",
+      "tabletop"
+    ],
+    "per_scenario": "last_run.outcome=='success' AND age<=cadence_days",
+    "min_conducted_per_class": 1
+  },
+  "detail": "FAIL: pending scenarios: RT-01 (backup-restore): never conducted (last_run null); RT-02 (failover): never conducted (last_run null); RT-03 (DR-drill): never conducted (last_run null); RT-04 (dependency-outage): never conducted (last_run null); RT-05 (tabletop): never conducted (last_run null)",
+  "tool_version": null,
+  "validator": "check_resilience_programme",
+  "checked_at": "2026-06-18T10:41:39Z"
+}

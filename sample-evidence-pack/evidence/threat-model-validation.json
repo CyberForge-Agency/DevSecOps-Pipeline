@@ -1,0 +1,27 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "threats": 43,
+    "stride_categories": [
+      "D",
+      "E",
+      "I",
+      "R",
+      "S",
+      "T"
+    ],
+    "stride_coverage": 6,
+    "gaps": 8,
+    "version": "1.0.0",
+    "reviewed_date": "2026-06-16",
+    "age_days": 2,
+    "review_window_days": 180,
+    "violations": 0
+  },
+  "threshold": "schema-complete threats (each with id,stride,component,threat,mitigation,status,residual + traceability); >= 6 STRIDE categories; reviewed within review_window_days (<= 366)",
+  "detail": "threat model v1.0.0: 43 threats, STRIDE 6/6 categories, 8 gaps; reviewed 2026-06-16 (2d ago, window 180d). NOTE: structural completeness + coverage + freshness verified; that each control fully mitigates its threat is an EVIDENCE-ONLY human assertion.",
+  "tool_version": "pyyaml 6.0.3",
+  "validator": "threat_model",
+  "checked_at": "2026-06-18T10:41:40Z"
+}

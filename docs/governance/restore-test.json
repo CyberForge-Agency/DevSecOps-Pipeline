@@ -1,0 +1,20 @@
+{
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "measured": {
+    "last_successful_test_date": null,
+    "successful_in_window": 0,
+    "total_logged": 0,
+    "rejections": []
+  },
+  "threshold": {
+    "max_age_days": 365,
+    "rto": "rto_actual<=rto_target",
+    "outcome": "success",
+    "min_successful_in_window": 1
+  },
+  "detail": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')",
+  "tool_version": null,
+  "validator": "check-restore-test",
+  "checked_at": "2026-06-17T09:40:50Z"
+}

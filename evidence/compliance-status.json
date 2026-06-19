@@ -1,0 +1,204 @@
+{
+  "schema": "cyberforge-compliance-status/v1",
+  "generated_at": "2026-06-16T14:14:20Z",
+  "overall_status": "FAIL",
+  "blocking_failures": 4,
+  "missing_verdicts": [],
+  "matrix": {
+    "blocking_failures": 0,
+    "source": "compliance-matrix.json",
+    "note": "compliance-matrix.json absent (content gate not run)"
+  },
+  "controls": [
+    {
+      "control": "A.1",
+      "task": "T-20",
+      "label": "Register of Information (DORA Art.28(3))",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "providers_total": 10,
+        "lei_checked": 2,
+        "lei_format_valid": 2,
+        "lei_registration": {
+          "issued": 0,
+          "placeholder": 2,
+          "pending": 0,
+          "not_lei_eligible": 8,
+          "other": 0
+        },
+        "maintaining_entity_lei_pending": true,
+        "schema_violations": 0,
+        "completeness_violations": 0,
+        "register_age_days": 93,
+        "blocking_problem_count": 0
+      },
+      "threshold": {
+        "schema_violations": 0,
+        "lei_format_invalid": 0,
+        "completeness_violations": 0,
+        "register_age_days_max": 365
+      },
+      "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 93d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
+      "source_file": "roi-validation.json"
+    },
+    {
+      "control": "A.2",
+      "task": "T-21",
+      "label": "Processor DPA freshness (RODO Art.28)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": 93,
+      "threshold": 92,
+      "detail": "vendor register last updated 2026-03-15 (93 days ago); limit 92 days",
+      "source_file": "dpa-compliance-check.json",
+      "remediation": "Re-review docs/governance/vendor-risk-register.md; update 'Last Reviewed:' (<=92d cadence)."
+    },
+    {
+      "control": "A.3",
+      "task": "T-22",
+      "label": "RoPA / DPIA completeness (RODO Art.30/35)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "activities": 3,
+        "violations": 0,
+        "dpia_determination": "not-required"
+      },
+      "threshold": "0 violations; Art.30(1)/(2) complete + DPIA determination recorded",
+      "detail": "RoPA present and complete: 3 processing activities satisfy RODO Art.30; DPIA determination='not-required'. NOTE: completeness verified, factual truth of recorded content is EVIDENCE-ONLY.",
+      "source_file": "ropa-completeness.json"
+    },
+    {
+      "control": "A.4",
+      "task": "T-23",
+      "label": "ICT incident register (DORA Art.17/NIS2 23)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "entry_count": 2,
+        "violations": 0
+      },
+      "threshold": "schema-valid register with all 4 clock fields populated per entry",
+      "detail": "2 incident(s); all entries carry classification + 4 reporting-clock fields",
+      "source_file": "incident-readiness.json"
+    },
+    {
+      "control": "A.6",
+      "task": "T-25",
+      "label": "Governance: board approval + training (DORA Art.5)",
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": {
+        "management_review_age_days": 93,
+        "training_record_age_days": 93,
+        "board_approval_signoff": true,
+        "training_attendees_recorded": 0
+      },
+      "threshold": {
+        "management_review_max_days": 183,
+        "training_record_max_days": 365
+      },
+      "detail": "governance evidence fresh: management review within 183d and management training within 365d",
+      "source_file": "governance-evidence.json"
+    },
+    {
+      "control": "A.7",
+      "task": "T-26",
+      "label": "Third-party clauses + tested exit plans (DORA 28-30)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": 2,
+      "threshold": 0,
+      "detail": "2 of 3 Critical/High vendor(s) lack a Documented/Tested exit plan: GitHub (Microsoft) (Critical, EP-001: Template available); Microsoft Azure (Critical, EP-002: Planned)",
+      "source_file": "tpp-clauses.json",
+      "remediation": "Document/test exit plans for Critical/High vendors in docs/governance/ict-third-party-contract-controls.md."
+    },
+    {
+      "control": "A.8",
+      "task": "T-27",
+      "label": "Access-review cadence (NIS2 21(2)(i)/ISO 8.2)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": {
+        "max_days_overdue": 1,
+        "overdue_count": 4,
+        "in_cycle_count": 3,
+        "total_rows": 7,
+        "overdue": [
+          {
+            "review_type": "Privileged: GitHub Org Owners",
+            "next_due": "2026-06-15",
+            "days_overdue": 1
+          },
+          {
+            "review_type": "Privileged: Azure roles",
+            "next_due": "2026-06-15",
+            "days_overdue": 1
+          },
+          {
+            "review_type": "Service principals",
+            "next_due": "2026-06-15",
+            "days_overdue": 1
+          },
+          {
+            "review_type": "Branch protection",
+            "next_due": "2026-06-15",
+            "days_overdue": 1
+          }
+        ],
+        "unparseable": []
+      },
+      "threshold": {
+        "rule": "every 'Next Due' >= today (no overdue access review)",
+        "max_days_overdue": 0
+      },
+      "detail": "FAIL: 4 access review(s) overdue (worst: Privileged: GitHub Org Owners by 1d): Privileged: GitHub Org Owners (due 2026-06-15, 1d overdue), Privileged: Azure roles (due 2026-06-15, 1d overdue), Service principals (due 2026-06-15, 1d overdue), Branch protection (due 2026-06-15, 1d overdue)",
+      "source_file": "access-review.json",
+      "remediation": "Conduct the overdue access reviews and update Next-Due in docs/governance/access-review-schedule.md."
+    },
+    {
+      "control": "A.9",
+      "task": "T-28",
+      "label": "Crypto posture vs IaC (NIS2 21(2)(h)/RODO 32)",
+      "status": "INDETERMINATE",
+      "tier": "EVIDENCE-ONLY",
+      "measured": null,
+      "threshold": null,
+      "detail": "not evaluated in evidence-pack context (no Terraform plan); enforced at deploy time against `terraform show -json`.",
+      "source_file": "crypto-posture.json",
+      "remediation": "Run at deploy time against `terraform show -json` (retention/crypto gate); reconcile with crypto-baseline.yaml.",
+      "notes": [
+        "deploy-time control"
+      ]
+    },
+    {
+      "control": "A.10",
+      "task": "T-29",
+      "label": "Restore-test proof + freshness (DORA Art.11-12)",
+      "status": "FAIL",
+      "tier": "BLOCKING",
+      "measured": {
+        "last_successful_test_date": null,
+        "successful_in_window": 0,
+        "total_logged": 0,
+        "rejections": []
+      },
+      "threshold": {
+        "max_age_days": 365,
+        "rto": "rto_actual<=rto_target",
+        "outcome": "success",
+        "min_successful_in_window": 1
+      },
+      "detail": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')",
+      "source_file": "restore-test.json",
+      "remediation": "Conduct a successful restore test and record it in docs/runbooks/restore-test-log.yaml."
+    }
+  ],
+  "summary": {
+    "pass": 4,
+    "fail": 4,
+    "indeterminate": 1,
+    "evidence_only": 1
+  }
+}

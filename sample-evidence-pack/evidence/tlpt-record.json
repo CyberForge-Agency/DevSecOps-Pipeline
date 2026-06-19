@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "tier": "EVIDENCE-ONLY",
+  "measured": {
+    "in_scope": false,
+    "entity": "CyberForge",
+    "classification": "ICT third-party service provider (not a DORA-identified significant financial entity)",
+    "determination_date": "2026-06-18",
+    "tlpt_conducted": false
+  },
+  "threshold": {
+    "in_scope": "applicability determination only"
+  },
+  "detail": "TLPT not mandatory for current entity classification (documented determination). CyberForge: ICT third-party service provider (not a DORA-identified significant financial entity). Rationale: CyberForge is an ICT third-party service provider and has not been identified by any competent authority as a financial entity significant for TLPT purposes under DORA Art. 26(8). The mandatory triennial TLPT obligation (DORA Art. 26-27, RTS 2025/1190) therefore does not currently apply. This determination is reviewed whenever the entity's classification or a client contractual requirement changes; should the entity become in scope, in_scope is set to true and a real TLPT engagement is recorded under `tlpt` before this control can pass.",
+  "tool_version": null,
+  "validator": "check_tlpt",
+  "checked_at": "2026-06-18T10:41:39Z"
+}

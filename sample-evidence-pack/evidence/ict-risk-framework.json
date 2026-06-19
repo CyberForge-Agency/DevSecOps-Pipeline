@@ -1,0 +1,34 @@
+{
+  "status": "INDETERMINATE",
+  "tier": "BLOCKING",
+  "measured": {
+    "missing_sections": [],
+    "review_date": null
+  },
+  "threshold": {
+    "max_age_days": 365,
+    "required_sections": [
+      "governance/ownership",
+      "risk appetite/tolerance",
+      "methodology reference",
+      "control-framework reference",
+      "review cadence"
+    ]
+  },
+  "detail": "INDETERMINATE: framework present with all required sections but no parseable 'Last Reviewed:' date (seed records 'pending initial management review') \u2014 cannot assess annual review freshness (DORA Art.6 / NIS2 Art.21(2)(a) (ICT risk-management framework + annual review))",
+  "tool_version": null,
+  "validator": "check_ict_risk_framework",
+  "checked_at": "2026-06-18T10:41:39Z",
+  "components": {
+    "management_body_approval": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": false,
+      "threshold": "management-body approval present",
+      "detail": "approval field present but placeholder: 'pending initial management review' (NIS2 Art.20(1) (management-body approval of risk-management policies))",
+      "tool_version": null,
+      "validator": "check_ict_risk_framework",
+      "checked_at": "2026-06-18T10:41:39Z"
+    }
+  }
+}

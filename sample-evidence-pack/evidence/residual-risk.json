@@ -1,0 +1,50 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "open_count": 1,
+    "violations": 0
+  },
+  "threshold": "every Active acceptance has a named approver, named owner, justification, and a future expiry within 12 months of approval",
+  "detail": "1 open accepted risk(s); all bounded with named approver + justification + future expiry (<=12mo)",
+  "tool_version": null,
+  "validator": "risk_acceptance",
+  "checked_at": "2026-06-18T10:41:41Z",
+  "register": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/compliance/exception-register.md",
+  "errors": [],
+  "residual_risk": {
+    "open_accepted_risks": 1,
+    "by_severity": {
+      "Medium": 1
+    },
+    "soonest_expiry": {
+      "id": "EXC-001",
+      "expiry": "2026-09-15",
+      "days_to_expiry": 89
+    },
+    "open_risks": [
+      {
+        "id": "EXC-001",
+        "control": "lodash@4.17.20 in app/package.json",
+        "vuln_id": "CVE-2024-99999",
+        "severity": "Medium",
+        "owner": "Jan Kowalski",
+        "approver": "Anna Nowak (CTO)",
+        "expiry": "2026-09-15",
+        "days_to_expiry": 89,
+        "violations": []
+      }
+    ],
+    "status_counts": {
+      "active": 1
+    },
+    "board_tolerance": {
+      "basis": "DORA Art. 5(2) \u2014 the management body shall determine the appropriate risk tolerance level of ICT risk; residual risk must remain within it.",
+      "iso_27001_2022": "Clause 6.1.2 \u2014 risk acceptance criteria are board-approved; each accepted risk has a named risk owner.",
+      "tolerance_document": "docs/governance/risk-acceptance-process.md",
+      "risk_register": "docs/governance/risk-register.md"
+    },
+    "statement": "As of 2026-06-18, 1 accepted ICT risk(s) remain open, each formally approved, justified, and time-bounded. Residual risk is asserted to remain within the board-approved risk tolerance (DORA Art. 5(2)); this statement is to be signed by the accountable officer at seal time.",
+    "signed_by_accountable_officer": false
+  }
+}

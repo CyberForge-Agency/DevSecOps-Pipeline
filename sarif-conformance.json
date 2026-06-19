@@ -1,0 +1,16 @@
+{
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "measured": {
+    "format": "sarif?",
+    "version": "2.0.0",
+    "has_schema": false
+  },
+  "threshold": {
+    "version": "2.1.0"
+  },
+  "detail": "SARIF version '2.0.0' != required '2.1.0'",
+  "tool_version": "sarif_conformance/1.0 (T-125)",
+  "validator": "sarif_conformance",
+  "checked_at": "2026-06-18T09:34:59Z"
+}

@@ -42,7 +42,7 @@ if ! command -v az &>/dev/null; then
     exit 1
 fi
 
-if ! az account show &>/dev/null 2>&1; then
+if ! az account show &>/dev/null; then
     echo "ERROR: az CLI is not authenticated. Run 'az login' first." >&2
     exit 1
 fi

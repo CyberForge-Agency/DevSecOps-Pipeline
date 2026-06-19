@@ -40,7 +40,7 @@ if ! command -v az &>/dev/null; then
   exit 1
 fi
 
-if ! az account show &>/dev/null 2>&1; then
+if ! az account show &>/dev/null; then
   echo -e "${RED}[ERROR]${RESET} Not logged in to Azure CLI. Run: az login"
   exit 1
 fi
@@ -88,7 +88,7 @@ fi
 
 header "Resource Inventory - ${RESOURCE_GROUP}"
 
-if az group show --name "${RESOURCE_GROUP}" &>/dev/null 2>&1; then
+if az group show --name "${RESOURCE_GROUP}" &>/dev/null; then
   RESOURCE_COUNT=$(az resource list \
     --resource-group "${RESOURCE_GROUP}" \
     --query "length(@)" \
@@ -109,7 +109,7 @@ fi
 
 header "Resource Inventory - ${TFSTATE_RG}"
 
-if az group show --name "${TFSTATE_RG}" &>/dev/null 2>&1; then
+if az group show --name "${TFSTATE_RG}" &>/dev/null; then
   TFSTATE_COUNT=$(az resource list \
     --resource-group "${TFSTATE_RG}" \
     --query "length(@)" \

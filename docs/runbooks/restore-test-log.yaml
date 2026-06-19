@@ -1,0 +1,59 @@
+# Restore-Test Log -- A.10 (DORA Art. 11-12 / NIS2 21(2)(c) / ISO/IEC 27001 A.8.13)
+# =============================================================================
+# Source of truth for the `check-restore-test.py` validator (task T-29).
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# DORA Art. 12 requires *periodic genuine restoration tests* that confirm data
+# can be recovered to a working state within the Recovery Time Objective (RTO)
+# and that data loss does not exceed the Recovery Point Objective (RPO). A backup
+# that has never been restored is NOT evidence of recoverability -- "backups
+# without a restore test" is an explicit auditor rejection trigger
+# (struktura S.12). bcdr-plan.md S.6.1 currently records every drill as
+# "Not yet conducted", so this log starts EMPTY and the validator HONESTLY FAILS
+# until a real, successful, in-window restore drill is logged here.
+#
+# DO NOT add an entry unless an actual restore drill was performed and produced
+# the evidence artifact described in bcdr-plan.md S.6.3 (drill-log.md +
+# metrics.json). Fabricating an entry to make the gate green defeats the control.
+#
+# SCHEMA (per test entry)
+# -----------------------
+#   test_date    (str, required)  ISO-8601 date the drill was performed (YYYY-MM-DD).
+#   scenario     (str, required)  Which restore drill, e.g. "Terraform state restore".
+#   rto_target   (number, req.)   Target Recovery Time Objective, in MINUTES (from
+#                                 bcdr-plan.md S.4; e.g. Terraform State = 60).
+#   rto_actual   (number, req.)   Measured recovery time of THIS drill, in MINUTES.
+#   rpo_actual   (number, req.)   Measured data loss of THIS drill, in MINUTES
+#                                 (0 = no data loss; target RPO is 0 per S.4).
+#   outcome      (str, required)  "success" | "fail" | "partial". Only "success"
+#                                 (with rto_actual <= rto_target) counts toward the gate.
+#   evidence     (str, optional)  Path / blob name of the archived drill evidence
+#                                 (bcdr-plan.md S.6.3), e.g. "bcdr-drills/bcdr-drill-2026-06-01.tar.gz".
+#   operator     (str, optional)  Person who ran the drill.
+#   sign_off     (str, optional)  Management / drill-lead approver.
+#   notes        (str, optional)  Free text (lessons learned, deviations).
+#
+# CADENCE WINDOW
+# --------------
+# At least one SUCCESSFUL restore must exist within the cadence window. The
+# Terraform-state restore drill in bcdr-plan.md S.6.1 is "Annually", so the
+# default freshness window is 365 days (override with --max-age-days).
+#
+# EXAMPLE (commented out -- this is a TEMPLATE, not a real result):
+# tests:
+#   - test_date: "2026-06-01"
+#     scenario: "Terraform state restore drill"
+#     rto_target: 60        # minutes (bcdr-plan.md S.4: Terraform State RTO = 1 hour)
+#     rto_actual: 38        # minutes -- met the target
+#     rpo_actual: 0         # minutes -- no data loss (target RPO = 0)
+#     outcome: "success"
+#     evidence: "bcdr-drills/bcdr-drill-2026-06-01.tar.gz"
+#     operator: "Szymon Mytych"
+#     sign_off: "Szymon Mytych"
+#     notes: "Restored versioned blob to staging, validated terraform plan clean."
+# =============================================================================
+
+# No restore drill has been conducted yet (bcdr-plan.md S.6.1: "Not yet conducted").
+# The validator will FAIL until a real successful, in-window, RTO-met entry is added.
+tests: []

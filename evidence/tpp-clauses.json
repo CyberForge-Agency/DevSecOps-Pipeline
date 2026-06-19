@@ -1,0 +1,142 @@
+{
+  "validator": "check-thirdparty-clauses",
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "checked_at": "2026-06-16T14:14:20Z",
+  "measured": 2,
+  "threshold": 0,
+  "detail": "2 of 3 Critical/High vendor(s) lack a Documented/Tested exit plan: GitHub (Microsoft) (Critical, EP-001: Template available); Microsoft Azure (Critical, EP-002: Planned)",
+  "regulatory_basis": "DORA Art.28(8), Art.30(2)-(3); ISO 27001 A.5.19-A.5.23",
+  "honesty_note": "Verifies exit plans are DOCUMENTED/TESTED in the register and the clause checklist document is present/structured/in-cadence. Does NOT verify a clause appears in a signed contract nor that an exit was executed (EVIDENCE-ONLY register facts attested by a human).",
+  "clause_checklist": {
+    "document": "ict-third-party-contract-controls.md",
+    "present": true,
+    "tier": "EVIDENCE-ONLY",
+    "required_categories": [
+      "Security Terms",
+      "Data Protection",
+      "Operational Controls",
+      "Exit and Transition"
+    ],
+    "present_categories": [
+      "Security Terms",
+      "Data Protection",
+      "Operational Controls",
+      "Exit and Transition"
+    ],
+    "missing_categories": [],
+    "last_reviewed": "2026-03-15",
+    "cadence_status": "PASS",
+    "cadence_age_days": 93,
+    "max_age_days": 400
+  },
+  "vendors_requiring_exit_plan": [
+    {
+      "vendor": "GitHub (Microsoft)",
+      "criticality": "Critical",
+      "exit_ref": "EP-001",
+      "exit_status": "Template available",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Microsoft Azure",
+      "criticality": "Critical",
+      "exit_ref": "EP-002",
+      "exit_status": "Planned",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Sigstore (Linux Foundation)",
+      "criticality": "High",
+      "exit_ref": "EP-003",
+      "exit_status": "Documented",
+      "exit_status_compliant": true
+    }
+  ],
+  "all_vendors": [
+    {
+      "vendor": "GitHub (Microsoft)",
+      "criticality": "Critical",
+      "requires_exit_plan": true,
+      "exit_ref": "EP-001",
+      "exit_status": "Template available",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Microsoft Azure",
+      "criticality": "Critical",
+      "requires_exit_plan": true,
+      "exit_ref": "EP-002",
+      "exit_status": "Planned",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Sigstore (Linux Foundation)",
+      "criticality": "High",
+      "requires_exit_plan": true,
+      "exit_ref": "EP-003",
+      "exit_status": "Documented",
+      "exit_status_compliant": true
+    },
+    {
+      "vendor": "OWASP Foundation",
+      "criticality": "Medium",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-004",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Aqua Security",
+      "criticality": "Medium",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-005",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Bridgecrew (Palo Alto Networks)",
+      "criticality": "Medium",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-006",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Anchore",
+      "criticality": "Medium",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-007",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "OxSecurity",
+      "criticality": "Low",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-008",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Mend (formerly WhiteSource)",
+      "criticality": "Low",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-009",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    },
+    {
+      "vendor": "Truffle Security",
+      "criticality": "Medium",
+      "requires_exit_plan": false,
+      "exit_ref": "EP-010",
+      "exit_status": "Low priority",
+      "exit_status_compliant": false
+    }
+  ],
+  "incomplete_exit_plans": [
+    "GitHub (Microsoft) (Critical, EP-001: Template available)",
+    "Microsoft Azure (Critical, EP-002: Planned)"
+  ]
+}

@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Evidence Pack — CyberForge Pipeline</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+:root{--ink:#07111D;--navy:#0D2147;--blue:#1A54D9;--blue2:#2E75F0;--blue3:#5B9AF5;--white:#fff;--mist:#F3F7FD;--fog:#E8F0FB;--txt:#334155;--mid:#64748B;--dim:#94A3B8;--border:#CBD5E8;--blt:#E2EAF5;--red:#DC2626;--orange:#EA580C;--green:#059669;--amber:#D97706;--purple:#7C3AED;--serif:'Playfair Display',Georgia,serif;--sans:'Syne','Inter',system-ui,sans-serif;--mono:'IBM Plex Mono',Menlo,monospace}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);color:var(--txt);background:var(--mist);line-height:1.6;font-size:14px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 28px}
+h1{font-family:var(--serif);font-size:1.9rem;color:var(--navy);font-weight:900;margin-bottom:6px}
+h1 em{font-style:italic;color:var(--blue)}
+h2{font-family:var(--serif);font-size:1.3rem;color:var(--navy);font-weight:700;margin:0 0 14px;line-height:1.3}
+h3{font-family:var(--sans);font-size:.98rem;font-weight:700;color:var(--navy);margin:14px 0 8px}
+h4{font-family:var(--mono);font-size:.7rem;font-weight:600;color:var(--navy);letter-spacing:.06em;text-transform:uppercase;margin:10px 0 6px}
+p{margin-bottom:8px;font-size:.86rem}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+code{font-family:var(--mono);font-size:.8em;background:var(--fog);padding:2px 5px;border-radius:3px;color:var(--navy)}
+strong{color:var(--navy);font-weight:600}
+button{font:inherit;cursor:pointer;border:none;background:none}
+.eyebrow{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--blue);display:block;margin-bottom:6px}
+[hidden]{display:none!important}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+header{background:var(--ink);color:var(--white);padding:24px 0 18px;border-bottom:3px solid var(--blue)}
+header .wrap{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center}
+.h-left h1{color:var(--white);font-size:1.6rem;margin-bottom:4px}
+.h-left h1 em{color:var(--blue3)}
+.h-meta{font-family:var(--mono);font-size:.7rem;color:var(--blue3);letter-spacing:.04em}
+.logo{display:flex;align-items:stretch;gap:8px}
+.logo-bar{width:3px;background:var(--blue);border-radius:2px}
+.logo-cyber,.logo-forge{font-family:var(--mono);font-weight:500;font-size:13px;letter-spacing:.08em;line-height:1.1}
+.logo-cyber{color:var(--white)}.logo-forge{color:var(--blue3)}
+
+/* ── Tab nav ─────────────────────────────────────────────────────────────── */
+.tabs{background:var(--white);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10;box-shadow:0 1px 3px rgba(13,33,71,.04)}
+.tabs-inner{display:flex;overflow-x:auto;scrollbar-width:thin;gap:0;align-items:stretch}
+.tab{font-family:var(--mono);font-size:.66rem;letter-spacing:.07em;text-transform:uppercase;color:var(--mid);padding:14px 18px;border-bottom:3px solid transparent;white-space:nowrap;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+.tab:hover{color:var(--navy);background:var(--mist)}
+.tab.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--white)}
+.tab-count{display:inline-block;background:var(--fog);color:var(--mid);padding:1px 7px;border-radius:9px;font-size:.65rem}
+.tab.active .tab-count{background:var(--blue);color:var(--white)}
+.search-wrap{margin-left:auto;padding:8px 14px;display:flex;align-items:center}
+.search-wrap input{font-family:var(--mono);font-size:.78rem;padding:7px 12px;border:1px solid var(--border);border-radius:5px;width:220px;color:var(--navy)}
+.search-wrap input:focus{outline:none;border-color:var(--blue)}
+
+/* ── Panels ──────────────────────────────────────────────────────────────── */
+.panel{display:none;padding:28px 0 60px;animation:fadeIn .25s ease}
+.panel.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* ── Cards & grids ───────────────────────────────────────────────────────── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:22px}
+.kpi{background:var(--white);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:6px;padding:14px 16px}
+.kpi.green{border-left-color:var(--green)}.kpi.amber{border-left-color:var(--amber)}.kpi.red{border-left-color:var(--red)}
+.kpi-num{font-family:var(--serif);font-size:1.7rem;font-weight:900;color:var(--navy);line-height:1}
+.kpi-lbl{font-family:var(--mono);font-size:.6rem;letter-spacing:.06em;text-transform:uppercase;color:var(--mid);margin-top:6px}
+.kpi-sub{font-family:var(--mono);font-size:.65rem;color:var(--dim);margin-top:3px}
+
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media(max-width:800px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px;margin-bottom:14px}
+.card h3{margin-top:0}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+table{width:100%;border-collapse:collapse;font-size:.82rem;background:var(--white);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+thead th{font-family:var(--mono);font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;color:var(--white);background:var(--navy);text-align:left;padding:9px 11px;cursor:pointer;user-select:none;white-space:nowrap}
+thead th:hover{background:#1a3160}
+thead th.sortable::after{content:' ⇅';color:var(--blue3);font-size:.7rem}
+thead th.sort-asc::after{content:' ↑';color:var(--blue3)}
+thead th.sort-desc::after{content:' ↓';color:var(--blue3)}
+tbody td{padding:9px 11px;border-bottom:1px solid var(--blt);vertical-align:top}
+tbody tr:hover{background:var(--mist)}
+tbody tr.hide{display:none}
+
+/* ── Severity badges ─────────────────────────────────────────────────────── */
+.sev{display:inline-block;font-family:var(--mono);font-size:.6rem;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:3px}
+.sev-CRITICAL,.sev-High{background:#FEE2E2;color:#991B1B}
+.sev-HIGH{background:#FED7AA;color:#9A3412}
+.sev-Medium,.sev-MEDIUM{background:#FEF3C7;color:#92400E}
+.sev-Low,.sev-LOW{background:#DBEAFE;color:#1E40AF}
+.sev-Informational,.sev-UNKNOWN{background:var(--fog);color:var(--mid)}
+.badge-pass{background:#ECFDF5;color:var(--green);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-fail{background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-skip{background:var(--fog);color:var(--mid);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-indet{background:#FFFBEB;color:#92400E;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-blocking{background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-evidence{background:#EEF2FB;color:var(--blue);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+
+/* ── Filters ─────────────────────────────────────────────────────────────── */
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.chip{font-family:var(--mono);font-size:.62rem;padding:5px 11px;border:1px solid var(--border);border-radius:14px;background:var(--white);color:var(--mid);cursor:pointer;letter-spacing:.04em;transition:all .12s}
+.chip:hover{color:var(--navy)}
+.chip.active{background:var(--navy);color:var(--white);border-color:var(--navy)}
+.filter-input{flex:1;min-width:200px;font-family:var(--mono);font-size:.76rem;padding:7px 11px;border:1px solid var(--border);border-radius:4px;color:var(--navy)}
+.filter-input:focus{outline:none;border-color:var(--blue)}
+
+/* ── Code blocks ─────────────────────────────────────────────────────────── */
+.codeblock{font-family:var(--mono);font-size:.72rem;background:var(--ink);color:var(--blue3);padding:14px;border-radius:6px;overflow-x:auto;line-height:1.7;white-space:pre;margin:10px 0;position:relative}
+.copy-btn{position:absolute;top:8px;right:8px;font-family:var(--mono);font-size:.58rem;background:var(--navy);color:var(--white);padding:4px 9px;border-radius:3px;cursor:pointer;opacity:.7;transition:opacity .15s}
+.copy-btn:hover{opacity:1}
+.copy-btn.copied{background:var(--green)}
+
+/* ── Phase pipeline (mini) ───────────────────────────────────────────────── */
+.phase-row{display:flex;gap:0;align-items:center;flex-wrap:wrap;margin:18px 0 26px;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:18px}
+.ph-node{flex:1;min-width:120px;text-align:center;padding:0 6px;position:relative}
+.ph-node::after{content:'→';position:absolute;right:-6px;top:14px;color:var(--mid);font-family:var(--mono);font-size:.8rem}
+.ph-node:last-child::after{display:none}
+.ph-circle{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:.8rem;font-weight:700;border:2px solid;margin-bottom:6px}
+.ph-circle.success{border-color:var(--green);color:var(--green);background:#ECFDF5}
+.ph-circle.failure{border-color:var(--red);color:var(--red);background:#FEE2E2}
+.ph-circle.skipped{border-color:var(--dim);color:var(--dim);background:var(--fog)}
+.ph-name{font-family:var(--mono);font-size:.62rem;letter-spacing:.04em;color:var(--mid)}
+.ph-status{font-family:var(--mono);font-size:.55rem;text-transform:uppercase;letter-spacing:.06em;margin-top:2px;font-weight:600}
+.ph-status.success{color:var(--green)}.ph-status.failure{color:var(--red)}.ph-status.skipped{color:var(--dim)}
+
+/* ── Donut / charts ──────────────────────────────────────────────────────── */
+.donut-wrap{display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.donut{width:140px;height:140px;flex-shrink:0}
+.donut-track{stroke:var(--fog);stroke-width:14;fill:none}
+.donut-fill{fill:none;stroke-width:14;stroke-linecap:round;transform:rotate(-90deg);transform-origin:50% 50%}
+.donut-text{font-family:var(--mono);font-weight:700;fill:var(--navy)}
+.bar-row{display:grid;grid-template-columns:140px 1fr 60px;gap:10px;align-items:center;margin-bottom:6px;font-size:.78rem}
+.bar-label{font-family:var(--mono);color:var(--navy);text-align:right}
+.bar-track{background:var(--fog);height:14px;border-radius:7px;overflow:hidden}
+.bar-fill{height:100%;border-radius:7px;transition:width .8s ease}
+.bar-value{font-family:var(--mono);font-size:.7rem;color:var(--mid)}
+
+/* ── Expandable rows ─────────────────────────────────────────────────────── */
+.expander{cursor:pointer}
+.expand-icon{display:inline-block;width:14px;color:var(--blue);transition:transform .2s;font-family:var(--mono)}
+.expanded .expand-icon{transform:rotate(45deg)}
+.detail-row{display:none}
+.detail-row.show{display:table-row}
+.detail-row td{background:var(--mist);padding:14px 18px;border-bottom:2px solid var(--border)}
+.detail-content{font-size:.82rem}
+.detail-content dl{display:grid;grid-template-columns:auto 1fr;gap:4px 16px;margin:8px 0}
+.detail-content dt{font-family:var(--mono);font-size:.66rem;color:var(--mid);text-transform:uppercase;letter-spacing:.04em}
+.detail-content dd{font-size:.8rem}
+
+/* ── Compliance grid ─────────────────────────────────────────────────────── */
+.fw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:14px}
+.fw-card{background:var(--white);border:1px solid var(--border);border-radius:8px;padding:16px;cursor:pointer;text-align:center;transition:all .15s}
+.fw-card:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(13,33,71,.06)}
+.fw-card.active{border-color:var(--blue);border-width:2px;padding:15px}
+.fw-name{font-family:var(--mono);font-size:.74rem;font-weight:600;color:var(--navy);letter-spacing:.04em}
+.fw-cov{font-family:var(--mono);font-size:1.4rem;font-weight:700;color:var(--green);margin:4px 0}
+.fw-lbl{font-family:var(--mono);font-size:.55rem;color:var(--dim);text-transform:uppercase;letter-spacing:.04em}
+.fw-controls{display:none;background:var(--white);border:1px solid var(--border);border-radius:8px;padding:14px;margin-top:8px}
+.fw-controls.active{display:block}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+footer{background:var(--ink);color:var(--dim);padding:30px 0;text-align:center;font-family:var(--mono);font-size:.7rem;letter-spacing:.04em}
+footer a{color:var(--blue3)}
+footer p{margin:4px 0}
+
+/* ── Print ───────────────────────────────────────────────────────────────── */
+@media print{
+  .tabs,.search-wrap,.filter-row,.copy-btn{display:none!important}
+  .panel{display:block!important;page-break-before:always;padding:18px 0}
+  .panel:first-of-type{page-break-before:auto}
+  body{background:var(--white);font-size:11pt}
+  .card{break-inside:avoid}
+}
+
+/* ── Empty state ─────────────────────────────────────────────────────────── */
+.empty{padding:40px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:.85rem}
+</style>
+</head>
+<body>
+
+<header>
+<div class="wrap">
+  <div class="h-left">
+    <span class="eyebrow" style="color:var(--blue3)">Evidence Pack Report</span>
+    <h1>Pipeline Run #? <em>— ?</em></h1>
+    <div class="h-meta">? · commit ? · ? · run ?</div>
+  </div>
+  <div class="logo">
+    <div class="logo-bar"></div>
+    <div><div class="logo-cyber">CYBER</div><div class="logo-forge">FORGE</div></div>
+  </div>
+</div>
+</header>
+
+<div class="tabs">
+<div class="wrap">
+<div class="tabs-inner">
+  <button class="tab active" data-tab="dashboard">Dashboard</button>
+  <button class="tab" data-tab="vulns">Vulnerabilities <span class="tab-count" id="cnt-vulns">0</span></button>
+  <button class="tab" data-tab="sbom">SBOM <span class="tab-count" id="cnt-sbom">0</span></button>
+  <button class="tab" data-tab="dast">DAST <span class="tab-count" id="cnt-dast">0</span></button>
+  <button class="tab" data-tab="compliance">Compliance</button>
+  <button class="tab" data-tab="compliance-code">Compliance-as-Code</button>
+  <button class="tab" data-tab="signing">Signing</button>
+  <button class="tab" data-tab="files">Files <span class="tab-count" id="cnt-files">0</span></button>
+  <button class="tab" data-tab="dpa">Vendors</button>
+  <button class="tab" data-tab="dataflow">Data Flow</button>
+  <button class="tab" data-tab="raw">Raw Data</button>
+  <div class="search-wrap">
+    <input type="text" id="globalSearch" placeholder="Search everything…">
+  </div>
+</div>
+</div>
+</div>
+
+<div class="wrap">
+
+<!-- ────────────────────────────── DASHBOARD ────────────────────────────── -->
+<section class="panel active" id="panel-dashboard">
+
+<div class="phase-row" id="phaseRow"></div>
+
+<div class="kpi-row" id="kpiRow"></div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Pipeline Run</h3>
+    <table>
+      <tbody>
+        <tr><td><strong>Pipeline</strong></td><td id="d-name"></td></tr>
+        <tr><td><strong>Run</strong></td><td>#<span id="d-run-num"></span> (id <span id="d-run-id"></span>, attempt <span id="d-run-attempt"></span>)</td></tr>
+        <tr><td><strong>Trigger</strong></td><td><span id="d-trigger"></span> by <span id="d-actor"></span></td></tr>
+        <tr><td><strong>Ref</strong></td><td><code id="d-ref"></code></td></tr>
+        <tr><td><strong>Commit</strong></td><td><code id="d-sha"></code></td></tr>
+        <tr><td><strong>Repository</strong></td><td><a id="d-repo-link" target="_blank" rel="noopener"></a></td></tr>
+        <tr><td><strong>Environment</strong></td><td id="d-env"></td></tr>
+        <tr><td><strong>Image URI</strong></td><td><code id="d-imguri" style="font-size:.74rem"></code></td></tr>
+        <tr><td><strong>Image Digest</strong></td><td><code id="d-imgdigest" style="font-size:.7rem;word-break:break-all"></code></td></tr>
+        <tr><td><strong>Generated</strong></td><td id="d-generated"></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card">
+    <h3>Compliance Coverage</h3>
+    <div class="donut-wrap">
+      <svg class="donut" viewBox="0 0 120 120">
+        <circle class="donut-track" cx="60" cy="60" r="48"/>
+        <circle class="donut-fill" cx="60" cy="60" r="48" id="donutPathDash" stroke="var(--green)"/>
+        <text class="donut-text" x="60" y="60" text-anchor="middle" font-size="18" id="donutPctDash">0%</text>
+        <text class="donut-text" x="60" y="76" text-anchor="middle" font-size="8" fill="var(--dim)" font-weight="400">controls</text>
+      </svg>
+      <div style="flex:1">
+        <div id="fwBars"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Severity Breakdown</h3>
+    <h4>Dependencies (Trivy SCA)</h4>
+    <div id="trivyBars"></div>
+    <h4>Container Image (Trivy)</h4>
+    <div id="trivyImgBars"></div>
+    <h4>Runtime (OWASP ZAP)</h4>
+    <div id="zapBars"></div>
+  </div>
+
+  <div class="card">
+    <h3>Tool Versions</h3>
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th></tr></thead>
+      <tbody id="toolsTable"></tbody>
+    </table>
+  </div>
+</div>
+
+</section>
+
+<!-- ────────────────────────────── VULNS ────────────────────────────── -->
+<section class="panel" id="panel-vulns">
+<h2>Vulnerability Findings</h2>
+<p>Combined view of dependency-level CVEs (Trivy SCA against package-lock.json) and container-level CVEs (Trivy image scan against the built Docker image). Click any row to expand for details.</p>
+
+<div class="filter-row">
+  <input type="text" class="filter-input" id="vulnSearch" placeholder="Filter by CVE, package, or title…">
+  <button class="chip active" data-vsev="all">All</button>
+  <button class="chip" data-vsev="CRITICAL">Critical</button>
+  <button class="chip" data-vsev="HIGH">High</button>
+  <button class="chip" data-vsev="MEDIUM">Medium</button>
+  <button class="chip" data-vsev="LOW">Low</button>
+  <button class="chip" data-vsrc="all">All sources</button>
+  <button class="chip" data-vsrc="filesystem">SCA only</button>
+  <button class="chip" data-vsrc="container">Image only</button>
+</div>
+
+<table id="vulnTable">
+  <thead><tr>
+    <th class="sortable" data-sort="severity">Severity</th>
+    <th class="sortable" data-sort="cve">CVE</th>
+    <th class="sortable" data-sort="package">Package</th>
+    <th class="sortable" data-sort="installed">Installed</th>
+    <th class="sortable" data-sort="fixed">Fixed in</th>
+    <th class="sortable" data-sort="kind">Source</th>
+    <th>Title</th>
+  </tr></thead>
+  <tbody id="vulnRows"></tbody>
+</table>
+<p id="vulnEmpty" class="empty" style="display:none">No vulnerabilities matching your filter.</p>
+</section>
+
+<!-- ────────────────────────────── SBOM ────────────────────────────── -->
+<section class="panel" id="panel-sbom">
+<h2>Software Bill of Materials</h2>
+<p id="sbomMeta"></p>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>By Component Type</h3>
+    <div id="sbomTypes"></div>
+  </div>
+  <div class="card">
+    <h3>Top Licenses</h3>
+    <div id="sbomLicenses"></div>
+  </div>
+</div>
+
+<div class="filter-row">
+  <input type="text" class="filter-input" id="sbomSearch" placeholder="Filter components…">
+</div>
+
+<table id="sbomTable">
+  <thead><tr>
+    <th class="sortable" data-sort="name">Name</th>
+    <th class="sortable" data-sort="version">Version</th>
+    <th class="sortable" data-sort="type">Type</th>
+    <th class="sortable" data-sort="license">License</th>
+    <th>PURL</th>
+  </tr></thead>
+  <tbody id="sbomRows"></tbody>
+</table>
+</section>
+
+<!-- ────────────────────────────── DAST ────────────────────────────── -->
+<section class="panel" id="panel-dast">
+<h2>DAST Findings (OWASP ZAP)</h2>
+<p>Runtime vulnerability scan against the deployed application: <code id="zapTarget"></code></p>
+
+<div class="kpi-row" id="zapKpis"></div>
+
+<div class="filter-row">
+  <input type="text" class="filter-input" id="zapSearch" placeholder="Filter findings…">
+  <button class="chip active" data-zsev="all">All</button>
+  <button class="chip" data-zsev="High">High</button>
+  <button class="chip" data-zsev="Medium">Medium</button>
+  <button class="chip" data-zsev="Low">Low</button>
+  <button class="chip" data-zsev="Informational">Info</button>
+</div>
+
+<div id="zapAlerts"></div>
+</section>
+
+<!-- ────────────────────────────── COMPLIANCE ────────────────────────────── -->
+<section class="panel" id="panel-compliance">
+<h2>Compliance Framework Mapping</h2>
+<p>Click any framework to see its control-level mapping. Each control points to the evidence artifact that satisfies it.</p>
+
+<div class="fw-grid" id="fwGrid"></div>
+<div id="fwControls"></div>
+</section>
+
+<!-- ──────────────────────── COMPLIANCE-AS-CODE (Part A) ──────────────────────── -->
+<section class="panel" id="panel-compliance-code">
+<h2>Compliance-as-Code — Organizational-Control Verdicts (Part A)</h2>
+<p>The signed organizational-control layer (struktura &sect;6 compliance gate). Each A.1-A.10 control
+is checked by a content validator that emits <strong>PASS only</strong> when it parsed a value that
+met a stated threshold &mdash; never a silent PASS. Verdicts aggregate into the fail-closed gate
+below. This is the proof the differentiator is machine-checked: signed PASS/FAIL org-control
+verdicts, not just DevSecOps SARIF.</p>
+<div class="card" id="ccGateCard">
+  <h3>Aggregate compliance gate</h3>
+  <p id="ccGateLine"></p>
+  <p class="empty" id="ccCounts" style="font-size:.82rem"></p>
+</div>
+<div id="ccTableWrap"></div>
+<p style="font-size:.82rem;color:var(--mid);margin-top:10px"><strong>Golden thread (struktura
+&sect;1):</strong> each row maps control &rarr; evidence verdict (SHA-bound in the manifest) &rarr;
+framework clause. A BLOCKING FAIL (e.g. a past-due access review under A.8, or 'restore not yet
+conducted' under A.10) makes the aggregate gate exit non-zero on a non-PR run &mdash; honest,
+fail-closed enforcement with a concrete remediation pointer, not a green-for-show banner.</p>
+</section>
+
+<!-- ────────────────────────────── SIGNING ────────────────────────────── -->
+<section class="panel" id="panel-signing">
+<h2>Cosign Verification</h2>
+<p>Cryptographic chain of custody from source code to deployed image. Cosign uses keyless signing via Sigstore — every signing event is recorded in the public Rekor transparency log.</p>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Signature Status</h3>
+    <p id="cosignStatus" style="font-size:1rem"></p>
+    <h4>Extracted Claims</h4>
+    <table id="cosignClaims"><tbody></tbody></table>
+  </div>
+  <div class="card">
+    <h3>Verify Yourself</h3>
+    <p>Anyone can independently verify this image was signed by this exact pipeline:</p>
+    <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignCmd')">copy</span><span id="cosignCmd"></span></div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Raw Verification Log</h3>
+  <p>Output of <code>cosign verify</code> at deploy time:</p>
+  <div class="codeblock"><span class="copy-btn" onclick="copyEl('cosignRaw')">copy</span><span id="cosignRaw"></span></div>
+</div>
+
+<div class="card">
+  <h3>SLSA Build Provenance</h3>
+  <p>SLSA v1.0 provenance — proves how the image was built and what inputs were used. Excerpt:</p>
+  <div class="codeblock"><span class="copy-btn" onclick="copyEl('provExcerpt')">copy</span><span id="provExcerpt"></span></div>
+</div>
+</section>
+
+<!-- ────────────────────────────── FILES ────────────────────────────── -->
+<section class="panel" id="panel-files">
+<h2>Evidence File Inventory</h2>
+<p>All artifacts in this evidence pack with their purpose, size, and SHA256 hash. The SHA256 manifest is regenerated at archive time — auditors can re-hash any file and compare to detect tampering.</p>
+
+<div class="filter-row">
+  <input type="text" class="filter-input" id="fileSearch" placeholder="Filter files…">
+  <button class="chip active" data-fpres="all">All files</button>
+  <button class="chip" data-fpres="present">Present only</button>
+  <button class="chip" data-fpres="missing">Missing only</button>
+</div>
+
+<table id="invTable">
+  <thead><tr>
+    <th class="sortable" data-sort="name">File</th>
+    <th class="sortable" data-sort="purpose">Purpose</th>
+    <th>Compliance Anchor</th>
+    <th class="sortable" data-sort="size">Size</th>
+    <th>Status</th>
+  </tr></thead>
+  <tbody id="invRows"></tbody>
+</table>
+
+<h3 style="margin-top:24px">SHA256 Manifest</h3>
+<p>Content-addressed integrity proof. Verify any file by running <code>sha256sum &lt;file&gt;</code> and comparing.</p>
+<div class="filter-row">
+  <input type="text" class="filter-input" id="manifestSearch" placeholder="Filter manifest…">
+</div>
+<table id="manifestTable">
+  <thead><tr><th>SHA256 Hash</th><th>File</th></tr></thead>
+  <tbody id="manifestRows"></tbody>
+</table>
+</section>
+
+<!-- ────────────────────────────── DPA ────────────────────────────── -->
+<section class="panel" id="panel-dpa">
+<h2>Third-Party Processors (GDPR Art. 28)</h2>
+<p id="dpaIntro"></p>
+
+<table id="dpaTable">
+  <thead><tr>
+    <th>Vendor</th>
+    <th>Service</th>
+    <th>DPA Status</th>
+    <th>Data Location</th>
+    <th>Justification</th>
+  </tr></thead>
+  <tbody id="dpaRows"></tbody>
+</table>
+
+<div class="card" style="margin-top:14px">
+  <h3>Retention Policy</h3>
+  <table id="retentionTable"><tbody></tbody></table>
+</div>
+</section>
+
+<!-- ────────────────────────────── DATA FLOW ────────────────────────────── -->
+<section class="panel" id="panel-dataflow">
+<h2>Data Flow Diagram (GDPR Art. 25 & 30)</h2>
+<p>Personal data flow through the pipeline. PII presence is justified per stage; sanitisation removes developer emails before evidence archival.</p>
+
+<table id="dfTable">
+  <thead><tr>
+    <th>Stage</th>
+    <th>Location</th>
+    <th>PII Present</th>
+    <th>Types</th>
+    <th>Justification</th>
+    <th>Flows To</th>
+  </tr></thead>
+  <tbody id="dfRows"></tbody>
+</table>
+</section>
+
+<!-- ────────────────────────────── RAW ────────────────────────────── -->
+<section class="panel" id="panel-raw">
+<h2>Raw Pipeline Run Data</h2>
+<p>Complete JSON dump of <code>pipeline-run.json</code> — the source of truth for this report's metadata.</p>
+<div class="codeblock"><span class="copy-btn" onclick="copyEl('rawJson')">copy</span><span id="rawJson"></span></div>
+
+<h2 style="margin-top:24px">Tooling Summary</h2>
+<div class="grid-3">
+  <div class="card">
+    <h3>CodeQL (SAST)</h3>
+    <p id="codeqlStat"></p>
+  </div>
+  <div class="card">
+    <h3>Checkov (IaC)</h3>
+    <p id="checkovStat"></p>
+  </div>
+  <div class="card">
+    <h3>Test Coverage</h3>
+    <div id="coverageStat"></div>
+  </div>
+</div>
+</section>
+
+</div><!-- /wrap -->
+
+<footer>
+<div class="wrap">
+  <p>Evidence Pack generated <span id="genAt"></span> · CyberForge DevSecOps Pipeline · <a href="https://cyberforge.agency">cyberforge.agency</a></p>
+  <p>This pack is WORM-designed (unlocked) — retention enforced by Azure immutable-blob policy (target); object-lock is not yet engaged (worm_state read live from manifest, never hardcoded). SHA256-manifested — auditors can re-hash any file and compare to detect tampering.</p>
+</div>
+</footer>
+
+<script id="evidence-data" type="application/json">{"generated_at": "2026-06-18T10:41:41Z", "pipeline": {"name": "CyberForge Pipeline", "run_id": "?", "run_number": "?", "run_attempt": "1", "trigger": "?", "actor": "?", "ref": "?", "sha": "?", "sha_short": "?", "timestamp": "?", "repo": "?", "repo_url": "#", "environment": "?", "image_uri": "?", "image_digest": "?", "gates": {}, "tools": {}}, "compliance": [{"name": "DORA", "passed": 0, "total": 4, "controls": [{"article": "Art.16.1.a", "requirement": "ICT risk management", "evidence": "security-report.json (+embedded Trivy Results)", "status": "INDETERMINATE"}, {"article": "Art.16.1.c", "requirement": "Updated systems", "evidence": "trivy-sca-summary.json + dependency-review.json", "status": "INDETERMINATE"}, {"article": "Art.16.1.d", "requirement": "Anomaly detection", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "Art.28", "requirement": "Supply chain risk", "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl", "status": "INDETERMINATE"}]}, {"name": "NIS2", "passed": 0, "total": 4, "controls": [{"article": "Art.21.2.b", "requirement": "Incident handling", "evidence": "zap-report.json", "status": "INDETERMINATE"}, {"article": "Art.21.2.d", "requirement": "Supply chain security", "evidence": "sbom.cyclonedx.json + provenance.intoto.jsonl", "status": "INDETERMINATE"}, {"article": "Art.21.2.e", "requirement": "Secure development", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "Art.21.2.h", "requirement": "Cryptography", "evidence": "cosign-verification.log", "status": "INDETERMINATE"}]}, {"name": "ISO27001", "passed": 0, "total": 4, "controls": [{"article": "A.8.4", "requirement": "Access to source code", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "A.8.9", "requirement": "Configuration management", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "A.8.25", "requirement": "Secure SDLC (threat model)", "evidence": "threat-model.yaml", "status": "INDETERMINATE"}, {"article": "A.8.28", "requirement": "Secure coding", "evidence": "security-report.json", "status": "INDETERMINATE"}]}, {"name": "SOC2", "passed": 0, "total": 4, "controls": [{"article": "CC6.1", "requirement": "Logical access", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "CC7.1", "requirement": "System operations", "evidence": "cosign-verification.log", "status": "INDETERMINATE"}, {"article": "CC8.1", "requirement": "Change management", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}, {"article": "PI1.1", "requirement": "Processing integrity", "evidence": "security-report.json", "status": "INDETERMINATE"}]}, {"name": "RODO", "passed": 0, "total": 5, "controls": [{"article": "Art.5.1.c", "requirement": "Data minimization", "evidence": "dpa-compliance-check.json", "status": "INDETERMINATE"}, {"article": "Art.5.1.e", "requirement": "Storage limitation", "evidence": "dpa-compliance-check.json", "status": "INDETERMINATE"}, {"article": "Art.25", "requirement": "Data protection by design", "evidence": "data-flow-diagram.json", "status": "INDETERMINATE"}, {"article": "Art.28", "requirement": "Processor agreements", "evidence": "dpa-compliance-check.json", "status": "INDETERMINATE"}, {"article": "Art.30", "requirement": "Records of processing", "evidence": "pipeline-run.json", "status": "INDETERMINATE"}]}, {"name": "GOVERNANCE", "passed": 2, "total": 6, "controls": [{"article": "DORA Art.24-26 / NIS2 21(2)(e) / ISO A.8.8", "requirement": "Penetration testing (independent, >= annual, signed, findings retested)", "evidence": "pentest-report.json", "status": "FAIL"}, {"article": "DORA Art.26-27 / RTS (EU) 2025/1190", "requirement": "DORA Threat-Led Penetration Testing (TLPT)", "evidence": "tlpt-record.json", "status": "PASS"}, {"article": "DORA Art.6 / NIS2 21(2)(a) / ISO Cl.6.1,8.2", "requirement": "ICT risk-management framework + annual review", "evidence": "ict-risk-framework.json", "status": "INDETERMINATE"}, {"article": "DORA Art.8", "requirement": "Asset / dependency & critical-function map", "evidence": "asset-map.json", "status": "PASS"}, {"article": "DORA Art.24-25", "requirement": "Digital operational resilience testing programme", "evidence": "resilience-programme.json", "status": "FAIL"}, {"article": "SPEC \u00a77 item 7 / ISO A.8.15,A.5.28 / DORA Art.9(3)", "requirement": "Tamper-evident evidence-store access log", "evidence": "access-log-posture.json", "status": "INDETERMINATE"}]}], "compliance_status": {"available": true, "overall": "FAIL", "controls": [{"id": "A.1", "title": "DORA Register of Information (RoI) \u2014 critical/important ICT providers, exit & substitutability", "clause": "DORA Art.28(3); Reg (EU) 2024/2956", "validator": "validate-roi", "evidence": "roi-validation.json", "status": "PASS", "tier": "BLOCKING", "measured": "{\"providers_total\": 10, \"lei_checked\": 2, \"lei_format_valid\": 2, \"lei_registration\": {\"issued\": 0, \"placeholder\": 2, \"pe", "threshold": {"schema_violations": 0, "lei_format_invalid": 0, "completeness_violations": 0, "register_age_days_max": 365}, "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 95d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking", "remediation": null, "reported": true}, {"id": "A.2", "title": "Data Processing Agreements (DPA) register \u2014 Art.28 processor clauses", "clause": "GDPR/RODO Art.28(3)", "validator": "check-dpa-register", "evidence": "dpa-compliance-check.json", "status": "PASS", "tier": "BLOCKING", "measured": 2, "threshold": 92, "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days", "remediation": null, "reported": true}, {"id": "A.3", "title": "Records of Processing (RoPA) + DPIA completeness", "clause": "GDPR/RODO Art.30(1)-(2), Art.35", "validator": "validate-ropa", "evidence": "ropa-completeness.json", "status": "PASS", "tier": "BLOCKING", "measured": "{\"activities\": 3, \"violations\": 0, \"dpia_determination\": \"not-required\"}", "threshold": "0 violations; Art.30(1)/(2) complete + DPIA determination recorded", "detail": "RoPA present and complete: 3 processing activities satisfy RODO Art.30; DPIA determination='not-required'. NOTE: completeness verified, factual truth of recorded content is EVIDENCE-ONLY.", "remediation": null, "reported": true}, {"id": "A.4", "title": "Incident register \u2014 statutory-clock schema (3-phase DORA clock)", "clause": "DORA Art.19; NIS2 Art.23", "validator": "check-incident-register", "evidence": "incident-readiness.json", "status": "PASS", "tier": "BLOCKING", "measured": "{\"entry_count\": 2, \"violations\": 0}", "threshold": "schema-valid register with all 4 clock fields populated per entry", "detail": "2 incident(s); all entries carry classification + 4 reporting-clock fields", "remediation": null, "reported": true}, {"id": "A.5", "title": "PII data-flow / transfer map", "clause": "GDPR/RODO Art.30(5), Art.25", "validator": "check-data-flow", "evidence": "data-flow-diagram.json", "status": null, "tier": null, "measured": null, "threshold": null, "detail": null, "remediation": null, "reported": false}, {"id": "A.6", "title": "Governance freshness \u2014 management review & NIS2 management training", "clause": "DORA Art.5; NIS2 Art.20(2); ISO 27001 9.3", "validator": "check-governance", "evidence": "governance-evidence.json", "status": "PASS", "tier": "BLOCKING", "measured": "{\"management_review_age_days\": 95, \"training_record_age_days\": 95, \"board_approval_signoff\": true, \"training_attendees_r", "threshold": {"management_review_max_days": 183, "training_record_max_days": 365}, "detail": "governance evidence fresh: management review within 183d and management training within 365d", "remediation": null, "reported": true}, {"id": "A.7", "title": "ICT third-party clauses + documented & tested exit strategy", "clause": "DORA Art.28-30; ISO 27001 A.5.19-A.5.23", "validator": "check-thirdparty-clauses", "evidence": "tpp-clauses.json", "status": "PASS", "tier": "BLOCKING", "measured": 0, "threshold": 0, "detail": "All 3 Critical/High vendor(s) have a Documented/Tested exit plan.", "remediation": null, "reported": true}, {"id": "A.8", "title": "Access-review cadence freshness (privileged re-certification)", "clause": "NIS2 Art.21(2)(i); ISO 27001 A.8.2", "validator": "check-access-reviews", "evidence": "access-review.json", "status": "PASS", "tier": "BLOCKING", "measured": "{\"max_days_overdue\": 0, \"overdue_count\": 0, \"in_cycle_count\": 7, \"total_rows\": 7, \"overdue\": [], \"unparseable\": []}", "threshold": {"rule": "every 'Next Due' >= today (no overdue access review)", "max_days_overdue": 0}, "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 89d out)", "remediation": null, "reported": true}, {"id": "A.9", "title": "Cryptographic posture \u2014 TLS floor & key-management threshold", "clause": "NIS2 Art.21(2)(h); ISO 27001 A.8.24; SOC2 CC7.1", "validator": "assert-crypto", "evidence": "crypto-posture.json", "status": "INDETERMINATE", "tier": "EVIDENCE-ONLY", "measured": null, "threshold": null, "detail": "not evaluated in evidence-pack context (no Terraform plan); enforced at deploy time against `terraform show -json`.", "remediation": "Run at deploy time against `terraform show -json` (retention/crypto gate); reconcile with crypto-baseline.yaml.", "reported": true}, {"id": "A.10", "title": "Backup restore-test proof + freshness (successful restore conducted)", "clause": "DORA Art.11-12; NIS2 Art.21(2)(c); ISO 27001 A.8.13", "validator": "check-restore-test", "evidence": "restore-test.json", "status": "FAIL", "tier": "BLOCKING", "measured": "{\"last_successful_test_date\": null, \"successful_in_window\": 0, \"total_logged\": 0, \"rejections\": []}", "threshold": {"max_age_days": 365, "rto": "rto_actual<=rto_target", "outcome": "success", "min_successful_in_window": 1}, "detail": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')", "remediation": "Conduct a successful restore test and record it in docs/runbooks/restore-test-log.yaml.", "reported": true}], "counts": {"pass": 7, "fail": 1, "indeterminate": 1, "not_reported": 1, "blocking_fail": 1}}, "trivy_sca": {"rows": [{"kind": "filesystem", "target": "package-lock.json", "cve": "CVE-2026-8723", "package": "qs", "installed": "6.14.2", "fixed": "6.15.2", "severity": "MEDIUM", "title": "### Summary    `qs.stringify` throws `TypeError` when called with `arr ...", "url": "https://avd.aquasec.com/nvd/cve-2026-8723", "published": "2026-05-17T00:16:21.233Z", "cvss": ""}], "severity_count": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 1, "LOW": 0, "UNKNOWN": 0}, "total": 1}, "trivy_image": {"rows": [], "severity_count": {"CRITICAL": 0, "HIGH": 0, "MEDIUM": 0, "LOW": 0, "UNKNOWN": 0}, "total": 0}, "sbom": {"components": [{"name": "package-lock.json", "version": "?", "type": "application", "purl": "", "license": "\u2014", "description": ""}, {"name": "accepts", "version": "1.3.8", "type": "library", "purl": "pkg:npm/accepts@1.3.8", "license": "MIT", "description": ""}, {"name": "array-flatten", "version": "1.1.1", "type": "library", "purl": "pkg:npm/array-flatten@1.1.1", "license": "MIT", "description": ""}, {"name": "body-parser", "version": "1.20.4", "type": "library", "purl": "pkg:npm/body-parser@1.20.4", "license": "MIT", "description": ""}, {"name": "bytes", "version": "3.1.2", "type": "library", "purl": "pkg:npm/bytes@3.1.2", "license": "MIT", "description": ""}, {"name": "call-bind-apply-helpers", "version": "1.0.2", "type": "library", "purl": "pkg:npm/call-bind-apply-helpers@1.0.2", "license": "MIT", "description": ""}, {"name": "call-bound", "version": "1.0.4", "type": "library", "purl": "pkg:npm/call-bound@1.0.4", "license": "MIT", "description": ""}, {"name": "content-disposition", "version": "0.5.4", "type": "library", "purl": "pkg:npm/content-disposition@0.5.4", "license": "MIT", "description": ""}, {"name": "content-type", "version": "1.0.5", "type": "library", "purl": "pkg:npm/content-type@1.0.5", "license": "MIT", "description": ""}, {"name": "cookie-signature", "version": "1.0.7", "type": "library", "purl": "pkg:npm/cookie-signature@1.0.7", "license": "MIT", "description": ""}, {"name": "cookie", "version": "0.7.2", "type": "library", "purl": "pkg:npm/cookie@0.7.2", "license": "MIT", "description": ""}, {"name": "debug", "version": "2.6.9", "type": "library", "purl": "pkg:npm/debug@2.6.9", "license": "MIT", "description": ""}, {"name": "depd", "version": "2.0.0", "type": "library", "purl": "pkg:npm/depd@2.0.0", "license": "MIT", "description": ""}, {"name": "destroy", "version": "1.2.0", "type": "library", "purl": "pkg:npm/destroy@1.2.0", "license": "MIT", "description": ""}, {"name": "dunder-proto", "version": "1.0.1", "type": "library", "purl": "pkg:npm/dunder-proto@1.0.1", "license": "MIT", "description": ""}, {"name": "ee-first", "version": "1.1.1", "type": "library", "purl": "pkg:npm/ee-first@1.1.1", "license": "MIT", "description": ""}, {"name": "encodeurl", "version": "2.0.0", "type": "library", "purl": "pkg:npm/encodeurl@2.0.0", "license": "MIT", "description": ""}, {"name": "es-define-property", "version": "1.0.1", "type": "library", "purl": "pkg:npm/es-define-property@1.0.1", "license": "MIT", "description": ""}, {"name": "es-errors", "version": "1.3.0", "type": "library", "purl": "pkg:npm/es-errors@1.3.0", "license": "MIT", "description": ""}, {"name": "es-object-atoms", "version": "1.1.1", "type": "library", "purl": "pkg:npm/es-object-atoms@1.1.1", "license": "MIT", "description": ""}, {"name": "escape-html", "version": "1.0.3", "type": "library", "purl": "pkg:npm/escape-html@1.0.3", "license": "MIT", "description": ""}, {"name": "etag", "version": "1.8.1", "type": "library", "purl": "pkg:npm/etag@1.8.1", "license": "MIT", "description": ""}, {"name": "express", "version": "4.22.1", "type": "library", "purl": "pkg:npm/express@4.22.1", "license": "MIT", "description": ""}, {"name": "finalhandler", "version": "1.3.2", "type": "library", "purl": "pkg:npm/finalhandler@1.3.2", "license": "MIT", "description": ""}, {"name": "forwarded", "version": "0.2.0", "type": "library", "purl": "pkg:npm/forwarded@0.2.0", "license": "MIT", "description": ""}, {"name": "fresh", "version": "0.5.2", "type": "library", "purl": "pkg:npm/fresh@0.5.2", "license": "MIT", "description": ""}, {"name": "function-bind", "version": "1.1.2", "type": "library", "purl": "pkg:npm/function-bind@1.1.2", "license": "MIT", "description": ""}, {"name": "get-intrinsic", "version": "1.3.0", "type": "library", "purl": "pkg:npm/get-intrinsic@1.3.0", "license": "MIT", "description": ""}, {"name": "get-proto", "version": "1.0.1", "type": "library", "purl": "pkg:npm/get-proto@1.0.1", "license": "MIT", "description": ""}, {"name": "gopd", "version": "1.2.0", "type": "library", "purl": "pkg:npm/gopd@1.2.0", "license": "MIT", "description": ""}, {"name": "has-symbols", "version": "1.1.0", "type": "library", "purl": "pkg:npm/has-symbols@1.1.0", "license": "MIT", "description": ""}, {"name": "hasown", "version": "2.0.2", "type": "library", "purl": "pkg:npm/hasown@2.0.2", "license": "MIT", "description": ""}, {"name": "helmet", "version": "8.1.0", "type": "library", "purl": "pkg:npm/helmet@8.1.0", "license": "MIT", "description": ""}, {"name": "http-errors", "version": "2.0.1", "type": "library", "purl": "pkg:npm/http-errors@2.0.1", "license": "MIT", "description": ""}, {"name": "iconv-lite", "version": "0.4.24", "type": "library", "purl": "pkg:npm/iconv-lite@0.4.24", "license": "MIT", "description": ""}, {"name": "inherits", "version": "2.0.4", "type": "library", "purl": "pkg:npm/inherits@2.0.4", "license": "ISC", "description": ""}, {"name": "ipaddr.js", "version": "1.9.1", "type": "library", "purl": "pkg:npm/ipaddr.js@1.9.1", "license": "MIT", "description": ""}, {"name": "math-intrinsics", "version": "1.1.0", "type": "library", "purl": "pkg:npm/math-intrinsics@1.1.0", "license": "MIT", "description": ""}, {"name": "media-typer", "version": "0.3.0", "type": "library", "purl": "pkg:npm/media-typer@0.3.0", "license": "MIT", "description": ""}, {"name": "merge-descriptors", "version": "1.0.3", "type": "library", "purl": "pkg:npm/merge-descriptors@1.0.3", "license": "MIT", "description": ""}, {"name": "methods", "version": "1.1.2", "type": "library", "purl": "pkg:npm/methods@1.1.2", "license": "MIT", "description": ""}, {"name": "mime-db", "version": "1.52.0", "type": "library", "purl": "pkg:npm/mime-db@1.52.0", "license": "MIT", "description": ""}, {"name": "mime-types", "version": "2.1.35", "type": "library", "purl": "pkg:npm/mime-types@2.1.35", "license": "MIT", "description": ""}, {"name": "mime", "version": "1.6.0", "type": "library", "purl": "pkg:npm/mime@1.6.0", "license": "MIT", "description": ""}, {"name": "ms", "version": "2.0.0", "type": "library", "purl": "pkg:npm/ms@2.0.0", "license": "MIT", "description": ""}, {"name": "ms", "version": "2.1.3", "type": "library", "purl": "pkg:npm/ms@2.1.3", "license": "MIT", "description": ""}, {"name": "negotiator", "version": "0.6.3", "type": "library", "purl": "pkg:npm/negotiator@0.6.3", "license": "MIT", "description": ""}, {"name": "object-inspect", "version": "1.13.4", "type": "library", "purl": "pkg:npm/object-inspect@1.13.4", "license": "MIT", "description": ""}, {"name": "on-finished", "version": "2.4.1", "type": "library", "purl": "pkg:npm/on-finished@2.4.1", "license": "MIT", "description": ""}, {"name": "parseurl", "version": "1.3.3", "type": "library", "purl": "pkg:npm/parseurl@1.3.3", "license": "MIT", "description": ""}, {"name": "path-to-regexp", "version": "0.1.13", "type": "library", "purl": "pkg:npm/path-to-regexp@0.1.13", "license": "MIT", "description": ""}, {"name": "proxy-addr", "version": "2.0.7", "type": "library", "purl": "pkg:npm/proxy-addr@2.0.7", "license": "MIT", "description": ""}, {"name": "qs", "version": "6.14.2", "type": "library", "purl": "pkg:npm/qs@6.14.2", "license": "BSD-3-Clause", "description": ""}, {"name": "range-parser", "version": "1.2.1", "type": "library", "purl": "pkg:npm/range-parser@1.2.1", "license": "MIT", "description": ""}, {"name": "raw-body", "version": "2.5.3", "type": "library", "purl": "pkg:npm/raw-body@2.5.3", "license": "MIT", "description": ""}, {"name": "safe-buffer", "version": "5.2.1", "type": "library", "purl": "pkg:npm/safe-buffer@5.2.1", "license": "MIT", "description": ""}, {"name": "safer-buffer", "version": "2.1.2", "type": "library", "purl": "pkg:npm/safer-buffer@2.1.2", "license": "MIT", "description": ""}, {"name": "send", "version": "0.19.2", "type": "library", "purl": "pkg:npm/send@0.19.2", "license": "MIT", "description": ""}, {"name": "serve-static", "version": "1.16.3", "type": "library", "purl": "pkg:npm/serve-static@1.16.3", "license": "MIT", "description": ""}, {"name": "setprototypeof", "version": "1.2.0", "type": "library", "purl": "pkg:npm/setprototypeof@1.2.0", "license": "ISC", "description": ""}, {"name": "side-channel-list", "version": "1.0.1", "type": "library", "purl": "pkg:npm/side-channel-list@1.0.1", "license": "MIT", "description": ""}, {"name": "side-channel-map", "version": "1.0.1", "type": "library", "purl": "pkg:npm/side-channel-map@1.0.1", "license": "MIT", "description": ""}, {"name": "side-channel-weakmap", "version": "1.0.2", "type": "library", "purl": "pkg:npm/side-channel-weakmap@1.0.2", "license": "MIT", "description": ""}, {"name": "side-channel", "version": "1.1.0", "type": "library", "purl": "pkg:npm/side-channel@1.1.0", "license": "MIT", "description": ""}, {"name": "statuses", "version": "2.0.2", "type": "library", "purl": "pkg:npm/statuses@2.0.2", "license": "MIT", "description": ""}, {"name": "toidentifier", "version": "1.0.1", "type": "library", "purl": "pkg:npm/toidentifier@1.0.1", "license": "MIT", "description": ""}, {"name": "type-is", "version": "1.6.18", "type": "library", "purl": "pkg:npm/type-is@1.6.18", "license": "MIT", "description": ""}, {"name": "unpipe", "version": "1.0.0", "type": "library", "purl": "pkg:npm/unpipe@1.0.0", "license": "MIT", "description": ""}, {"name": "utils-merge", "version": "1.0.1", "type": "library", "purl": "pkg:npm/utils-merge@1.0.1", "license": "MIT", "description": ""}, {"name": "vary", "version": "1.1.2", "type": "library", "purl": "pkg:npm/vary@1.1.2", "license": "MIT", "description": ""}], "total": 70, "format": "CycloneDX 1.7", "types": {"application": 1, "library": 69}, "licenses": {"MIT": 66, "ISC": 2, "BSD-3-Clause": 1}}, "zap": {"alerts": [], "severity_count": {"High": 0, "Medium": 0, "Low": 0, "Informational": 0}, "target": ""}, "cosign": {"verified": false, "raw": "", "claims": {}}, "manifest": [{"hash": "60c5826d0705abb2221d585c93b54340b61d3f63ed79f76f2e62e12eb40a09ad", "file": "access-log-posture.json"}, {"hash": "a37d24c41834b4dd875b9de04ce190a12fe07c9ace8728fe5e2687ee46f88410", "file": "access-review.json"}, {"hash": "ab014a2de1a5e65a89e5fedfece2c613e9ea3633ebdde38f3b5b847babe88761", "file": "asset-map.json"}, {"hash": "9882905cdc6be2737b9bf193582b5a5b9e3233453ced9d67fe4e99ee6557240c", "file": "cloud-posture.json"}, {"hash": "bbbe4557d655201310e4006b7a2db3cfface81110f12c69bfcba8f6c34b466ad", "file": "compliance-matrix.json"}, {"hash": "b5bd43d368fb5bd3608612dff84056ec4938ef2cb213f7c88fd12d0f92b1608a", "file": "compliance-status.json"}, {"hash": "d0aa9f2d8a326f9e71a7a60daff277d9316cbbb83e24a17084dd8d1c387b8324", "file": "crosswalk.json"}, {"hash": "ed7bd2a693c8badb1ff69d82dedb287d9247a1018723165d9071d7e1da6cff38", "file": "dpa-compliance-check.json"}, {"hash": "f285f7eee371939f67f2e7b62e13408f8730c1dfae06c050acd945cb503301b3", "file": "gap-register.json"}, {"hash": "1b63add3b929c4c8868bde9933f6b65875cc5a7625b755955df6005cac9074aa", "file": "gap-register.md"}, {"hash": "d33b00e3e191b74105d6ecb2bd5f65d9dc22ad6f199e1e94e0a1ec1dae2f3dd2", "file": "governance-evidence.json"}, {"hash": "188aea3b8a77383c2e27e63032821563ae45674e3daa78138b20d90c6fdfb5ae", "file": "ict-risk-framework.json"}, {"hash": "13dc680c16350aa6d97193025111af8d03bd0c5932916fadd1f55ad556ae4250", "file": "incident-readiness.json"}, {"hash": "6a54b9f562512de4f73a6ec8420557c4a244804b85b2084a4b5ee8a2d2b2224e", "file": "pentest-report.json"}, {"hash": "9135c939c1e58ea9ec37800541b06427be8deb11680201be42657ed65700ec89", "file": "reproducibility-statement.json"}, {"hash": "64cf2231ba13341e9b5ff9714977ef4410e37a3c62f802ed430bb9a272e78793", "file": "residency.json"}, {"hash": "f5dc61bb7f5501fa4e49ddfaac3efdd224cca360931bad9308f29904bb7d0550", "file": "residual-risk.json"}, {"hash": "441c29dc4623c15e090667a5651faa92e65f210ff1b6ea4baeec69e18db3175d", "file": "resilience-programme.json"}, {"hash": "7bae4a3408bb74293faea3ade45e525ea37ea2f074e7388dfc1ff82949ca2a04", "file": "restore-test.json"}, {"hash": "25c2b79b76b236850b11651387e69c4bf9dfe651e40cb57a20abb7bbb0b0202d", "file": "retention-policy.json"}, {"hash": "2eb454f9d6ffb19342ba32dc434efa8399892bcbe0b3a27dadd6406a9a128520", "file": "roi-validation.json"}, {"hash": "62f967f5c861b790ff6317fea8d5d380fffc53f010b0ec196ef9d35f93ff6764", "file": "ropa-completeness.json"}, {"hash": "24ce1b881360236781ed7ed15c29963869ea435ab5c152207c126259612d2435", "file": "runtime-hardening.json"}, {"hash": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791", "file": "sbom.cyclonedx.json"}, {"hash": "9397bc07a626bd04e8458059eb26915b7eec1a9f96080616f65d3f3f2a1dfd49", "file": "scope-determination.json"}, {"hash": "4191127479543991e28eb729e3568103c9fe01f9fd021b38ad239211d761854a", "file": "soa-maturity.json"}, {"hash": "230589b2bfb7d4c90c95719897ec13a5eb818647a34ade8b7a86c31d7a003c18", "file": "threat-model-validation.json"}, {"hash": "73155adc89de4059012adf8a866a6da516b0533852c935a97f97d84d3cf142c9", "file": "threat-model.yaml"}, {"hash": "b501aca6fa95db5493acc1b7bb905e6969d48366697be172b745ea9def43e3fa", "file": "tlpt-record.json"}, {"hash": "fb3f4fb0e413fdeb512ee60a3abf1e6314d57a49d7b9b8de0aef3c2e81aac928", "file": "tpp-clauses.json"}, {"hash": "c671efda6c8d092d6e7a7149a4966e68e1cb11b6ef2a1ff12416d487de03e8c2", "file": "trivy-results.sarif"}, {"hash": "3376e1290ceea48f0c335651cf40766416904ac88a16f5ed6fac21a371f757c9", "file": "trivy-sca-results.json"}, {"hash": "27b8d9984f92b364f444fc087c2e38eadb46b84ef0e5a9bc98a3b59f10f98c29", "file": "vex.openvex.json"}], "codeql": {"findings": [], "rules_count": 0}, "checkov": {"findings": [], "rules_count": 0}, "coverage": {"available": false}, "dpa": {"generated_at": "2026-06-18T10:41:38Z", "description": "DPA compliance verification for pipeline third-party processors", "vendor_risk_register_ref": "docs/governance/vendor-risk-register.md", "last_reviewed": "2026-06-16", "status": "PASS", "envelope": {"status": "PASS", "tier": "BLOCKING", "measured": 2, "threshold": 92, "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days", "tool_version": null, "validator": "libcompliance", "checked_at": "2026-06-18T10:41:38Z"}, "freshness": {"status": "PASS", "tier": "BLOCKING", "measured": 2, "threshold": 92, "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days", "tool_version": null, "validator": "libcompliance", "checked_at": "2026-06-18T10:41:38Z"}, "retention_policy": {"evidence_pack_retention_days": 1825, "log_retention_days": 90, "deletion_schedule": "Automated via Azure lifecycle management policy"}, "processors": [{"name": "GitHub (Microsoft)", "service": "GitHub Actions, GitHub Advanced Security, CodeQL", "dpa_status": "ACTIVE", "data_location": "EU (GitHub data residency)", "data_types": "Source code, build logs, developer metadata, PR/issue data", "justification": "", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "ACTIVE", "threshold": "documented DPA status", "detail": "GitHub (Microsoft): DPA status ACTIVE (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}, "dpa_url": "https://github.com/customer-terms/github-data-protection-agreement"}, {"name": "Microsoft Azure", "service": "ACR, Container Apps, Key Vault, Blob Storage", "dpa_status": "ACTIVE", "data_location": "Poland Central (EU)", "data_types": "Container images, application logs, evidence packs, secrets (encrypted)", "justification": "", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "ACTIVE", "threshold": "documented DPA status", "detail": "Microsoft Azure: DPA status ACTIVE (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}, "dpa_url": "https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA"}, {"name": "Sigstore (Linux Foundation)", "service": "Fulcio, Rekor transparency log", "dpa_status": "NOT_REQUIRED", "data_location": "Global (US-hosted infrastructure)", "data_types": "OIDC identity tokens, cryptographic signatures", "justification": "N/A - Public transparency log; no personal data beyond GitHub OIDC identity", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "Sigstore (Linux Foundation): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "OWASP Foundation", "service": "OWASP ZAP", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (local execution)", "data_types": "No data sent externally (self-hosted on runner)", "justification": "N/A - Self-hosted, no external data transmission", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "OWASP Foundation: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "Aqua Security", "service": "Trivy (OSS)", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (client-side only)", "data_types": "Vulnerability database downloads (inbound only); scan results remain local", "justification": "N/A - No data sent externally; vulnerability DB fetched read-only", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "Aqua Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "Bridgecrew (Palo Alto Networks)", "service": "Checkov (OSS)", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (client-side only)", "data_types": "IaC scan results (local only)", "justification": "N/A - All processing local; no telemetry enabled", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "Bridgecrew (Palo Alto Networks): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "Anchore", "service": "Syft (OSS)", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (client-side only)", "data_types": "SBOM generation output (local only)", "justification": "N/A - All processing local; SBOM stored in pipeline artifacts", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "Anchore: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "OxSecurity", "service": "MegaLinter (OSS)", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (client-side only)", "data_types": "Linting results (local only)", "justification": "N/A - All processing local; no external reporting enabled", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "OxSecurity: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "Mend (formerly WhiteSource)", "service": "Renovate (OSS)", "dpa_status": "COVERED_BY_GITHUB_DPA", "data_location": "GitHub (via GitHub App integration)", "data_types": "Dependency metadata (package names, versions)", "justification": "Operates within GitHub environment; covered under [GitHub DPA](https://github.com/customer-terms/github-data-protection-agreement)", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "COVERED_BY_GITHUB_DPA", "threshold": "documented DPA status", "detail": "Mend (formerly WhiteSource): DPA status COVERED_BY_GITHUB_DPA (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}, {"name": "Truffle Security", "service": "TruffleHog (OSS)", "dpa_status": "NOT_REQUIRED", "data_location": "N/A (client-side only)", "data_types": "Secret scan results (local only)", "justification": "N/A - All processing local; no data exfiltration", "envelope": {"status": "PASS", "tier": "EVIDENCE-ONLY", "measured": "NOT_REQUIRED", "threshold": "documented DPA status", "detail": "Truffle Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)", "tool_version": null, "validator": "check_dpa_validator", "checked_at": "2026-06-18T10:41:38Z"}}]}, "data_flow": {}, "inventory": [{"name": "pipeline-run.json", "purpose": "Pipeline execution metadata", "framework": "All frameworks", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "security-report.json", "purpose": "Consolidated scan results", "framework": "DORA Art.16, NIS2 Art.21", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "sbom.cyclonedx.json", "purpose": "Software Bill of Materials", "framework": "DORA Art.28, NIS2 Art.21.2.d", "present": true, "size": 47029, "size_fmt": "45.9 KB"}, {"name": "cosign-verification.log", "purpose": "Image signature proof", "framework": "ISO A.8.24, SOC2 CC8.1", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "provenance.intoto.jsonl", "purpose": "SLSA build provenance", "framework": "DORA Art.28, SLSA Build L2", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "zap-report.json", "purpose": "DAST scan results (JSON)", "framework": "NIS2 Art.21.2.e, ISO A.8.28", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "zap-report.html", "purpose": "DAST scan results (HTML)", "framework": "NIS2 Art.21.2.e, ISO A.8.28", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "compliance-matrix.json", "purpose": "Framework control mapping", "framework": "All frameworks", "present": true, "size": 21621, "size_fmt": "21.1 KB"}, {"name": "dpa-compliance-check.json", "purpose": "Data processor agreements", "framework": "GDPR Art.28", "present": true, "size": 8507, "size_fmt": "8.3 KB"}, {"name": "data-flow-diagram.json", "purpose": "PII data flow map", "framework": "GDPR Art.25, Art.30", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "manifest.sha256", "purpose": "Integrity checksums", "framework": "ISO A.8.4, SOC2 PI1.1", "present": true, "size": 2870, "size_fmt": "2.8 KB"}, {"name": "trivy-sca-results.json", "purpose": "Dependency CVE scan", "framework": "DORA Art.16.1.c", "present": true, "size": 47694, "size_fmt": "46.6 KB"}, {"name": "trivy-image-results.json", "purpose": "Container image CVE scan", "framework": "NIS2 Art.21.2.d", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "checkov-results.sarif", "purpose": "IaC security scan", "framework": "ISO A.8.9, SOC2 CC8.1", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "codeql/javascript.sarif", "purpose": "SAST results", "framework": "ISO A.8.28, NIS2 Art.21.2.e", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "dependency-review.json", "purpose": "Dependency review", "framework": "DORA Art.16.1.c", "present": false, "size": 0, "size_fmt": "\u2014"}, {"name": "README.md", "purpose": "Pack contents description", "framework": "\u2014", "present": false, "size": 0, "size_fmt": "\u2014"}], "provenance_excerpt": "", "stats": {"total_cves": 1, "critical_cves": 0, "high_cves": 0, "zap_high": 0, "zap_medium": 0, "sbom_components": 70, "evidence_present": 5, "evidence_total": 17, "compliance_passed": 2, "compliance_total": 27, "manifest_files": 33, "coverage_lines": 0, "gates_passed": 0, "gates_total": 0}}</script>
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// Evidence report renderer
+// ═══════════════════════════════════════════════════════════════════
+const DATA = JSON.parse(document.getElementById('evidence-data').textContent);
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+// ── Tab switching ────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    $('panel-' + t.dataset.tab).classList.add('active');
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+});
+
+// ── Copy helper ──────────────────────────────────────────────────────
+function copyEl(id) {
+  const el = $(id);
+  if (!el) return;
+  navigator.clipboard?.writeText(el.textContent).then(() => {
+    const btn = el.parentElement.querySelector('.copy-btn');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1300);
+    }
+  });
+}
+window.copyEl = copyEl;
+
+// ── DASHBOARD ────────────────────────────────────────────────────────
+function renderDashboard() {
+  const p = DATA.pipeline;
+  $('d-name').textContent = p.name;
+  $('d-run-num').textContent = p.run_number;
+  $('d-run-id').textContent = p.run_id;
+  $('d-run-attempt').textContent = p.run_attempt;
+  $('d-trigger').textContent = p.trigger;
+  $('d-actor').textContent = p.actor;
+  $('d-ref').textContent = p.ref;
+  $('d-sha').textContent = p.sha;
+  $('d-repo-link').textContent = p.repo;
+  $('d-repo-link').href = p.repo_url;
+  $('d-env').textContent = p.environment;
+  $('d-imguri').textContent = p.image_uri;
+  $('d-imgdigest').textContent = p.image_digest;
+  $('d-generated').textContent = DATA.generated_at;
+
+  // Replace header tokens already done server-side; just mirror here
+  document.title = `Evidence Pack — Run #${p.run_number} (${p.environment})`;
+  $('genAt').textContent = DATA.generated_at;
+
+  // Phase row
+  const phaseLabels = ['Security Gate','Build & Scan','Sign & Attest','Deploy','DAST'];
+  const phaseKeys = ['security_gate','build_scan','sign_attest','deploy','dast'];
+  const phaseRow = $('phaseRow');
+  phaseRow.innerHTML = phaseKeys.map((k, i) => {
+    const status = p.gates[k] || 'skipped';
+    return `<div class="ph-node"><div class="ph-circle ${status}">${i+1}</div><div class="ph-name">${phaseLabels[i]}</div><div class="ph-status ${status}">${status}</div></div>`;
+  }).join('') + `<div class="ph-node"><div class="ph-circle success">6</div><div class="ph-name">Evidence Pack</div><div class="ph-status success">success</div></div>`;
+
+  // KPI row
+  const s = DATA.stats;
+  const kpis = [
+    {n: `${s.gates_passed}/${s.gates_total}`, l: 'Gates Passed', cls: s.gates_passed===s.gates_total?'green':'amber'},
+    {n: s.evidence_present + '/' + s.evidence_total, l: 'Evidence Files', cls: s.evidence_present>=11?'green':'amber'},
+    {n: s.compliance_passed + '/' + s.compliance_total, l: 'Compliance Controls', cls: 'green'},
+    {n: s.sbom_components, l: 'SBOM Components', cls: ''},
+    {n: s.total_cves, l: 'Vulnerabilities', cls: s.critical_cves>0?'red':(s.high_cves>0?'amber':'green'), sub: `${s.critical_cves}C / ${s.high_cves}H`},
+    {n: s.zap_high + s.zap_medium, l: 'DAST H+M', cls: s.zap_high>0?'red':(s.zap_medium>0?'amber':'green'), sub: `${s.zap_high}H / ${s.zap_medium}M`},
+    {n: (s.coverage_lines||0).toFixed(0)+'%', l: 'Test Coverage', cls: s.coverage_lines>=80?'green':'amber'},
+    {n: s.manifest_files, l: 'Manifested Files', cls: ''},
+  ];
+  $('kpiRow').innerHTML = kpis.map(k =>
+    `<div class="kpi ${k.cls}"><div class="kpi-num">${k.n}</div><div class="kpi-lbl">${k.l}</div>${k.sub?`<div class="kpi-sub">${k.sub}</div>`:''}</div>`
+  ).join('');
+
+  // Donut for compliance
+  const total = s.compliance_total || 1;
+  const pct = Math.round(s.compliance_passed * 100 / total);
+  const circ = 2 * Math.PI * 48;
+  const dash = circ * pct / 100;
+  $('donutPathDash').setAttribute('stroke-dasharray', `${dash} ${circ}`);
+  $('donutPctDash').textContent = pct + '%';
+
+  // Per-framework bars
+  $('fwBars').innerHTML = DATA.compliance.map(fw => {
+    const p = fw.total ? (fw.passed*100/fw.total) : 0;
+    return `<div class="bar-row"><div class="bar-label">${fw.name}</div><div class="bar-track"><div class="bar-fill" style="width:${p}%;background:linear-gradient(90deg,var(--blue) 0%,var(--green) 100%)"></div></div><div class="bar-value">${fw.passed}/${fw.total}</div></div>`;
+  }).join('');
+
+  // Trivy bars
+  const sevColors = {CRITICAL:'#DC2626',HIGH:'#EA580C',MEDIUM:'#D97706',LOW:'#2563EB',UNKNOWN:'#94A3B8'};
+  function sevBars(counts) {
+    const max = Math.max(1, ...Object.values(counts));
+    return Object.entries(counts).map(([sev,n]) =>
+      `<div class="bar-row"><div class="bar-label">${sev}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:${sevColors[sev]||'var(--blue)'}"></div></div><div class="bar-value">${n}</div></div>`
+    ).join('');
+  }
+  $('trivyBars').innerHTML = sevBars(DATA.trivy_sca.severity_count);
+  $('trivyImgBars').innerHTML = sevBars(DATA.trivy_image.severity_count);
+  $('zapBars').innerHTML = sevBars(DATA.zap.severity_count);
+
+  // Tools table
+  $('toolsTable').innerHTML = Object.entries(DATA.pipeline.tools || {}).map(([k,v]) =>
+    `<tr><td><strong>${esc(k)}</strong></td><td><code>${esc(v)}</code></td></tr>`
+  ).join('') || '<tr><td colspan="2" class="empty">No tool versions recorded.</td></tr>';
+}
+
+// ── VULNS ────────────────────────────────────────────────────────────
+let vulnFilters = {sev:'all', src:'all', q:''};
+function renderVulns() {
+  const all = [...DATA.trivy_sca.rows, ...DATA.trivy_image.rows];
+  const filtered = all.filter(v => {
+    if (vulnFilters.sev !== 'all' && v.severity !== vulnFilters.sev) return false;
+    if (vulnFilters.src !== 'all' && v.kind !== vulnFilters.src) return false;
+    if (vulnFilters.q) {
+      const q = vulnFilters.q.toLowerCase();
+      const blob = (v.cve+v.package+v.title+v.target).toLowerCase();
+      if (!blob.includes(q)) return false;
+    }
+    return true;
+  });
+  $('cnt-vulns').textContent = all.length;
+  $('vulnEmpty').style.display = filtered.length ? 'none' : 'block';
+  $('vulnRows').innerHTML = filtered.map((v, idx) => `
+    <tr class="expander" data-idx="${idx}">
+      <td><span class="sev sev-${v.severity}">${v.severity}</span></td>
+      <td><code>${esc(v.cve)}</code><span class="expand-icon">+</span></td>
+      <td><code>${esc(v.package)}</code></td>
+      <td><code>${esc(v.installed)}</code></td>
+      <td><code>${esc(v.fixed||'—')}</code></td>
+      <td>${v.kind==='filesystem'?'SCA':'Image'}</td>
+      <td>${esc(v.title)}</td>
+    </tr>
+    <tr class="detail-row" id="vd-${idx}"><td colspan="7"><div class="detail-content">
+      <dl>
+        <dt>CVE</dt><dd><a href="${esc(v.url)}" target="_blank" rel="noopener">${esc(v.cve)}</a></dd>
+        <dt>Target</dt><dd><code>${esc(v.target)}</code></dd>
+        <dt>CVSS Score</dt><dd>${esc(v.cvss||'n/a')}</dd>
+        <dt>Published</dt><dd>${esc(v.published||'—')}</dd>
+        <dt>Remediation</dt><dd>${v.fixed?`Upgrade to <code>${esc(v.fixed)}</code>`:'No fix available — risk-accept via .trivyignore with VEX justification'}</dd>
+      </dl>
+    </div></td></tr>
+  `).join('');
+  // Wire expanders
+  document.querySelectorAll('#vulnRows .expander').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = row.dataset.idx;
+      const detail = $('vd-'+idx);
+      row.classList.toggle('expanded');
+      detail.classList.toggle('show');
+    });
+  });
+}
+$('vulnSearch').addEventListener('input', e => { vulnFilters.q = e.target.value; renderVulns(); });
+document.querySelectorAll('[data-vsev]').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('[data-vsev]').forEach(x => x.classList.remove('active'));
+  c.classList.add('active'); vulnFilters.sev = c.dataset.vsev; renderVulns();
+}));
+document.querySelectorAll('[data-vsrc]').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('[data-vsrc]').forEach(x => x.classList.remove('active'));
+  c.classList.add('active'); vulnFilters.src = c.dataset.vsrc; renderVulns();
+}));
+
+// ── SBOM ─────────────────────────────────────────────────────────────
+let sbomQ = '';
+function renderSbom() {
+  const s = DATA.sbom;
+  $('cnt-sbom').textContent = s.total;
+  $('sbomMeta').innerHTML = `<strong>${s.total}</strong> components · format <code>${esc(s.format)}</code>`;
+  // Type breakdown
+  $('sbomTypes').innerHTML = Object.entries(s.types).map(([t,n]) => {
+    const pct = (n/s.total*100).toFixed(1);
+    return `<div class="bar-row"><div class="bar-label">${esc(t)}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:var(--blue)"></div></div><div class="bar-value">${n}</div></div>`;
+  }).join('');
+  // Licenses
+  $('sbomLicenses').innerHTML = Object.entries(s.licenses).map(([l,n]) => {
+    const max = Math.max(...Object.values(s.licenses), 1);
+    return `<div class="bar-row"><div class="bar-label">${esc(l)}</div><div class="bar-track"><div class="bar-fill" style="width:${n/max*100}%;background:var(--purple)"></div></div><div class="bar-value">${n}</div></div>`;
+  }).join('') || '<p class="empty">No license metadata found.</p>';
+  // Filter & render
+  const filtered = s.components.filter(c => {
+    if (!sbomQ) return true;
+    return (c.name+c.version+c.type+c.license+c.purl).toLowerCase().includes(sbomQ.toLowerCase());
+  });
+  $('sbomRows').innerHTML = filtered.slice(0, 500).map(c => `
+    <tr><td><strong>${esc(c.name)}</strong></td><td><code>${esc(c.version)}</code></td><td>${esc(c.type)}</td><td>${esc(c.license)}</td><td><code style="font-size:.7rem">${esc(c.purl)}</code></td></tr>
+  `).join('');
+}
+$('sbomSearch').addEventListener('input', e => { sbomQ = e.target.value; renderSbom(); });
+
+// ── DAST ─────────────────────────────────────────────────────────────
+let zapFilter = {sev:'all', q:''};
+function renderDast() {
+  const z = DATA.zap;
+  $('cnt-dast').textContent = z.alerts.length;
+  $('zapTarget').textContent = z.target || '(unknown)';
+  $('zapKpis').innerHTML = ['High','Medium','Low','Informational'].map(s => {
+    const cls = s==='High'?'red':s==='Medium'?'amber':'';
+    return `<div class="kpi ${cls}"><div class="kpi-num">${z.severity_count[s]||0}</div><div class="kpi-lbl">${s}</div></div>`;
+  }).join('');
+  const filtered = z.alerts.filter(a => {
+    if (zapFilter.sev !== 'all' && a.risk !== zapFilter.sev) return false;
+    if (zapFilter.q && !(a.name+a.desc+a.solution).toLowerCase().includes(zapFilter.q.toLowerCase())) return false;
+    return true;
+  });
+  $('zapAlerts').innerHTML = filtered.length ? filtered.map((a,i) => `
+    <div class="card">
+      <h3><span class="sev sev-${a.risk}">${a.risk}</span> ${esc(a.name)}</h3>
+      <table><tbody>
+        <tr><td><strong>Confidence</strong></td><td>${esc(a.confidence)}</td></tr>
+        ${a.cwe?`<tr><td><strong>CWE</strong></td><td><a href="https://cwe.mitre.org/data/definitions/${esc(a.cwe)}.html" target="_blank" rel="noopener">CWE-${esc(a.cwe)}</a></td></tr>`:''}
+        <tr><td><strong>Instances</strong></td><td>${a.count} (showing ${Math.min(a.instances.length,10)})</td></tr>
+      </tbody></table>
+      <h4>Description</h4>
+      <p>${esc(a.desc)}</p>
+      <h4>Recommended Solution</h4>
+      <p>${esc(a.solution)}</p>
+      ${a.instances.length ? `
+        <h4>Affected URLs</h4>
+        <table><thead><tr><th>Method</th><th>URI</th></tr></thead><tbody>
+          ${a.instances.map(i => `<tr><td><code>${esc(i.method)}</code></td><td><code style="font-size:.7rem">${esc(i.uri)}</code></td></tr>`).join('')}
+        </tbody></table>` : ''}
+    </div>
+  `).join('') : '<p class="empty">No DAST findings match.</p>';
+}
+$('zapSearch').addEventListener('input', e => { zapFilter.q = e.target.value; renderDast(); });
+document.querySelectorAll('[data-zsev]').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('[data-zsev]').forEach(x => x.classList.remove('active'));
+  c.classList.add('active'); zapFilter.sev = c.dataset.zsev; renderDast();
+}));
+
+// ── COMPLIANCE ───────────────────────────────────────────────────────
+let activeFw = null;
+function renderCompliance() {
+  $('fwGrid').innerHTML = DATA.compliance.map(fw => {
+    const cls = activeFw === fw.name ? 'active' : '';
+    return `<div class="fw-card ${cls}" data-fw="${esc(fw.name)}"><div class="fw-name">${esc(fw.name)}</div><div class="fw-cov">${fw.passed}/${fw.total}</div><div class="fw-lbl">controls</div></div>`;
+  }).join('');
+  $('fwControls').innerHTML = DATA.compliance.map(fw => `
+    <div class="fw-controls ${activeFw===fw.name?'active':''}" data-fw="${esc(fw.name)}">
+      <h3>${esc(fw.name)} — ${fw.passed} of ${fw.total} controls satisfied</h3>
+      <table><thead><tr><th>Article</th><th>Requirement</th><th>Evidence</th><th>Status</th></tr></thead><tbody>
+        ${fw.controls.map(c => `<tr>
+          <td><strong>${esc(c.article)}</strong></td>
+          <td>${esc(c.requirement)}</td>
+          <td><code style="font-size:.74rem">${esc(c.evidence)}</code></td>
+          <td><span class="${c.status==='PASS'?'badge-pass':c.status==='SKIP'?'badge-skip':'badge-fail'}">${esc(c.status)}</span></td>
+        </tr>`).join('')}
+      </tbody></table>
+    </div>
+  `).join('');
+  document.querySelectorAll('.fw-card').forEach(c => c.addEventListener('click', () => {
+    activeFw = activeFw === c.dataset.fw ? null : c.dataset.fw;
+    renderCompliance();
+  }));
+}
+
+// ── COMPLIANCE-AS-CODE (A.1-A.10 signed org-control verdicts) ─────────
+function ccStatusBadge(s) {
+  const n = String(s ?? '').toUpperCase();
+  if (n === 'PASS') return '<span class="badge-pass">PASS</span>';
+  if (n === 'FAIL') return '<span class="badge-fail">FAIL</span>';
+  if (n === 'INDETERMINATE') return '<span class="badge-indet">INDETERMINATE</span>';
+  if (n) return '<span class="badge-skip">' + esc(n) + '</span>';
+  return '<span class="badge-skip">NOT REPORTED</span>';
+}
+function ccTierBadge(t) {
+  const n = String(t ?? '').toUpperCase();
+  if (n === 'BLOCKING') return '<span class="badge-blocking">BLOCKING</span>';
+  if (n === 'EVIDENCE-ONLY' || n === 'EVIDENCE_ONLY') return '<span class="badge-evidence">EVIDENCE-ONLY</span>';
+  if (n) return '<span class="badge-skip">' + esc(n) + '</span>';
+  return '—';
+}
+function renderComplianceCode() {
+  const cc = DATA.compliance_status || {available:false, overall:null, controls:[], counts:{}};
+  // Gate verdict line — honest: NOT AVAILABLE when the signed status file is absent.
+  if (cc.available) {
+    $('ccGateLine').innerHTML = ccStatusBadge(cc.overall) +
+      ' <span style="font-size:.82rem;color:var(--mid)">read from compliance-status.json ' +
+      'overall_status — the signed, fail-closed verdict; not recomputed here.</span>';
+  } else {
+    $('ccGateLine').innerHTML = '<span class="badge-skip">NOT AVAILABLE</span> ' +
+      '<span style="font-size:.82rem;color:var(--mid)">compliance-status.json was not present in ' +
+      'this evidence pack; controls below show NOT REPORTED rather than a fabricated PASS.</span>';
+  }
+  const k = cc.counts || {};
+  $('ccCounts').textContent =
+    'A.1-A.10 verdicts: ' + (k.pass||0) + ' PASS, ' + (k.fail||0) + ' FAIL (' +
+    (k.blocking_fail||0) + ' BLOCKING), ' + (k.indeterminate||0) + ' INDETERMINATE, ' +
+    (k.not_reported||0) + ' NOT REPORTED. Only a BLOCKING FAIL fails the gate; an EVIDENCE-ONLY ' +
+    'FAIL is recorded but does not break the build (libcompliance tiers).';
+  const rows = (cc.controls || []).map(c => {
+    let measured = (c.measured === null || c.measured === undefined || c.measured === '') ? '—'
+      : '<code style="font-size:.72rem">' + esc(c.measured) + '</code>';
+    if (c.threshold !== null && c.threshold !== undefined && c.threshold !== '')
+      measured += ' <span style="color:var(--mid);font-size:.72rem">/ thr ' + esc(c.threshold) + '</span>';
+    const rem = c.remediation ? esc(c.remediation) : '—';
+    const ev = c.evidence ? '<code style="font-size:.72rem">' + esc(c.evidence) + '</code>' : '—';
+    return '<tr>' +
+      '<td><strong>' + esc(c.id) + '</strong></td>' +
+      '<td>' + esc(c.title) + '</td>' +
+      '<td style="font-size:.78rem">' + esc(c.clause) + '</td>' +
+      '<td>' + ev + '</td>' +
+      '<td>' + ccTierBadge(c.tier) + '</td>' +
+      '<td>' + ccStatusBadge(c.status) + '<br>' + measured + '</td>' +
+      '<td style="font-size:.78rem">' + rem + '</td>' +
+      '</tr>';
+  }).join('');
+  $('ccTableWrap').innerHTML =
+    '<table><thead><tr><th>Control</th><th>Organizational control</th><th>Framework clause</th>' +
+    '<th>Evidence verdict</th><th>Tier</th><th>Result / measured</th><th>Remediation pointer</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
+// ── SIGNING ──────────────────────────────────────────────────────────
+function renderSigning() {
+  const c = DATA.cosign;
+  $('cosignStatus').innerHTML = c.verified
+    ? '<span class="badge-pass">✓ VERIFIED</span> Image signature verified at deploy time.'
+    : '<span class="badge-fail">UNVERIFIED</span>';
+  $('cosignClaims').innerHTML = `<tbody>${
+    Object.entries(c.claims).map(([k,v]) =>
+      `<tr><td><strong>${esc(k)}</strong></td><td><code style="font-size:.74rem">${esc(v)}</code></td></tr>`
+    ).join('') || '<tr><td colspan="2" class="empty">No claims extracted</td></tr>'
+  }</tbody>`;
+  const repo = DATA.pipeline.repo;
+  const img = DATA.pipeline.image_uri || '';
+  const dig = DATA.pipeline.image_digest || '';
+  $('cosignCmd').textContent =
+    `cosign verify \\\n  --certificate-identity-regexp='^https://github.com/${repo}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
+  $('cosignRaw').textContent = c.raw || '(no log captured)';
+  $('provExcerpt').textContent = DATA.provenance_excerpt || '(no provenance captured)';
+}
+
+// ── FILES (inventory + manifest) ─────────────────────────────────────
+let invFilter = {pres:'all', q:''};
+let manifestQ = '';
+function renderFiles() {
+  $('cnt-files').textContent = DATA.inventory.length;
+  const inv = DATA.inventory.filter(f => {
+    if (invFilter.pres === 'present' && !f.present) return false;
+    if (invFilter.pres === 'missing' && f.present) return false;
+    if (invFilter.q && !(f.name+f.purpose+f.framework).toLowerCase().includes(invFilter.q.toLowerCase())) return false;
+    return true;
+  });
+  $('invRows').innerHTML = inv.map(f => `
+    <tr>
+      <td><code>${esc(f.name)}</code></td>
+      <td>${esc(f.purpose)}</td>
+      <td><code style="font-size:.7rem">${esc(f.framework)}</code></td>
+      <td>${esc(f.size_fmt)}</td>
+      <td><span class="${f.present?'badge-pass':'badge-fail'}">${f.present?'PRESENT':'MISSING'}</span></td>
+    </tr>
+  `).join('');
+
+  // Manifest
+  const m = DATA.manifest.filter(r => !manifestQ || (r.hash+r.file).toLowerCase().includes(manifestQ.toLowerCase()));
+  $('manifestRows').innerHTML = m.slice(0, 500).map(r => `
+    <tr><td><code style="font-size:.66rem">${esc(r.hash)}</code></td><td><code>${esc(r.file)}</code></td></tr>
+  `).join('');
+}
+$('fileSearch').addEventListener('input', e => { invFilter.q = e.target.value; renderFiles(); });
+$('manifestSearch').addEventListener('input', e => { manifestQ = e.target.value; renderFiles(); });
+document.querySelectorAll('[data-fpres]').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('[data-fpres]').forEach(x => x.classList.remove('active'));
+  c.classList.add('active'); invFilter.pres = c.dataset.fpres; renderFiles();
+}));
+
+// ── DPA ──────────────────────────────────────────────────────────────
+function renderDpa() {
+  const d = DATA.dpa || {};
+  $('dpaIntro').textContent = d.description || '';
+  $('dpaRows').innerHTML = (d.processors || []).map(p => `
+    <tr>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td>${esc(p.service)}</td>
+      <td><span class="${p.dpa_status==='ACTIVE'||p.dpa_status==='COVERED_BY_GITHUB_DPA'?'badge-pass':'badge-skip'}">${esc(p.dpa_status)}</span></td>
+      <td>${esc(p.data_location || '—')}</td>
+      <td>${esc(p.justification || '—')}</td>
+    </tr>
+  `).join('');
+  const r = d.retention_policy || {};
+  $('retentionTable').innerHTML = `
+    <tr><td><strong>Evidence pack retention</strong></td><td>${esc(r.evidence_pack_retention_days || '—')} days</td></tr>
+    <tr><td><strong>Log retention</strong></td><td>${esc(r.log_retention_days || '—')} days</td></tr>
+    <tr><td><strong>Deletion schedule</strong></td><td>${esc(r.deletion_schedule || '—')}</td></tr>
+  `;
+}
+
+// ── DATA FLOW ────────────────────────────────────────────────────────
+function renderDataFlow() {
+  const d = DATA.data_flow || {};
+  $('dfRows').innerHTML = (d.stages || []).map(s => `
+    <tr>
+      <td><strong>${esc(s.name)}</strong></td>
+      <td>${esc(s.location)}</td>
+      <td><span class="${s.pii_present?'badge-fail':'badge-pass'}">${s.pii_present?'YES':'NO'}</span></td>
+      <td>${(s.pii_types||[]).map(t=>`<code style="font-size:.7rem">${esc(t)}</code>`).join('<br>')||'—'}</td>
+      <td style="font-size:.78rem">${esc(s.pii_justification || '—')}</td>
+      <td>${(s.data_flows_to||[]).map(t=>`<code style="font-size:.7rem">${esc(t)}</code>`).join('<br>')||'—'}</td>
+    </tr>
+  `).join('');
+}
+
+// ── RAW ──────────────────────────────────────────────────────────────
+function renderRaw() {
+  $('rawJson').textContent = JSON.stringify(DATA.pipeline, null, 2);
+  $('codeqlStat').innerHTML = `<strong>${DATA.codeql.findings.length}</strong> findings across <strong>${DATA.codeql.rules_count}</strong> rules`;
+  $('checkovStat').innerHTML = `<strong>${DATA.checkov.findings.length}</strong> findings across <strong>${DATA.checkov.rules_count}</strong> rules`;
+  const cov = DATA.coverage;
+  $('coverageStat').innerHTML = cov.available ? `
+    <table><tbody>
+      <tr><td>Lines</td><td><strong>${cov.lines.toFixed(1)}%</strong></td></tr>
+      <tr><td>Statements</td><td><strong>${cov.statements.toFixed(1)}%</strong></td></tr>
+      <tr><td>Functions</td><td><strong>${cov.functions.toFixed(1)}%</strong></td></tr>
+      <tr><td>Branches</td><td><strong>${cov.branches.toFixed(1)}%</strong></td></tr>
+    </tbody></table>` : '<p class="empty">No coverage data</p>';
+}
+
+// ── Global search ────────────────────────────────────────────────────
+$('globalSearch').addEventListener('input', e => {
+  const q = e.target.value;
+  vulnFilters.q = q; sbomQ = q; zapFilter.q = q; invFilter.q = q;
+  $('vulnSearch').value = q; $('sbomSearch').value = q; $('zapSearch').value = q; $('fileSearch').value = q;
+  renderVulns(); renderSbom(); renderDast(); renderFiles();
+});
+
+// ── Init ─────────────────────────────────────────────────────────────
+renderDashboard();
+renderVulns();
+renderSbom();
+renderDast();
+renderCompliance();
+renderComplianceCode();
+renderSigning();
+renderFiles();
+renderDpa();
+renderDataFlow();
+renderRaw();
+</script>
+</body>
+</html>

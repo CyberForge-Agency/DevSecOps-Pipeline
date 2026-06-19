@@ -1,0 +1,13 @@
+{
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "measured": {
+    "regimes": 4,
+    "violations": 27
+  },
+  "threshold": "schema-valid; DORA/NIS2-KSC/CRA/RODO each with applies + non-empty rationale + clause/legal basis; named approver + dated determination",
+  "detail": "scope determination incomplete: (root): Additional properties are not allowed ('approved_by', 'determination_date' were unexpected); (root): 'schema_version' is a required property; (root): 'entity' is a required property; (root): 'determination' is a required property; regimes/CRA: 'name' is a required property; regimes/CRA: 'clause_basis' is a required property (+21 more)",
+  "tool_version": "jsonschema 4.26.0",
+  "validator": "applicability",
+  "checked_at": "2026-06-18T09:36:27Z"
+}

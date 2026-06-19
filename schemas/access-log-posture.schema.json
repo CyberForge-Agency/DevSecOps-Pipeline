@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberforge.dev/schemas/access-log-posture.schema.json",
+  "title": "Evidence-Pack Store Access Log (tamper-evident hash chain)",
+  "description": "Schema for the access log of the EVIDENCE PACK STORE itself (SPEC §7 item 7): a tamper-evident, append-only record of who read/listed/exported the evidence container. Each entry carries the hash of the previous entry (prev_hash) forming a hash chain, plus the entry's own canonical hash (entry_hash). The live source of these entries is Azure Storage diagnostic logging delivered to an immutable (WORM) append-only container; this schema validates an exported representation of that log (evidence/access-log.jsonl, parsed to a list, or a wrapper object with an 'entries' array). Presence + verifiable chain are BOTH required for a PASS by check_access_log.py; because the LIVE diagnostic log is an Azure runtime concern that does not exist offline, the validator HONESTLY emits INDETERMINATE when no exported log is present — never a fabricated PASS. Tier is EVIDENCE-ONLY.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["chain_version", "container", "entries"],
+  "properties": {
+    "chain_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$",
+      "description": "Hash-chain format version."
+    },
+    "container": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The evidence-pack storage container whose access is being logged (e.g. the Azure Blob container holding sealed evidence packs)."
+    },
+    "hash_algorithm": {
+      "type": "string",
+      "enum": ["sha256"],
+      "description": "Algorithm used for prev_hash / entry_hash. Only sha256 is supported by the verifier."
+    },
+    "source": {
+      "type": "object",
+      "description": "Provenance of the log (informational): Azure diagnostic settings + immutable container target.",
+      "additionalProperties": true,
+      "properties": {
+        "azure_diagnostic_setting": { "type": "string" },
+        "immutable_container": { "type": "string" },
+        "worm_policy": { "type": "string" }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "description": "Ordered, append-only list of access events. May be empty in a freshly-provisioned log (the validator treats an empty live log as INDETERMINATE, not PASS, since it proves nothing about real access capture).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seq", "timestamp", "operation", "principal", "prev_hash", "entry_hash"],
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Monotonic 0-based sequence number; entry N's prev_hash must equal entry N-1's entry_hash."
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "UTC ISO-8601 timestamp of the access event.",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?Z$"
+          },
+          "operation": {
+            "type": "string",
+            "enum": ["read", "list", "export", "download", "delete-attempt"],
+            "description": "The access operation captured against the evidence container."
+          },
+          "principal": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Identity (object id / UPN / managed identity) that performed the operation."
+          },
+          "object_path": {
+            "type": "string",
+            "description": "Blob/path acted upon within the container."
+          },
+          "client_ip": { "type": "string" },
+          "prev_hash": {
+            "type": "string",
+            "description": "Hex sha256 of the previous entry's entry_hash chain input. The genesis entry (seq 0) uses the all-zero hash (64 zero hex chars).",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "entry_hash": {
+            "type": "string",
+            "description": "Hex sha256 over the canonical JSON of the entry payload (all fields except entry_hash) including prev_hash. Recomputed and verified by check_access_log.py.",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

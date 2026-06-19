@@ -16,6 +16,23 @@ on:
         required: false
         type: string
         default: "staging"
+      critical_cves:
+        description: >-
+          Measured count of CRITICAL image CVEs from build-and-scan. When empty
+          the OPA deployment gate recomputes it from the downloaded Trivy image
+          scan artifact (never hardcoded). Kept as an input so the orchestrator
+          can forward build-and-scan's measured value once it exports one.
+        required: false
+        type: string
+        default: ""
+      coverage_pct:
+        description: >-
+          Measured line-coverage percentage from build-and-scan. When empty the
+          OPA deployment gate recomputes it from the downloaded coverage artifact
+          (never hardcoded). Kept as an input for the same forwarding reason.
+        required: false
+        type: string
+        default: ""
     outputs:
       app_url:
         description: "Deployed application URL"
@@ -53,17 +70,150 @@ jobs:
         uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
 
       - name: Verify image signature before deploy
+        id: verify-signature
         run: |
           # pipefail REQUIRED: this is THE deploy admission gate. Without it, tee
           # masks a failed cosign verify and an unsigned/tampered image deploys.
           set -o pipefail
           echo "Verifying image signature..."
+          # T-08 / T-69 (bug K7): pin the cert identity to the sign-and-attest
+          # signing workflow on main OR a release tag, anchored ^...$ so a
+          # signature minted by ANY OTHER workflow/branch in this repo fails
+          # admission. Verification is against the immutable DIGEST, not the tag.
+          # NOTE (reusable-workflow caveat): sign-and-attest.yml is invoked via
+          # `workflow_call` from pipeline.yml. For GitHub keyless OIDC the SAN is
+          # the path of the workflow whose job runs the cosign step
+          # (sign-and-attest.yml) with `@ref` = the *caller's* ref (refs/heads/main
+          # or refs/tags/*) — this matches evidence-pdf-test.yml:82. If a future
+          # call chain emits the CALLER's path (pipeline.yml) instead, this regexp
+          # must be widened; confirm the exact identity on the first live run with
+          # `cosign verify ... --output json` (verification_status = NEEDS-CI).
           cosign verify \
-            --certificate-identity-regexp="https://github.com/${{ github.repository }}/" \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
             2>&1 | tee /tmp/cosign-deploy-verify.log
+          # MEASURED signal for the OPA gate: this line is reached ONLY when the
+          # cosign verify above exits 0 (set -e + pipefail), so image_signed=true
+          # is a real outcome, never a hardcoded literal.
+          echo "image_signed=true" >> "$GITHUB_OUTPUT"
           echo "Image signature verified successfully."
+
+      - name: Verify SBOM attestation before deploy
+        id: verify-sbom
+        run: |
+          # MEASURED signal for the OPA gate (input.sbom_attached). cosign
+          # verify-attestation asserts a CycloneDX SBOM predicate is attached to
+          # the released digest by THIS repo's keyless identity. We record the
+          # boolean rather than hardcoding it; a missing/unverifiable SBOM yields
+          # sbom_attached=false and the OPA gate then denies (no silent pass).
+          set -o pipefail
+          # T-08 / T-69: same anchored identity as the image-sig verify above so
+          # the SBOM attestation must also originate from sign-and-attest.yml on
+          # main OR a release tag (see the reusable-workflow caveat above).
+          if cosign verify-attestation \
+            --type cyclonedx \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            > /tmp/cosign-sbom-attest.log 2>&1; then
+            echo "sbom_attached=true" >> "$GITHUB_OUTPUT"
+            echo "SBOM attestation verified."
+          else
+            echo "sbom_attached=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::SBOM attestation not verifiable for the released digest"
+            tail -n 5 /tmp/cosign-sbom-attest.log || true
+          fi
+
+      # T-60: download the build-and-scan measurements (Trivy image CVEs +
+      # coverage) so the OPA deployment gate evaluates REAL numbers, not literals.
+      - name: Download image scan results (for OPA gate)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image-scan-results
+          path: /tmp/deploy-gate/
+        continue-on-error: true
+
+      - name: Download coverage report (for OPA gate)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: coverage-report
+          path: /tmp/deploy-gate/coverage/
+        continue-on-error: true
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.17.1
+
+      # T-60 / T-62 (policy gate) — admission control BEFORE any infra mutation.
+      # Evaluates deployment-gate.rego against MEASURED inputs:
+      #   critical_cves : forwarded input if set, else recomputed from the Trivy
+      #                   image scan artifact (count of CRITICAL severities).
+      #   coverage_pct  : forwarded input if set, else read from coverage-summary.
+      #   image_signed  : outcome of the cosign verify step above.
+      #   sbom_attached : outcome of the cosign verify-attestation step above.
+      #   tests_passed  : the run only reaches deploy because build-and-scan's
+      #                   coverage/test gate passed (Phase 2 is a `needs`), so a
+      #                   present coverage report is the measured pass signal;
+      #                   absent coverage -> false (gate then denies on coverage).
+      # NEVER hardcodes true/0. A non-empty deny set fails the deploy (exit 1).
+      - name: OPA deployment gate (blocking)
+        env:
+          INPUT_CRITICAL_CVES: ${{ inputs.critical_cves }}
+          INPUT_COVERAGE_PCT: ${{ inputs.coverage_pct }}
+          IMAGE_SIGNED: ${{ steps.verify-signature.outputs.image_signed }}
+          SBOM_ATTACHED: ${{ steps.verify-sbom.outputs.sbom_attached }}
+        run: |
+          set -euo pipefail
+          GATE_DIR=/tmp/deploy-gate
+          TRIVY_JSON="${GATE_DIR}/trivy-image-results.json"
+          COV_JSON="${GATE_DIR}/coverage/coverage-summary.json"
+
+          # --- critical_cves: prefer forwarded input, else measure from Trivy ---
+          if [ -n "${INPUT_CRITICAL_CVES}" ]; then
+            CRITICAL_CVES="${INPUT_CRITICAL_CVES}"
+          elif [ -s "${TRIVY_JSON}" ]; then
+            CRITICAL_CVES="$(jq '[.Results[]?.Vulnerabilities[]? | select((.Severity // "" | ascii_upcase) == "CRITICAL")] | length' "${TRIVY_JSON}")"
+          else
+            # Fail-closed: no measurement available -> treat as a blocking unknown
+            # so the gate denies rather than silently passing on missing evidence.
+            echo "::warning::Trivy image scan artifact absent — treating critical_cves as 1 (fail-closed)"
+            CRITICAL_CVES=1
+          fi
+
+          # --- coverage_pct + tests_passed: prefer forwarded input, else measure ---
+          TESTS_PASSED=false
+          if [ -n "${INPUT_COVERAGE_PCT}" ]; then
+            COVERAGE_PCT="${INPUT_COVERAGE_PCT}"
+            TESTS_PASSED=true
+          elif [ -s "${COV_JSON}" ]; then
+            COVERAGE_PCT="$(jq -r '.total.lines.pct // 0' "${COV_JSON}")"
+            TESTS_PASSED=true
+          else
+            echo "::warning::coverage-summary.json absent — coverage_pct=0, tests_passed=false (fail-closed)"
+            COVERAGE_PCT=0
+          fi
+
+          # jq input builder keeps types correct (numbers stay numbers).
+          jq -n \
+            --argjson critical_cves "${CRITICAL_CVES:-0}" \
+            --argjson coverage_pct "${COVERAGE_PCT:-0}" \
+            --argjson image_signed "$([ "${IMAGE_SIGNED}" = "true" ] && echo true || echo false)" \
+            --argjson sbom_attached "$([ "${SBOM_ATTACHED}" = "true" ] && echo true || echo false)" \
+            --argjson tests_passed "${TESTS_PASSED}" \
+            '{image_signed:$image_signed, sbom_attached:$sbom_attached, critical_cves:$critical_cves, tests_passed:$tests_passed, coverage_pct:$coverage_pct}' \
+            > /tmp/deploy-input.json
+          echo "OPA deployment-gate input:"
+          cat /tmp/deploy-input.json
+
+          DENY="$(opa eval -d policies/deployment-gate.rego -i /tmp/deploy-input.json 'data.compliance.deployment.deny' --format raw)"
+          echo "deny set: ${DENY}"
+          if [ "$(echo "${DENY}" | jq 'length')" -ne 0 ]; then
+            echo "::error::OPA deployment gate DENIED: ${DENY}"
+            exit 1
+          fi
+          echo "OPA deployment gate passed: deny set empty."
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@5e8dbf3c6d9deaf4193ca7a8fb23f2ac83bb6c85 # v4.0.0
@@ -94,7 +244,19 @@ jobs:
               -backend-config="container_name=${TFSTATE_CONTAINER}" \
               -backend-config="key=${TFSTATE_KEY}"
           else
-            echo "::warning::Terraform backend variables are not fully configured. Falling back to local state (-backend=false) for this run."
+            # T-74: fail-hard guard. github.event_name on a workflow_call run
+            # resolves to the TRIGGERING event of the whole run (push for real
+            # deploys, pull_request for PR dry-runs) — pipeline.yml already gates
+            # this deploy job on `github.event_name != 'pull_request'`, so the
+            # same signal is the authoritative PR check here. Without backend
+            # vars a real (non-PR) apply would run against ephemeral local state
+            # and the T-62 retention OPA gate would then evaluate a
+            # non-authoritative plan. Refuse it.
+            if [ "${{ github.event_name }}" != 'pull_request' ]; then
+              echo "::error::Terraform backend variables not configured; refusing a real (non-PR) apply on ephemeral local state"
+              exit 1
+            fi
+            echo "::warning::PR dry-run: using local state (-backend=false)"
             terraform init -backend=false
           fi
 
@@ -114,6 +276,93 @@ jobs:
           # Extract plan summary
           PLAN_SUMMARY=$(grep -E "Plan:|No changes" /tmp/tf-plan-output.txt | tail -1 || echo "Plan completed")
           echo "plan_summary=${PLAN_SUMMARY}" >> "$GITHUB_OUTPUT"
+
+      # T-62 policy gate — DORA Art.12 / RODO Art.5.1.e evidence-retention.
+      # Runs against the LIVE Terraform plan (not a constant): tfplan-to-retention
+      # extracts the configured WORM immutability period + deletion schedule, and
+      # retention-policy.rego denies if retention < 1825 days, WORM is off, or no
+      # deletion schedule exists. A non-empty deny set fails BEFORE apply so a
+      # regression shortening retention can never reach the WORM container. The
+      # only DORA-specific number in the stack, finally enforced against infra.
+      - name: OPA retention policy (blocking)
+        working-directory: infra/
+        run: |
+          set -euo pipefail
+          terraform show -json tfplan > /tmp/tfplan.json
+          python3 ../scripts/tfplan-to-retention-input.py /tmp/tfplan.json --opa-input > /tmp/ret-input.json
+          echo "OPA retention-policy input:"
+          cat /tmp/ret-input.json
+          DENY="$(opa eval -d ../policies/retention-policy.rego -i /tmp/ret-input.json 'data.compliance.retention.deny' --format raw)"
+          echo "deny set: ${DENY}"
+          if [ "$(echo "${DENY}" | jq 'length')" -ne 0 ]; then
+            echo "::error::OPA retention policy DENIED: ${DENY}"
+            exit 1
+          fi
+          echo "OPA retention policy passed: retention >= 1825 days, WORM enabled, deletion schedule present."
+
+      # T-28 (A.9 crypto posture) — assert TLS min-version + encryption-at-rest +
+      # key-management against the SAME live tfplan the retention gate evaluated
+      # (/tmp/tfplan.json, written by the OPA retention step above; regenerated
+      # here only if absent so this step is order-independent). The validator emits
+      # the T-33 envelope and maps PASS->0, FAIL->1, INDETERMINATE->2. On a real
+      # (non-PR) deploy this step is FAIL-CLOSED: any non-zero (a measured crypto
+      # FAIL *or* an honest INDETERMINATE where the plan cannot express the control)
+      # blocks the apply with exit 1 — never a silent pass. On a PR dry-run the
+      # plan runs on local state (see the T-74 guard), so the envelope is reported
+      # as a warning and not enforced, matching the retention gate's PR posture.
+      - name: assert-crypto (T-28, blocking on non-PR)
+        working-directory: infra/
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/tfplan.json ]; then
+            terraform show -json tfplan > /tmp/tfplan.json
+          fi
+          set +e
+          python3 ../scripts/validators/assert-crypto.py /tmp/tfplan.json \
+            --out /tmp/crypto-posture.json
+          rc=$?
+          set -e
+          echo "assert-crypto exit code: ${rc} (0 PASS, 1 FAIL, 2 INDETERMINATE)"
+          if [ "${{ github.event_name }}" != 'pull_request' ]; then
+            if [ "${rc}" -ne 0 ]; then
+              echo "::error::assert-crypto did not PASS (exit ${rc}) on a real deploy — fail-closed"
+              exit 1
+            fi
+            echo "assert-crypto PASSED against the live tfplan."
+          elif [ "${rc}" -ne 0 ]; then
+            echo "::warning::PR dry-run: assert-crypto exit ${rc} on local-state plan (NEEDS-CI for an authoritative plan; not enforced here)"
+          fi
+
+      # T-48 (A.5 retention content) — assert retention floor (>=1825d) + WORM
+      # LOCK posture against the live tfplan via the content validator (complements
+      # the rego gate above: the validator reads the immutability `locked` flag and
+      # downgrades an unlocked-WORM-at-floor to an honest INDETERMINATE rather than
+      # a fake PASS). Same fail-closed contract as T-28: on a real deploy any
+      # non-zero (FAIL=below floor / WORM off, or INDETERMINATE=reversible WORM /
+      # plan can't express the control) blocks with exit 1; on a PR dry-run it is a
+      # reported warning only.
+      - name: assert-retention (T-48, blocking on non-PR)
+        working-directory: infra/
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/tfplan.json ]; then
+            terraform show -json tfplan > /tmp/tfplan.json
+          fi
+          set +e
+          python3 ../scripts/validators/assert-retention.py /tmp/tfplan.json \
+            --out /tmp/retention-content.json
+          rc=$?
+          set -e
+          echo "assert-retention exit code: ${rc} (0 PASS, 1 FAIL, 2 INDETERMINATE)"
+          if [ "${{ github.event_name }}" != 'pull_request' ]; then
+            if [ "${rc}" -ne 0 ]; then
+              echo "::error::assert-retention did not PASS (exit ${rc}) on a real deploy — fail-closed"
+              exit 1
+            fi
+            echo "assert-retention PASSED: retention >= floor and WORM locked."
+          elif [ "${rc}" -ne 0 ]; then
+            echo "::warning::PR dry-run: assert-retention exit ${rc} on local-state plan (NEEDS-CI for an authoritative plan; not enforced here)"
+          fi
 
       - name: Terraform Apply
         id: tf-apply

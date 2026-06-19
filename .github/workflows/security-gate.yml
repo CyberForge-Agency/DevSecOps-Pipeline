@@ -97,6 +97,17 @@ jobs:
           ref: ${{ inputs.ref || github.ref }}
           persist-credentials: false
 
+      - name: Validate Checkov skip justifications
+        # Fail-closed gate (T-04 / T-76): every id in CHECKOV_SKIP_CHECKS below MUST
+        # have an in-date, fully-justified row in docs/compliance/checkov-exceptions.md.
+        # A skip with no justification, an expired waiver, or drift between the workflow
+        # list and the register fails here BEFORE Checkov runs — so a silenced control
+        # can never quietly green the IaC gate. Mirrors the .trivyignore VEX policy.
+        run: |
+          python3 scripts/validate-checkov-skips.py \
+            --register docs/compliance/checkov-exceptions.md \
+            --workflow .github/workflows/security-gate.yml
+
       - name: Install Checkov
         run: pip3 install checkov
 
@@ -105,6 +116,10 @@ jobs:
           # pipefail REQUIRED: tee would otherwise mask Checkov's non-zero exit
           # on policy failures, silently passing the IaC security gate.
           set -o pipefail
+          # CHECKOV_SKIP_CHECKS: each id below is justified (reason + compensating
+          # control + owner + expiry) in docs/compliance/checkov-exceptions.md and
+          # enforced by the "Validate Checkov skip justifications" step above. Do not
+          # edit this list without updating the register — the validator will fail CI.
           CHECKOV_SKIP_CHECKS="CKV_AZURE_163,CKV_AZURE_237,CKV_AZURE_165,CKV_AZURE_139,CKV_AZURE_166,CKV_AZURE_164,CKV_AZURE_167,CKV_AZURE_233,CKV_AZURE_189,CKV_AZURE_109,CKV2_AZURE_32,CKV_AZURE_59,CKV_AZURE_33,CKV2_AZURE_40,CKV2_AZURE_41,CKV2_AZURE_1,CKV2_AZURE_33,CKV2_AZURE_21,CKV_AZURE_206"
           checkov -d infra/ \
             --framework terraform \
@@ -193,9 +208,19 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
 
       - name: MegaLinter
         id: megalinter
+        # T-05 GATE: This is an ENFORCING gate, not summary-only.
+        #   - Error-class linters (JAVASCRIPT_ES, TYPESCRIPT_ES, DOCKERFILE_HADOLINT)
+        #     are blocking: MegaLinter exits non-zero on any of their errors
+        #     (DISABLE_ERRORS defaults to false), and the explicit "Fail on lint
+        #     errors" step below re-asserts that failure so the gate behaviour is
+        #     visible in the YAML and cannot be silently masked by the summary step.
+        #   - Style/format linters (MARKDOWN, YAML, JSON) are ADVISORY: listed in
+        #     DISABLE_ERRORS_LINTERS so they still run and report, but their findings
+        #     never fail the job. Keep this split in sync with the docs/matrix.
         uses: oxsecurity/megalinter/flavors/javascript@f90c800040e4f84800700b27b2394d3eecc1fdad # v8.4.0
         env:
           VALIDATE_ALL_CODEBASE: false
@@ -206,8 +231,28 @@ jobs:
             MARKDOWN_MARKDOWNLINT,
             YAML_YAMLLINT,
             JSON_JSONLINT
+          # Advisory tier: run but never block on style/format linters.
+          DISABLE_ERRORS_LINTERS: >-
+            MARKDOWN_MARKDOWNLINT,
+            YAML_YAMLLINT,
+            JSON_JSONLINT
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_COMMENT_REPORTER: false
+
+      - name: Fail on lint errors
+        # Explicit gate assertion (T-05). MegaLinter already exits non-zero on
+        # blocking-linter errors, but this step makes the gate self-evident and
+        # fail-closed regardless of how MegaLinter surfaces its outcome. The
+        # advisory linters above cannot reach here as a failure (DISABLE_ERRORS_LINTERS).
+        #
+        # `always()` is REQUIRED: a bare `if:` (no status-check function) has an
+        # implicit success() ANDed in by GitHub, which would SKIP this step after
+        # MegaLinter fails — silently passing the gate. always() forces the step
+        # to run, then the outcome check decides whether to fail.
+        if: always() && steps.megalinter.outcome != 'success'
+        run: |
+          echo "::error::MegaLinter reported errors from a blocking linter (JS/TS ES or Dockerfile Hadolint). Failing the security gate."
+          exit 1
 
       - name: Job Summary
         if: always()
@@ -311,24 +356,50 @@ jobs:
             echo "Scanning for hardcoded PII patterns..."
             FOUND=0
 
-            if grep -rn --include="*.ts" --include="*.js" --include="*.json" \
+            # Fail-closed: capture grep rc explicitly. rc==0 -> match,
+            # rc==1 -> no match (continue), rc>=2 -> scanner error -> fail.
+            set +e
+            grep -rn --include="*.ts" --include="*.js" --include="*.json" \
               -E '\b[0-9]{2}([02468]1|[13579][012])(0[1-9]|[12][0-9]|3[01])[0-9]{5}\b' \
-              app/src/ app/tests/ || false; then
+              app/src/ app/tests/
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
               echo "::error::Potential PESEL numbers found in source code"
               FOUND=1
+            elif [ "$rc" -ge 2 ]; then
+              echo "::error::PII grep failed (PESEL scan, exit $rc)"
+              exit 1
             fi
 
-            if grep -rn --include="*.ts" --include="*.js" --include="*.json" \
+            set +e
+            grep -rn --include="*.ts" --include="*.js" --include="*.json" \
               -E '\+48\s?[0-9]{3}\s?[0-9]{3}\s?[0-9]{3}' \
-              app/src/ app/tests/ || false; then
+              app/src/ app/tests/
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
               echo "::error::Potential Polish phone numbers found in source code"
               FOUND=1
+            elif [ "$rc" -ge 2 ]; then
+              echo "::error::PII grep failed (phone scan, exit $rc)"
+              exit 1
             fi
 
-            if grep -rn --include="*.ts" --include="*.js" \
+            # Email check stays advisory (warning only, never sets FOUND),
+            # but a scanner error (rc>=2) on the source grep still fails closed.
+            # pipefail is on, so a downstream filter error also surfaces here.
+            set +e
+            grep -rn --include="*.ts" --include="*.js" \
               -E '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}' \
-              app/src/ | grep -v "// " | grep -v "noreply" || false; then
+              app/src/ | grep -v "// " | grep -v "noreply"
+            rc=$?
+            set -e
+            if [ "$rc" -eq 0 ]; then
               echo "::warning::Potential email addresses found in source code"
+            elif [ "$rc" -ge 2 ]; then
+              echo "::error::PII grep failed (email scan, exit $rc)"
+              exit 1
             fi
 
             if [ "$FOUND" -eq 1 ]; then

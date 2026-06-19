@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberforge.dev/schemas/roi.schema.json",
+  "title": "DORA Register of Information",
+  "description": "Schema for the machine-readable Register of Information mandated by DORA Art.28(3) and Commission Implementing Regulation (EU) 2024/2956 (ITS on the register of information). Validates structure, mandatory fields and LEI format (ISO 17442). Registration-truth of an LEI (GLEIF ACTIVE status) is NOT enforced here -- it is reported EVIDENCE-ONLY by validate-roi.py because it is not verifiable from inside the pipeline.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "maintaining_entity",
+    "ict_third_party"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+$"
+    },
+    "regulation": {
+      "type": "object",
+      "description": "Provenance of the regulatory mapping (informational).",
+      "properties": {
+        "framework": { "type": "string" },
+        "article": { "type": "string" },
+        "its": { "type": "string" },
+        "knf_form": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "maintaining_entity": {
+      "type": "object",
+      "description": "EBA template B_01.01 -- the financial entity maintaining the register.",
+      "additionalProperties": false,
+      "required": ["name", "lei", "last_updated", "review_cadence_days"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "lei": {
+          "description": "ISO 17442 LEI, OR the documented placeholder 'PENDING-NOT-YET-ISSUED' when the entity has no issued LEI (struktura A.1 open question). Format-blocking is applied by the validator only to issued LEIs.",
+          "type": "string",
+          "minLength": 1
+        },
+        "country": { "type": "string" },
+        "competent_authority": { "type": "string" },
+        "last_updated": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "review_cadence_days": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "ict_third_party": {
+      "type": "array",
+      "description": "EBA templates B_01.02 / B_05.01 / B_05.02 -- one entry per ICT third-party provider.",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "provider",
+          "lei",
+          "lei_status",
+          "function",
+          "ict_service",
+          "data_location",
+          "criticality",
+          "substitutability",
+          "exit_plan_ref"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TPP-[0-9]{3,}$"
+          },
+          "provider": { "type": "string", "minLength": 1 },
+          "lei": {
+            "description": "ISO 17442 LEI string when the provider is a legal entity that holds one, or null when lei_status is NOT_LEI_ELIGIBLE.",
+            "type": ["string", "null"]
+          },
+          "lei_status": {
+            "type": "string",
+            "enum": ["ISSUED", "PLACEHOLDER", "PENDING", "NOT_LEI_ELIGIBLE"]
+          },
+          "function": { "type": "string", "minLength": 1 },
+          "ict_service": { "type": "string", "minLength": 1 },
+          "data_types": { "type": "string" },
+          "data_location": { "type": "string", "minLength": 1 },
+          "criticality": {
+            "type": "string",
+            "enum": ["Critical", "High", "Medium", "Low"]
+          },
+          "substitutability": {
+            "description": "Substitutability assessment of the provider (B_05.01). BLOCKING-required to be non-empty for Critical/High criticality.",
+            "type": "string"
+          },
+          "exit_plan_ref": {
+            "description": "Exit plan reference / availability (B_05.01). BLOCKING-required to be non-empty for Critical/High criticality.",
+            "type": "string"
+          },
+          "sub_outsourcing": { "type": "boolean" },
+          "notice_period_days": { "type": "integer", "minimum": 0 },
+          "last_audit_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+          },
+          "dpa_status": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -32,10 +32,22 @@ concurrency:
 
 jobs:
   # ============================================
+  # Phase 0: Self-Test (quality gate; always runs first)
+  # ============================================
+  # The pipeline's own gate: opa test + T-71 action-pin audit + pytest
+  # tests/compliance + T-81 bats. Every later phase chains off this via `needs`,
+  # so a broken validator/policy or a re-introduced unpinned action fails the run
+  # before anything builds, signs or deploys — nothing can depend-around it.
+  self-test:
+    name: "Phase 0: Self-Test"
+    uses: ./.github/workflows/self-test.yml
+
+  # ============================================
   # Phase 1: Security Gate (always runs)
   # ============================================
   security-gate:
     name: "Phase 1: Security Gate"
+    needs: [self-test]
     uses: ./.github/workflows/security-gate.yml
     with:
       ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -78,6 +90,11 @@ jobs:
       image_uri: ${{ needs.build-and-scan.outputs.image_uri }}
       image_digest: ${{ needs.build-and-scan.outputs.image_digest }}
       environment: ${{ inputs.deploy_environment || 'staging' }}
+      # Forward build-and-scan's MEASURED gate inputs so the OPA deployment gate
+      # admits on real scan/coverage numbers (T-03/T-63). deploy.yml re-measures
+      # from artifacts as a fail-closed fallback when these are empty.
+      critical_cves: ${{ needs.build-and-scan.outputs.critical_cves }}
+      coverage_pct: ${{ needs.build-and-scan.outputs.coverage_pct }}
 
   # ============================================
   # Phase 5: DAST (main branch only, after deploy)

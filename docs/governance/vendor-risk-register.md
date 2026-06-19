@@ -1,7 +1,7 @@
 # Vendor Risk Register
 
 **Document Owner:** Security Lead
-**Last Reviewed:** 2026-03-15
+**Last Reviewed:** 2026-06-16 (reviewed 2026-06-16; Szymon to countersign)
 **Review Cadence:** Quarterly (minimum) and upon any vendor change
 **Compliance Scope:** DORA Art.28-30, NIS2 Art.21.2.d, ISO 27001 A.5.19-A.5.23, SOC 2 CC9
 
@@ -55,12 +55,27 @@ DORA, NIS2, ISO 27001, and SOC 2.
 
 ---
 
+## Data Retention Policy
+
+Retention periods for personal data and evidence processed through the pipeline
+(RODO/GDPR Art.5.1.e — storage limitation; DORA Art.28 — processor oversight). These
+values are read by `check-dpa.sh`; they are the single source of truth for the
+`retention_policy` block of `dpa-compliance-check.json`.
+
+| Setting | Value | Notes |
+|---------|-------|-------|
+| Evidence pack retention (days) | 1825 | 5-year WORM-immutable archive in Azure Blob Storage |
+| Log retention (days) | 90 | Build/runtime logs in GitHub + Azure |
+| Deletion schedule | Automated via Azure lifecycle management policy | Tier-to-cool then delete after retention window |
+
+---
+
 ## Exit Plan References
 
 | Ref | Vendor | Exit Plan Document | Status |
 |-----|--------|--------------------|--------|
-| EP-001 | GitHub (Microsoft) | [vendor-exit-plan-template.md](vendor-exit-plan-template.md) (example: GitHub Actions to GitLab CI) | Template available |
-| EP-002 | Microsoft Azure | To be developed per vendor-exit-plan-template.md | Planned |
+| EP-001 | GitHub (Microsoft) | [vendor-exit-plans.md](vendor-exit-plans.md) — EP-001 (GitHub -> GitLab/Gitea) | Documented (tabletop-tested 2026-06-15) |
+| EP-002 | Microsoft Azure | [vendor-exit-plans.md](vendor-exit-plans.md) — EP-002 (Azure -> AWS/GCP/self-hosted) | Documented (tabletop-tested 2026-06-15) |
 | EP-003 | Sigstore | Replace with self-hosted signing infrastructure (e.g., Notation + self-managed CA) | Documented |
 | EP-004 | OWASP ZAP | Replace with alternative DAST tool (e.g., Nuclei, Burp Suite CI) | Low priority |
 | EP-005 | Trivy | Replace with Grype (Anchore) or Snyk CLI | Low priority |
@@ -106,6 +121,7 @@ Microsoft Azure
 | Date | Reviewer | Changes |
 |------|----------|---------|
 | 2026-03-15 | Initial creation | Full vendor inventory established with 10 vendors/tools |
+| 2026-06-16 | Szymon (pending countersign) | Quarterly re-review: all 10 vendor rows re-verified against the live pipeline (workflows, infra/, renovate.json); every vendor/tool, DPA status, data location, and retention value confirmed still accurate. No changes to inventory. Freshness date refreshed. |
 
 ---
 

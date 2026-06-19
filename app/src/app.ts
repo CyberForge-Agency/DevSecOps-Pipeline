@@ -1,8 +1,9 @@
 import path from "path";
 import fs from "fs";
-import express, { Request, Response } from "express";
+import express, { NextFunction, Request, Response } from "express";
 import helmet from "helmet";
-import { itemsRouter } from "./routes/items";
+import { BoundedMap, createItemsRouter, DEFAULT_CAPACITY } from "./routes/items";
+import { createRateLimiter } from "./middleware/rate-limit";
 
 interface BuildInfo {
   git_sha: string;
@@ -42,7 +43,9 @@ app.use(
     },
   }),
 );
-app.use(express.json());
+// Cap request bodies so the public demo cannot be flooded with huge payloads.
+// Oversized bodies are rejected with a clean 413 by the error handler below.
+app.use(express.json({ limit: "16kb" }));
 
 // Serve the showcase page
 app.use(express.static(path.join(__dirname, "public")));
@@ -138,6 +141,33 @@ app.get("/api/build-info", (_req: Request, res: Response) => {
   res.json(info);
 });
 
-app.use("/api/items", itemsRouter);
+// Public, unauthenticated demo store — bounded so it cannot be flooded to OOM.
+// A small in-process rate limiter blunts request floods on the mutating routes
+// (POST/DELETE) only; reads, /health and /api/build-info stay unthrottled.
+const itemsMutationLimiter = createRateLimiter({ windowMs: 60_000, max: 60 });
+app.use(
+  "/api/items",
+  createItemsRouter(new BoundedMap(DEFAULT_CAPACITY), itemsMutationLimiter),
+);
+
+// JSON error handler: turn body-parser failures into clean JSON responses
+// instead of express's default HTML error page (oversized body -> 413,
+// malformed JSON -> 400).
+app.use(
+  (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
+    if (err && typeof err === "object" && "type" in err) {
+      const type = (err as { type?: string }).type;
+      if (type === "entity.too.large") {
+        res.status(413).json({ error: "request body too large" });
+        return;
+      }
+      if (type === "entity.parse.failed") {
+        res.status(400).json({ error: "invalid JSON body" });
+        return;
+      }
+    }
+    next(err);
+  },
+);
 
 export { app };

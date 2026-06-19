@@ -1,0 +1,24 @@
+# CodeQL SAST suppression list, honored by the fail-closed gate in
+# .github/workflows/build-and-scan.yml ("Enforce CodeQL high-severity gate").
+#
+# A suppression silences ONE CodeQL ruleId that would otherwise block the build
+# (level == "error" OR rule security-severity >= 7.0). It is deliberately strict
+# and mirrors the .trivyignore VEX policy: an entry is honored ONLY when it has
+# BOTH a justification AND a future expiry. Expired, unjustified, or malformed
+# entries are ignored, so the finding keeps gating (fail-safe by design).
+#
+# Format (one rule per line):
+#   <ruleId>  <justification text...>  expires=YYYY-MM-DD
+#
+# Example:
+#   js/incomplete-sanitization  False positive: input is validated upstream by zod schema  expires=2026-09-01
+#
+# Rules:
+#   - <ruleId> is the CodeQL rule id from the SARIF (e.g. js/sql-injection).
+#   - The justification is mandatory free text explaining WHY this is safe to
+#     suppress (not_affected / false_positive / accepted-with-compensating-control).
+#   - expires= is mandatory and MUST be a future date; review and renew or remove
+#     before it lapses. Once expired, the rule blocks again automatically.
+#   - Suppressions are visible in the job log as ::notice:: lines for auditability.
+
+# No active suppressions. The current app scans clean under security-extended.

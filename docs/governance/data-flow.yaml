@@ -1,0 +1,78 @@
+# Data-flow record for the CyberForge DevSecOps Pipeline.
+#
+# Purpose (RODO/GDPR Art.25 "data protection by design" + Art.30 "records of
+# processing activities"): a *maintained* map of where data — including personal
+# data (PII) — moves through the pipeline, so the privacy evidence is a reviewed
+# record rather than a string baked into a script.
+#
+# This file is the single source of truth read by scripts/generate-data-flow.sh,
+# which schema-validates it and renders evidence/data-flow-diagram.json. Edit the
+# stages here (NOT the script) to change the data-flow evidence.
+#
+# Schema (enforced by generate-data-flow.py — BLOCKING on violation):
+#   description : str (non-empty)
+#   stages      : non-empty list; each stage:
+#     name              : str (non-empty, unique)
+#     location          : str (non-empty)
+#     pii_present       : bool (REQUIRED on every stage)
+#     pii_types         : list[str]  (must be non-empty when pii_present is true)
+#     pii_justification : str        (REQUIRED & non-empty when pii_present is true;
+#                                      RODO Art.30(1)(g)/Art.25 — why the PII is
+#                                      processed / minimised at this stage)
+#     data_flows_to     : list[str]  (optional; downstream stage names — terminal
+#                                      stages may omit it)
+#     retention_days    : int        (optional; >= 0)
+#
+# EVIDENCE-ONLY truth caveat: that these stages match the *real* production data
+# flows is a human-maintained assertion, not something the pipeline can prove.
+# The validator enforces the SCHEMA (presence/shape/PII-justification) as BLOCKING;
+# the record's correspondence to reality is EVIDENCE-ONLY (reviewed by a human).
+
+description: "Data flow diagram for CyberForge DevSecOps Pipeline"
+
+stages:
+  - name: "Source Code"
+    location: "GitHub Repository"
+    pii_present: true
+    pii_types:
+      - "developer_emails_in_commits"
+      - "developer_names_in_commits"
+    pii_justification: "Git metadata required for audit trail (ISO 27001 A.8.4)"
+    data_flows_to:
+      - "Security Gate"
+      - "Build & Scan"
+
+  - name: "Security Gate"
+    location: "GitHub Actions Runner (ephemeral)"
+    pii_present: false
+    pii_types: []
+    data_flows_to:
+      - "Build & Scan"
+
+  - name: "Build & Scan"
+    location: "GitHub Actions Runner (ephemeral)"
+    pii_present: false
+    pii_types: []
+    data_flows_to:
+      - "Azure Container Registry"
+
+  - name: "Azure Container Registry"
+    location: "Azure (Poland Central)"
+    pii_present: false
+    pii_types: []
+    data_flows_to:
+      - "Azure Container Apps"
+
+  - name: "Azure Container Apps"
+    location: "Azure (Poland Central)"
+    pii_present: false
+    pii_types: []
+    pii_justification: "Demo app does not process personal data"
+
+  - name: "Evidence Pack Archive"
+    location: "Azure Blob Storage WORM (Poland Central)"
+    pii_present: true
+    pii_types:
+      - "developer_names_in_pipeline_logs"
+    pii_justification: "Required for audit trail. Sanitized to minimum. Retention: 5 years (DORA). Access: compliance-team + auditor roles only."
+    retention_days: 1825

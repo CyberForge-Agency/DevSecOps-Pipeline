@@ -94,7 +94,18 @@ jobs:
           set -o pipefail  # a failure of generate-provenance.sh must fail the step, not be masked by the pipe
           echo "GitHub native attestation unavailable — generating SLSA provenance manually"
           mkdir -p provenance-out
-          bash scripts/generate-provenance.sh 2>&1 | tee /tmp/provenance-generation-output.txt > provenance-out/provenance.intoto.jsonl
+          # Only stdout (the in-toto JSON) reaches the attestation file; stderr (warnings,
+          # set -x traces, the IMAGE_URI:?… error text) goes to a separate log so it cannot
+          # corrupt the JSONL attestation (BUG §6.4-B).
+          bash scripts/generate-provenance.sh > provenance-out/provenance.intoto.jsonl 2>/tmp/provenance-generation-output.txt
+
+      - name: Validate fallback provenance is line-delimited JSON
+        if: steps.provenance.outcome == 'failure' || steps.provenance.outputs.bundle-path == ''
+        run: |
+          # Fail the build if the fallback attestation is malformed JSONL, so a corrupt
+          # provenance.intoto.jsonl is never uploaded and labelled DORA Art.28 / NIS2 Art.21.2.d.
+          python3 -c 'import json;[json.loads(l) for l in open("provenance-out/provenance.intoto.jsonl") if l.strip()]'
+          echo "PROVENANCE_JSONL_OK"
 
       - name: Bundle signing proof
         if: always()
@@ -127,18 +138,55 @@ jobs:
           # pipefail REQUIRED: tee would otherwise mask a failed cosign verify,
           # letting a bad/missing signature pass this defense-in-depth check.
           set -o pipefail
+          # T-08 / T-69 (bug K7): pin the cert identity to THIS signing workflow
+          # (sign-and-attest.yml) on main OR a release tag, anchored ^...$, so a
+          # signature from any other workflow/branch cannot satisfy this
+          # defense-in-depth self-verify. Verify against the DIGEST, not the tag.
+          # NOTE (reusable-workflow caveat): sign-and-attest.yml runs via
+          # `workflow_call` from pipeline.yml. Keyless OIDC emits the SAN as the
+          # path of the workflow whose job signs (sign-and-attest.yml) with `@ref`
+          # = the caller's ref (refs/heads/main | refs/tags/*); this is what
+          # evidence-pdf-test.yml:82 expects. If the SAN ever resolves to the
+          # caller path (pipeline.yml) instead, widen this regexp — confirm the
+          # exact identity on the first live run via `cosign verify ... --output
+          # json` (verification_status = NEEDS-CI for the live signature test).
           cosign verify \
-            --certificate-identity-regexp="https://github.com/${{ github.repository }}/" \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
             2>&1 | tee cosign-verification.log
+
+      - name: Verify SBOM attestation + Rekor inclusion (proof for evidence pack)
+        run: |
+          # T-51 (spec §7.2 #2 / Part I.2 — Rekor transparency log): independently
+          # confirm the CycloneDX SBOM attestation attached above is recorded in
+          # Rekor. `cosign verify-attestation` performs tlog verification by
+          # default (--insecure-ignore-tlog defaults to false), so a success here
+          # cryptographically proves the attestation's Rekor inclusion — the
+          # "who attested what, when, survives key disposal" property the pack
+          # claims. Identity+issuer are pinned exactly like the image-sig verify.
+          # pipefail REQUIRED so a failed verify is not masked by the tee.
+          set -o pipefail
+          # T-08 / T-69: same anchored sign-and-attest.yml identity as the image
+          # verify above (see reusable-workflow caveat there).
+          cosign verify-attestation \
+            --type cyclonedx \
+            --insecure-ignore-tlog=false \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${{ inputs.image_uri }}@${{ inputs.image_digest }}" \
+            2>&1 | tee cosign-attestation-verification.log
+          echo "REKOR_SBOM_ATTESTATION_INCLUSION_VERIFIED" | tee -a cosign-attestation-verification.log
 
       - name: Upload verification log
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cosign-verification
-          path: cosign-verification.log
+          path: |
+            cosign-verification.log
+            cosign-attestation-verification.log
+          if-no-files-found: warn
 
       - name: Upload provenance bundle (GitHub native)
         if: always() && steps.provenance.outputs.bundle-path != ''
@@ -175,7 +223,7 @@ jobs:
           echo "|--------|-------|" >> "$GITHUB_STEP_SUMMARY"
           echo "| Method | Keyless OIDC (Sigstore) |" >> "$GITHUB_STEP_SUMMARY"
           echo "| OIDC issuer | \`https://token.actions.githubusercontent.com\` |" >> "$GITHUB_STEP_SUMMARY"
-          echo "| Certificate identity | \`https://github.com/${{ github.repository }}/\` |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Certificate identity | \`^https://github.com/${{ github.repository }}/.github/workflows/sign-and-attest.yml@refs/(heads/main\|tags/.*)\$\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "| Image | \`${IMAGE_REF}\` |" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo ":white_check_mark: **Image signed with keyless OIDC**" >> "$GITHUB_STEP_SUMMARY"
@@ -186,6 +234,9 @@ jobs:
           ### SBOM Attestation
           EOF
           echo ":white_check_mark: **CycloneDX SBOM attached to image as signed attestation**" >> "$GITHUB_STEP_SUMMARY"
+          if [ -f cosign-attestation-verification.log ] && grep -q REKOR_SBOM_ATTESTATION_INCLUSION_VERIFIED cosign-attestation-verification.log; then
+            echo ":white_check_mark: **SBOM attestation Rekor transparency-log inclusion verified** (spec §7.2/I.2)" >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
 
           # Provenance

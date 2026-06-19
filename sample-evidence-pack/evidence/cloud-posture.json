@@ -1,0 +1,18 @@
+{
+  "status": "INDETERMINATE",
+  "tier": "EVIDENCE-ONLY",
+  "measured": {
+    "posture": "design-stage / not-yet-scanned",
+    "scan_present": false,
+    "posture_doc": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/compliance/cspm-posture.md",
+    "posture_doc_present": true,
+    "cis_benchmark": "CIS Microsoft Azure Foundations Benchmark v3.0.0"
+  },
+  "threshold": {
+    "requires": "a live CSPM scan producing cloud-posture.json"
+  },
+  "detail": "CSPM design-stage / not-yet-scanned: no live CSPM scan and no cloud-posture.json present; design-stage posture documented at /cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/compliance/cspm-posture.md. Reporting INDETERMINATE (EVIDENCE-ONLY) \u2014 the static IaC-derived CIS mapping is design-stage context and is NOT a fabricated CIS PASS (cspm-posture.md \u00a71, \u00a75, \u00a76 #1). Continuous scan + drift alerting are TARGET-STATE.",
+  "tool_version": "python 3.14.5",
+  "validator": "cloud_posture",
+  "checked_at": "2026-06-18T10:41:40Z"
+}

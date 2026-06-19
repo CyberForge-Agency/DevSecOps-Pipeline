@@ -18,8 +18,11 @@
 #     provenance flag in the manifest and continue; the script always exits 0
 #     for missing-tool conditions.
 #   * EVIDENCE_ALLOW_DEGRADE unset (CI): missing render output / verapdf failure
-#     / cosign failure are HARD FAILS. RFC-3161 TSA unreachability and absence of
-#     pyhanko/qpdf are SOFT (warn + flag) even in CI per the design spec.
+#     / cosign failure are HARD FAILS. A *transient* RFC-3161 TSA miss on a single
+#     artifact stays SOFT (warn + flag) even in CI per the design spec, BUT zero
+#     valid .tsr produced across ALL artifacts (a structurally-broken trusted-time
+#     path) is a HARD FAIL in CI (T-56: structural-vs-flaky distinction). Absence
+#     of pyhanko/qpdf remains SOFT even in CI.
 #
 set -euo pipefail
 
@@ -36,7 +39,67 @@ PDF_PATH="$2"
 MANIFEST_JSON="$3"
 
 ALLOW_DEGRADE="${EVIDENCE_ALLOW_DEGRADE:-}"
-TSA_URL="${TSA_URL:-https://freetsa.org/tsr}"
+
+# ---------------------------------------------------------------------------
+# Pluggable timestamp authority (T-53 / T-110).
+#
+# The timestamp authority is configured ENTIRELY by environment so that
+# upgrading from the free, NON-QUALIFIED freetsa.org TSA to a QUALIFIED eIDAS
+# QTS (KIR Szafir, Asseco Certum, EuroCert, CenCert) is a config switch, not a
+# code change. Nothing about the qualified-provider path is hardcoded here.
+#
+#   QTS_PROVIDER  Optional human-readable name of the qualified TSP (e.g.
+#                 "KIR Szafir", "Asseco Certum"). Recorded into the manifest
+#                 for the audit trail. Empty => default (non-qualified) path.
+#   QTS_URL       Optional RFC-3161 endpoint of the qualified TSP. When set it
+#                 takes precedence over TSA_URL (a qualified endpoint, once
+#                 provisioned, should be used instead of the free default).
+#   TSA_URL       Generic RFC-3161 endpoint. Defaults to freetsa.org, which is
+#                 NON-QUALIFIED (free, no eIDAS qualified status). Clearly
+#                 labeled as such in the manifest.
+#   TSA_CA_FILE   Optional PEM bundle for the TSA's CA chain. When set, Step 4
+#                 copies it to ${EVIDENCE_DIR}/tsa-ca.pem after a successful
+#                 stamp; otherwise the configured TSA's public CA chain is
+#                 fetched (default freetsa). verify-evidence-pack.sh then reads
+#                 that shipped tsa-ca.pem to fully verify the RFC-3161 token.
+#   TSA_AUTH      Optional auth header value for authenticated (paid) QTS
+#                 endpoints, e.g. "Authorization: Bearer <token>" or
+#                 "Authorization: Basic <b64>". Passed verbatim to curl. Most
+#                 qualified providers are authenticated.
+#   TSA_QUALIFIED Explicit honest override of the qualified label
+#                 (true|false). When UNSET, the label is inferred: true only
+#                 when QTS_PROVIDER or QTS_URL is configured AND the default
+#                 free freetsa endpoint is NOT in use. Defaults to false so the
+#                 pack NEVER over-claims qualified status.
+# ---------------------------------------------------------------------------
+DEFAULT_TSA_URL="https://freetsa.org/tsr"   # free, NON-QUALIFIED eIDAS TSA
+QTS_PROVIDER="${QTS_PROVIDER:-}"
+QTS_URL="${QTS_URL:-}"
+# A configured qualified endpoint (QTS_URL) wins over a generic TSA_URL.
+TSA_URL="${QTS_URL:-${TSA_URL:-${DEFAULT_TSA_URL}}}"
+TSA_CA_FILE="${TSA_CA_FILE:-}"
+TSA_AUTH="${TSA_AUTH:-}"
+
+# Honest qualified label. Default false; only true when explicitly asserted, or
+# when a qualified provider/endpoint is wired AND we are not on the free default.
+infer_qualified() {
+  if [ -n "${TSA_QUALIFIED:-}" ]; then
+    # Normalize an explicit operator assertion to a strict true|false.
+    case "${TSA_QUALIFIED}" in
+      1|true|TRUE|True|yes|YES) printf 'true'  ;;
+      *)                        printf 'false' ;;
+    esac
+    return
+  fi
+  if { [ -n "${QTS_PROVIDER}" ] || [ -n "${QTS_URL}" ]; } \
+        && [ "${TSA_URL}" != "${DEFAULT_TSA_URL}" ]; then
+    printf 'true'
+  else
+    printf 'false'
+  fi
+}
+TSA_QUALIFIED_LABEL="$(infer_qualified)"
+
 COSIGN_IDENTITY="${COSIGN_IDENTITY:-}"
 COSIGN_ISSUER="${COSIGN_ISSUER:-}"
 
@@ -204,6 +267,7 @@ sha256_of() {
 
 log "sealing evidence: dir=${EVIDENCE_DIR} pdf=${PDF_PATH} manifest=${MANIFEST_JSON}"
 log "degrade mode: ${ALLOW_DEGRADE:-<unset> (fail-closed)}"
+log "tsa: url=${TSA_URL} qualified=${TSA_QUALIFIED_LABEL} provider=${QTS_PROVIDER:-freetsa.org (non-qualified, default)}"
 
 # ---------------------------------------------------------------------------
 # Step 1 — qpdf normalize: INTENTIONALLY DISABLED.
@@ -228,6 +292,16 @@ fi
 
 MERKLE_ROOT="$(get_field merkle_root || true)"
 log "merkle_root from manifest: ${MERKLE_ROOT:-<empty>}"
+
+# Materialize the immutable merkle-root.txt NOW — BEFORE Step 3 — so the cosign
+# sign-blob `-f` guard sees the file and actually produces merkle-root.cosign.bundle.
+# (Previously this file was first written in Step 4, after Step 3 had already
+# short-circuited; the headline signature was therefore never produced.) The same
+# file is reused by the RFC-3161 stamp in Step 4 — written once, here.
+MR_FILE="${EVIDENCE_DIR}/merkle-root.txt"
+if [ -n "${MERKLE_ROOT}" ]; then
+  printf '%s\n' "${MERKLE_ROOT}" > "${MR_FILE}"
+fi
 
 # ---------------------------------------------------------------------------
 # Step 2 — veraPDF PDF/A-3b conformance gate
@@ -261,12 +335,19 @@ fi
 # Step 3 — cosign sign-blob (keyless) over the STABLE merkle-root.txt + pdf hash.
 #
 # CRITICAL: we sign merkle-root.txt and pdf.sha256, NOT manifest.json. The
-# Merkle root cryptographically commits to every evidence artifact's content.
+# Merkle root cryptographically commits to every evidence artifact's content —
+# this now includes the organizational/compliance verdicts and per-release
+# triage artifacts (compliance-status.json, compliance-matrix.json,
+# vex.openvex.json, soa-maturity.json, residual-risk.json, scope-determination
+# .json, and each A.x *-validation/verdict JSON), because the manifest is
+# (re)generated over the full evidence/ directory before this step. No explicit
+# allowlist is needed here: anything written into evidence/ ahead of the seal is
+# leaf-hashed into the Merkle root by generate-evidence-manifest.py.
 # manifest.json must NOT be signed because the set_sig calls below mutate it
 # (recording these very signatures) — signing it then writing to it would
-# invalidate its own signature. merkle-root.txt (written once above) and
-# pdf.sha256 are never modified after signing. Both are excluded from the
-# manifest's hashed set, so signing perturbs nothing.
+# invalidate its own signature. merkle-root.txt (written before Step 3, right
+# after MERKLE_ROOT is read) and pdf.sha256 are never modified after signing.
+# Both are excluded from the manifest's hashed set, so signing perturbs nothing.
 # ---------------------------------------------------------------------------
 if have cosign; then
   set_tool cosign "$(tool_version cosign version --json 2>/dev/null || tool_version cosign version)"
@@ -355,22 +436,114 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Step 4 — RFC-3161 timestamp over merkle_root, manifest, and the PDF.
-# TSA unreachability is SOFT even in CI (per design spec failure_policy).
+# Step 3 hard precondition (anti-regression for blueprint §6.2-A).
+# The headline cryptographic claim of the pack is keyless identity attribution
+# over the Merkle root. §6.2-A was a silent ordering bug: cosign soft-degraded
+# and the bundle was never produced, yet the seal exited 0. To ensure that
+# regression cannot recur silently, in NON-degrade (CI) mode a missing or empty
+# merkle-root.cosign.bundle is a HARD FAIL — even though plain cosign failure
+# soft-degrades, the centerpiece signature is mandatory whenever a Merkle root
+# exists to sign. (In degrade mode this stays soft, matching local runs.)
 # ---------------------------------------------------------------------------
+if ! is_degrade && [ -n "${MERKLE_ROOT}" ] && [ ! -s "${EVIDENCE_DIR}/merkle-root.cosign.bundle" ]; then
+  die "merkle-root.cosign.bundle missing or empty after Step 3 — Merkle signing failed (fail-closed; §6.2-A anti-regression)"
+fi
+
+# ---------------------------------------------------------------------------
+# Step 4 — RFC-3161 timestamp over merkle_root, manifest, and the PDF.
+# A *single-artifact* TSA miss is SOFT even in CI (per design spec
+# failure_policy), but ZERO valid .tsr across all artifacts is a HARD FAIL in
+# non-degrade mode (T-56: structural-vs-flaky trusted-time assertion below).
+# ---------------------------------------------------------------------------
+# tsr_is_valid_token <tsr>: exit 0 iff the file is a non-empty, well-formed
+# RFC-3161 timestamp response that the TSA GRANTED. `openssl ts -reply -text`
+# DER-decodes the TimeStampResp and prints its status; a genuine token shows
+# "Status: Granted." A misbehaving TSA / proxy that 200s with an HTML error
+# page, an empty body, or an RFC-3161 rejection (status grantedWithMods/rejected)
+# is caught here so a non-token can never be counted as a stamp. (Full
+# cryptographic chain verification needs the TSA CA — Step 4 below ships
+# ${EVIDENCE_DIR}/tsa-ca.pem (from TSA_CA_FILE or a provider fetch) and verify-
+# evidence-pack.sh reads it to verify the chain; here we assert structural
+# validity + granted status, which is what catches a STRUCTURALLY broken path.)
+tsr_is_valid_token() {
+  local tsr="$1"
+  [ -s "${tsr}" ] || return 1
+  openssl ts -reply -in "${tsr}" -text 2>/dev/null | grep -qi 'Status: *Granted'
+}
+
 rfc3161_stamp() {
   # $1 = label, $2 = path-to-data-file
   local label="$1" data="$2"
   local tsq="${EVIDENCE_DIR}/${label}.tsq"
   local tsr="${EVIDENCE_DIR}/${label}.tsr"
   if openssl ts -query -data "${data}" -sha256 -cert -out "${tsq}" >/dev/null 2>&1; then
-    if curl -fsS -H "Content-Type: application/timestamp-query" \
-          --data-binary "@${tsq}" "${TSA_URL}" -o "${tsr}" 2>/dev/null; then
-      set_sig rfc3161 "${label}_tsr=$(basename "${tsr}")" "${label}_status=stamped"
-      log "rfc3161: ${label} timestamped via ${TSA_URL}"
-      return 0
+    # Build the curl arg list. An optional TSA_AUTH header lets authenticated
+    # (paid) qualified-QTS endpoints work without changing this code; it is
+    # passed verbatim and only added when non-empty (freetsa needs no auth).
+    local -a curl_args=(-fsS -H "Content-Type: application/timestamp-query")
+    [ -n "${TSA_AUTH}" ] && curl_args+=(-H "${TSA_AUTH}")
+    curl_args+=(--data-binary "@${tsq}" "${TSA_URL}" -o "${tsr}")
+    if curl "${curl_args[@]}" 2>/dev/null; then
+      # Produced AND valid: only count a token the TSA actually granted. A 200
+      # response carrying a non-token body must NOT masquerade as a stamp.
+      if tsr_is_valid_token "${tsr}"; then
+        set_sig rfc3161 "${label}_tsr=$(basename "${tsr}")" "${label}_status=stamped"
+        log "rfc3161: ${label} timestamped via ${TSA_URL} (token validated: granted, qualified=${TSA_QUALIFIED_LABEL})"
+        return 0
+      fi
+      # Remove the bogus file so a non-token never satisfies the *.tsr CI/verify
+      # assertion downstream; record the per-artifact miss (kept SOFT here).
+      rm -f "${tsr}"
+      set_sig rfc3161 "${label}_status=invalid-token"
+      warn "rfc3161: ${label} TSA returned a response that is not a granted RFC-3161 token — discarded"
     fi
   fi
+  return 1
+}
+
+# materialize_tsa_ca: ship ${EVIDENCE_DIR}/tsa-ca.pem so verify-evidence-pack.sh
+# can run FULL `openssl ts -verify -CAfile` instead of only the parse+granted
+# SKIP. Provider-driven: an operator-supplied TSA_CA_FILE is copied verbatim;
+# otherwise the configured TSA's PUBLIC CA chain is fetched (default freetsa:
+# tsa.crt + cacert.pem concatenated, mirroring make-sample-pack.sh). DEGRADE-
+# HONEST: a fetch failure (offline) or degrade mode warns and continues WITHOUT
+# a tsa-ca.pem (the pack then honestly SKIPs full ts -verify) — it NEVER fails
+# the seal and NEVER fabricates a CA. Only the free freetsa default has a known
+# public CA URL pair; any other endpoint without TSA_CA_FILE is skipped honestly.
+materialize_tsa_ca() {
+  local ca="${EVIDENCE_DIR}/tsa-ca.pem"
+  [ -s "${ca}" ] && return 0
+  if [ -n "${TSA_CA_FILE}" ]; then
+    if [ -f "${TSA_CA_FILE}" ] && cp "${TSA_CA_FILE}" "${ca}" 2>/dev/null; then
+      log "rfc3161: shipped TSA CA chain from TSA_CA_FILE -> $(basename "${ca}")"
+      return 0
+    fi
+    warn "rfc3161: TSA_CA_FILE set but unreadable (${TSA_CA_FILE}) — no tsa-ca.pem shipped (verify will SKIP full ts -verify)"
+    return 1
+  fi
+  if is_degrade; then
+    warn "rfc3161: degrade mode — skipping TSA CA fetch (no tsa-ca.pem shipped; verify will SKIP full ts -verify)"
+    return 1
+  fi
+  if [ "${TSA_URL}" = "${DEFAULT_TSA_URL}" ] && have curl; then
+    # Default freetsa: fetch its public tsa.crt + cacert.pem and concatenate.
+    local tsa_crt ca_crt
+    tsa_crt="$(mktemp)"; ca_crt="$(mktemp)"
+    if curl -fsS -m 30 https://freetsa.org/files/tsa.crt    -o "${tsa_crt}" 2>/dev/null \
+       && curl -fsS -m 30 https://freetsa.org/files/cacert.pem -o "${ca_crt}" 2>/dev/null \
+       && [ -s "${tsa_crt}" ] && [ -s "${ca_crt}" ]; then
+      cat "${tsa_crt}" "${ca_crt}" > "${ca}" 2>/dev/null
+      rm -f "${tsa_crt}" "${ca_crt}"
+      if [ -s "${ca}" ]; then
+        log "rfc3161: fetched freetsa public CA chain -> $(basename "${ca}")"
+        return 0
+      fi
+    fi
+    rm -f "${tsa_crt}" "${ca_crt}"
+    warn "rfc3161: freetsa CA chain fetch failed (offline?) — no tsa-ca.pem shipped (verify will SKIP full ts -verify)"
+    return 1
+  fi
+  warn "rfc3161: no TSA_CA_FILE and no known public CA URL for ${TSA_URL} — no tsa-ca.pem shipped (verify will SKIP full ts -verify)"
   return 1
 }
 
@@ -378,24 +551,61 @@ if have openssl; then
   set_tool openssl "$(tool_version openssl version)"
   TSA_ANY=0
 
-  # merkle root: write to a temp file then stamp.
-  if [ -n "${MERKLE_ROOT}" ]; then
-    MR_FILE="${EVIDENCE_DIR}/merkle-root.txt"
-    printf '%s\n' "${MERKLE_ROOT}" > "${MR_FILE}"
+  # merkle root: reuse the merkle-root.txt already written before Step 3.
+  if [ -n "${MERKLE_ROOT}" ] && [ -f "${MR_FILE}" ]; then
     if have curl && rfc3161_stamp "merkle-root" "${MR_FILE}"; then TSA_ANY=1; fi
   fi
   if have curl && rfc3161_stamp "manifest" "${MANIFEST_JSON}"; then TSA_ANY=1; fi
   if [ "${PDF_PRESENT}" -eq 1 ] && have curl && rfc3161_stamp "pdf" "${PDF_PATH}"; then TSA_ANY=1; fi
 
+  # Record the honest qualified label + provider provenance regardless of
+  # outcome, so the manifest never silently implies qualified status. With the
+  # free freetsa default this is qualified=false; only a wired qualified eIDAS
+  # QTS (QTS_PROVIDER/QTS_URL, or explicit TSA_QUALIFIED=true) flips it to true.
+  set_sig rfc3161 "qualified=${TSA_QUALIFIED_LABEL}" \
+    "provider=${QTS_PROVIDER:-freetsa.org (non-qualified, default)}" \
+    "ca_file=${TSA_CA_FILE:-<unset>}"
+
   if [ "${TSA_ANY}" -eq 0 ]; then
     set_sig rfc3161 "status=unavailable" "reason=tsa-unreachable-or-no-curl" "tsa_url=${TSA_URL}"
-    warn "rfc3161: TSA unreachable or curl absent — recorded rfc3161_unavailable (soft, no fail)"
+    # ---------------------------------------------------------------------
+    # T-56 — structural-vs-flaky trusted-time assertion (blueprint §6.2 gap #2).
+    # RFC-3161 stamping soft-degrades by design so a *transient* TSA miss on a
+    # single artifact never breaks a build. But ZERO valid .tsr across ALL
+    # artifacts in NON-degrade (CI) mode means the trusted-time anchor path is
+    # STRUCTURALLY broken (TSA totally unreachable, returns non-tokens, or
+    # openssl-query is failing) — not flaky. Combined with §6.2-A this is the
+    # exact case where a permanent failure could masquerade as infra flakiness
+    # forever, so it is a HARD FAIL here. Per-artifact softness is preserved
+    # above: this trips only when the entire path produced nothing valid.
+    # (Degrade/local mode stays soft, matching local runs without a TSA.)
+    # ---------------------------------------------------------------------
+    if is_degrade; then
+      warn "rfc3161: TSA unreachable or curl absent — recorded rfc3161_unavailable (soft, degrade mode)"
+    else
+      die "rfc3161: NO valid RFC-3161 timestamp produced for any artifact (fail-closed; T-56: trusted-time path structurally broken, not flaky). Set EVIDENCE_ALLOW_DEGRADE=1 for local runs without a TSA."
+    fi
   else
     set_sig rfc3161 "tsa_url=${TSA_URL}"
+    # At least one artifact got a granted token: ship the TSA CA chain so the
+    # pack can be FULLY verified (openssl ts -verify -CAfile) rather than only
+    # parse+granted SKIP. Degrade-honest: a fetch miss just omits tsa-ca.pem.
+    if materialize_tsa_ca; then
+      set_sig rfc3161 "ca_shipped=true" "ca_file_shipped=tsa-ca.pem"
+    else
+      set_sig rfc3161 "ca_shipped=false"
+    fi
   fi
 else
   set_sig rfc3161 "status=unavailable" "reason=openssl-absent"
-  warn "rfc3161: openssl absent — soft skip"
+  # openssl is the timestamping engine. Its absence in CI means no trusted-time
+  # anchor can ever be produced — fail-closed in non-degrade mode (T-56), soft
+  # locally where the toolchain may legitimately be incomplete.
+  if is_degrade; then
+    warn "rfc3161: openssl absent — soft skip (degrade mode)"
+  else
+    die "rfc3161: openssl absent — RFC-3161 trusted-time anchor cannot be produced (fail-closed; T-56)"
+  fi
 fi
 
 # ---------------------------------------------------------------------------

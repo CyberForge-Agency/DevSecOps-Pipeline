@@ -1,0 +1,163 @@
+# OpenSSF Scorecard — supply-chain self-defence (T-70)
+#
+# Why this exists
+#   The master spec names OpenSSF Scorecard's *Pinned-Dependencies* and
+#   *Dangerous-Workflow* checks as the supply-chain self-defence differentiator
+#   for this pipeline — the pipeline's own scanners are an attack surface
+#   (cf. the March-2026 trivy-action compromise). See
+#   evidence-pack-specification.md:201 and the L5 maturity row at :295.
+#   Before this workflow, 64/64 actions were SHA-pinned but that posture was
+#   *unproven*; Scorecard turns it into an externally-attestable signal.
+#
+# What it does
+#   1. Runs Scorecard, emits SARIF, and uploads it to GitHub code-scanning so
+#      Pinned-Dependencies + Dangerous-Workflow findings appear in the
+#      Security dashboard (results_format: sarif).
+#   2. Runs Scorecard again in JSON mode and a gate step parses the two named
+#      checks; the job FAILS if either scores below threshold. This is what
+#      makes a regression (e.g. a tag-pinned action) drop Pinned-Dependencies
+#      and fail the run — Acceptance Criterion 3 of T-70.
+#
+# OPEN DECISION (target-state, NOT yet achieved)
+#   publish_results is set to **false** on purpose. Publishing pushes results
+#   to the public OpenSSF API/badge and binds them to a concrete GitHub
+#   org/repo identity, which is still an open decision for this repo. Flip to
+#   `true` (and add the badge) once the canonical org/repo home is settled.
+#   See T-70 implementation notes — the spec's reference value is `true`.
+#
+# Disjointness note: this is a NEW file. It does not edit any existing
+# workflow. Scorecard officially supports only `push`/`schedule` (default
+# branch) plus `branch_protection_rule`; it is therefore a standalone
+# workflow rather than a `workflow_call` reusable invoked by pipeline.yml.
+
+name: "OpenSSF Scorecard"
+
+on:
+  # Re-score whenever branch-protection settings change (Scorecard reads them).
+  branch_protection_rule:
+  # Weekly scheduled scan — Scorecard's intended cadence for trend data.
+  schedule:
+    - cron: "27 4 * * 1" # Mondays 04:27 UTC
+  # Score on every push to the default branch so regressions gate immediately.
+  push:
+    branches: ["main"]
+
+# Least privilege: declared empty at top level, granted per-job.
+permissions: read-all
+
+jobs:
+  analysis:
+    name: "Scorecard analysis"
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to upload the SARIF results to the code-scanning dashboard.
+      security-events: write
+      # Required for the OIDC token Scorecard uses to read the workflow run.
+      id-token: write
+      # Read-only repo access for the analysis itself.
+      contents: read
+      actions: read
+    steps:
+      - name: "Harden the runner"
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
+      - name: "Checkout repository"
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # ---- 1. SARIF run: feeds the code-scanning Security dashboard ----
+      - name: "Run Scorecard (SARIF for code-scanning)"
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # OPEN DECISION — see header. Keep false until org/repo home settles.
+          publish_results: false
+
+      - name: "Upload SARIF to code-scanning"
+        uses: github/codeql-action/upload-sarif@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
+        with:
+          sarif_file: results.sarif
+
+      - name: "Upload SARIF as run artifact"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      # ---- 2. JSON run: machine-parseable for the gate below ----
+      - name: "Run Scorecard (JSON for gate)"
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.json
+          results_format: json
+          publish_results: false
+
+      - name: "Upload JSON as run artifact"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scorecard-json
+          path: results.json
+          retention-days: 5
+
+      # ---- 3. The gate: assert the two spec-named checks PASS ----
+      # Threshold 8/10. Scorecard JSON shape: { "checks": [ { "name": ...,
+      # "score": N }, ... ] }. A negative score (-1) means "not run / inconclusive"
+      # and is treated as a failure so the gate never passes on missing data.
+      - name: "Assert Pinned-Dependencies and Dangerous-Workflow PASS"
+        env:
+          THRESHOLD: "8"
+        run: |
+          set -euo pipefail
+
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq jq
+          fi
+
+          if [ ! -s results.json ]; then
+            echo "::error::Scorecard JSON results.json missing or empty"
+            exit 1
+          fi
+
+          fail=0
+          {
+            echo "## OpenSSF Scorecard supply-chain gate"
+            echo ""
+            echo "| Check | Score | Threshold | Result |"
+            echo "| --- | --- | --- | --- |"
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+          for check in "Pinned-Dependencies" "Dangerous-Workflow"; do
+            score="$(jq -r --arg n "$check" \
+              '.checks[]? | select(.name == $n) | .score' results.json)"
+
+            if [ -z "$score" ] || [ "$score" = "null" ]; then
+              echo "::error::Scorecard check '$check' not present in results.json"
+              echo "| $check | (missing) | $THRESHOLD | FAIL |" \
+                >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              fail=1
+              continue
+            fi
+
+            # Inconclusive (-1) and below-threshold both fail the gate.
+            if [ "$score" -lt "$THRESHOLD" ]; then
+              echo "::error::Scorecard '$check' scored $score (< $THRESHOLD)"
+              echo "| $check | $score | $THRESHOLD | FAIL |" \
+                >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              fail=1
+            else
+              echo "Scorecard '$check' scored $score (>= $THRESHOLD) — PASS"
+              echo "| $check | $score | $THRESHOLD | PASS |" \
+                >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            fi
+          done
+
+          if [ "$fail" -ne 0 ]; then
+            echo "::error::Supply-chain self-defence gate failed (T-70)."
+            exit 1
+          fi
+          echo "Supply-chain self-defence gate passed (T-70)."

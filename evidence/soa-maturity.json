@@ -1,0 +1,154 @@
+{
+  "status": "FAIL",
+  "tier": "EVIDENCE-ONLY",
+  "measured": {
+    "overall_level": "L1",
+    "dimension_levels": {
+      "evidence_production": "L1",
+      "build_integrity": "L1",
+      "scanning": "L1",
+      "compliance_mapping": "L1",
+      "integrity": "L1"
+    }
+  },
+  "threshold": {
+    "target": "L3 (strong)",
+    "ceiling": "L5 (state-of-the-art)"
+  },
+  "detail": "computed pack maturity = L1 (lowest of evidence_production=L1, build_integrity=L1, scanning=L1, compliance_mapping=L1, integrity=L1); weakest dimension(s): build_integrity, compliance_mapping, evidence_production, integrity, scanning. Headline maturity is the COMPUTED level, not a hardcoded L5 (corrects struktura \u00a713 overclaim).",
+  "tool_version": null,
+  "validator": "soa_maturity",
+  "checked_at": "2026-06-18T09:36:10Z",
+  "overall_level": "L1",
+  "weakest_dimensions": [
+    "build_integrity",
+    "compliance_mapping",
+    "evidence_production",
+    "integrity",
+    "scanning"
+  ],
+  "soa": {
+    "total_controls_parsed": 93,
+    "iso_total_expected": 93,
+    "structurally_complete": true,
+    "by_theme": {
+      "A.5": 37,
+      "A.6": 8,
+      "A.7": 14,
+      "A.8": 34
+    },
+    "applicable": 83,
+    "not_applicable": 10,
+    "implemented": 57,
+    "partially_implemented": 22,
+    "planned": 4,
+    "unparsed_status": 0,
+    "implementation_rate_applicable": 0.8193
+  },
+  "dimensions": {
+    "evidence_production": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": "L1",
+      "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
+      "detail": "no pipeline-emitted evidence artifacts found in evidence dir",
+      "tool_version": null,
+      "validator": "soa_maturity",
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
+      "anchors": {
+        "L1": "Manual, screenshots",
+        "L3": "Pipeline emits artifacts",
+        "L5": "Every artifact auto-signed + QTS + Rekor at production"
+      },
+      "evidence": {
+        "manifest": false,
+        "pdf_report": false
+      }
+    },
+    "build_integrity": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": "L1",
+      "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
+      "detail": "no SBOM found; build integrity at baseline",
+      "tool_version": null,
+      "validator": "soa_maturity",
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
+      "anchors": {
+        "L1": "Build runs",
+        "L3": "SBOM per release",
+        "L5": "SLSA Build L3, non-falsifiable provenance, reproducible"
+      },
+      "evidence": {
+        "sbom": false,
+        "provenance": false
+      }
+    },
+    "scanning": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": "L1",
+      "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
+      "detail": "no scan results found in evidence dir",
+      "tool_version": null,
+      "validator": "soa_maturity",
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
+      "anchors": {
+        "L1": "SAST runs sometimes",
+        "L3": "SAST/DAST/SCA/IaC/container all gate",
+        "L5": "+ VEX triage, OpenSSF Scorecard, digest-pinned toolchain"
+      },
+      "evidence": {
+        "security_report": false,
+        "sca_results": false
+      }
+    },
+    "compliance_mapping": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": "L1",
+      "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
+      "detail": "no compliance-matrix artifact in evidence dir \u2014 mapping at spreadsheet baseline (SoA exists as the source document)",
+      "tool_version": null,
+      "validator": "soa_maturity",
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
+      "anchors": {
+        "L1": "Spreadsheet of controls",
+        "L3": "Crosswalk to 2-3 frameworks",
+        "L5": "One evidence -> all frameworks, auto-generated, gap-tracked live"
+      },
+      "evidence": {
+        "compliance_matrix": false,
+        "oscal": false,
+        "soa_structurally_complete": true
+      }
+    },
+    "integrity": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": "L1",
+      "threshold": "L3 (strong) target; L5 (state-of-the-art) ceiling",
+      "detail": "no signature/timestamp artifacts found \u2014 integrity at folder baseline",
+      "tool_version": null,
+      "validator": "soa_maturity",
+      "checked_at": "2026-06-18T09:36:10Z",
+      "level": 1,
+      "anchors": {
+        "L1": "Files in a folder",
+        "L3": "Signed + retained",
+        "L5": "Qualified timestamps, transparency log, immutable WORM, reproducible"
+      },
+      "evidence": {
+        "merkle_cosign_bundle": false,
+        "cosign_verification": false,
+        "rfc3161_tsr": false
+      }
+    }
+  },
+  "evidence_dir": "evidence",
+  "soa_source": "docs/governance/statement-of-applicability.md"
+}

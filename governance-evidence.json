@@ -1,0 +1,60 @@
+{
+  "status": "PASS",
+  "tier": "BLOCKING",
+  "measured": {
+    "management_review_age_days": 93,
+    "training_record_age_days": 93,
+    "board_approval_signoff": true,
+    "training_attendees_recorded": 0
+  },
+  "threshold": {
+    "management_review_max_days": 183,
+    "training_record_max_days": 365
+  },
+  "detail": "governance evidence fresh: management review within 183d and management training within 365d",
+  "tool_version": null,
+  "validator": "check-governance",
+  "checked_at": "2026-06-16T11:32:34Z",
+  "components": {
+    "management_review_freshness": {
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": 93,
+      "threshold": 183,
+      "detail": "management review last updated 2026-03-15 (93 days ago); limit 183 days",
+      "tool_version": null,
+      "validator": "libcompliance",
+      "checked_at": "2026-06-16T11:32:34Z"
+    },
+    "training_record_freshness": {
+      "status": "PASS",
+      "tier": "BLOCKING",
+      "measured": 93,
+      "threshold": 365,
+      "detail": "management training record last updated 2026-03-15 (93 days ago); limit 365 days",
+      "tool_version": null,
+      "validator": "libcompliance",
+      "checked_at": "2026-06-16T11:32:34Z"
+    },
+    "board_approval_signoff": {
+      "status": "PASS",
+      "tier": "EVIDENCE-ONLY",
+      "measured": true,
+      "threshold": "approval block present",
+      "detail": "approval recorded: 'Approved By' = 'CyberForge Management' (NIS2 Art.20(1) (management-body approval / board sign-off))",
+      "tool_version": null,
+      "validator": "check-governance",
+      "checked_at": "2026-06-16T11:32:34Z"
+    },
+    "training_attendees_recorded": {
+      "status": "FAIL",
+      "tier": "EVIDENCE-ONLY",
+      "measured": 0,
+      "threshold": ">=1 recorded attendee",
+      "detail": "0 populated training-attendee row(s) recorded (EVIDENCE-ONLY: the pipeline records the log, not that training occurred \u2014 NIS2 Art.20(2) (mandatory management cybersecurity training))",
+      "tool_version": null,
+      "validator": "check-governance",
+      "checked_at": "2026-06-16T11:32:34Z"
+    }
+  }
+}

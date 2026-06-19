@@ -56,6 +56,10 @@ def fmt_size(n: int) -> str:
 # ── Core data ────────────────────────────────────────────────────────────────
 pipeline = load_json(EVIDENCE_DIR / "pipeline-run.json") or {}
 compliance = load_json(EVIDENCE_DIR / "compliance-matrix.json") or {}
+# Compliance-as-code gate output (A.1-A.10 organizational-control verdicts aggregate). Produced by
+# scripts/aggregate-compliance.py from each validator's T-33 envelope; overall_status + per-check
+# rows carrying status/measured/tier. May be absent (degrade to NOT AVAILABLE, never fabricate PASS).
+compliance_status = load_json(EVIDENCE_DIR / "compliance-status.json") or {}
 dpa = load_json(EVIDENCE_DIR / "dpa-compliance-check.json") or {}
 data_flow = load_json(EVIDENCE_DIR / "data-flow-diagram.json") or {}
 sbom = load_json(EVIDENCE_DIR / "sbom.cyclonedx.json") or {}
@@ -64,6 +68,7 @@ trivy_image = load_json(EVIDENCE_DIR / "trivy-image-results.json") or {}
 zap = load_json(EVIDENCE_DIR / "zap-report.json") or {}
 cosign_log = load_text(EVIDENCE_DIR / "cosign-verification.log")
 manifest = load_text(EVIDENCE_DIR / "manifest.sha256")
+manifest_json = load_json(EVIDENCE_DIR / "manifest.json") or {}
 provenance_text = load_text(EVIDENCE_DIR / "provenance.intoto.jsonl")
 codeql = load_json(EVIDENCE_DIR / "codeql/javascript.sarif") or {}
 checkov = load_json(EVIDENCE_DIR / "checkov-results.sarif") or {}
@@ -222,6 +227,118 @@ def parse_compliance():
         })
     return fws
 
+# Canonical A.1-A.10 catalog: control -> verdict filenames, title, framework clause (struktura §6).
+# Fixed editorial clause crosswalk; NOT a computed figure. Mirrors build-audit-document.py's catalog
+# so the HTML report and the forensic PDF tell the same compliance-as-code story.
+COMPLIANCE_AS_CODE_CATALOG = [
+    ("A.1", "DORA Register of Information (RoI) — critical/important ICT providers, exit & substitutability",
+     "DORA Art.28(3); Reg (EU) 2024/2956", ["roi-validation.json"], "validate-roi"),
+    ("A.2", "Data Processing Agreements (DPA) register — Art.28 processor clauses",
+     "GDPR/RODO Art.28(3)", ["dpa-compliance-check.json"], "check-dpa-register"),
+    ("A.3", "Records of Processing (RoPA) + DPIA completeness",
+     "GDPR/RODO Art.30(1)-(2), Art.35", ["ropa-completeness.json"], "validate-ropa"),
+    ("A.4", "Incident register — statutory-clock schema (3-phase DORA clock)",
+     "DORA Art.19; NIS2 Art.23", ["incident-readiness.json"], "check-incident-register"),
+    ("A.5", "PII data-flow / transfer map",
+     "GDPR/RODO Art.30(5), Art.25", ["data-flow-diagram.json"], "check-data-flow"),
+    ("A.6", "Governance freshness — management review & NIS2 management training",
+     "DORA Art.5; NIS2 Art.20(2); ISO 27001 9.3", ["governance-evidence.json"], "check-governance"),
+    ("A.7", "ICT third-party clauses + documented & tested exit strategy",
+     "DORA Art.28-30; ISO 27001 A.5.19-A.5.23", ["tpp-clauses.json"], "check-thirdparty-clauses"),
+    ("A.8", "Access-review cadence freshness (privileged re-certification)",
+     "NIS2 Art.21(2)(i); ISO 27001 A.8.2", ["access-review.json"], "check-access-reviews"),
+    ("A.9", "Cryptographic posture — TLS floor & key-management threshold",
+     "NIS2 Art.21(2)(h); ISO 27001 A.8.24; SOC2 CC7.1", ["crypto-posture.json"], "assert-crypto"),
+    ("A.10", "Backup restore-test proof + freshness (successful restore conducted)",
+     "DORA Art.11-12; NIS2 Art.21(2)(c); ISO 27001 A.8.13", ["restore-test.json"], "check-restore-test"),
+]
+
+def _norm_key(v):
+    return re.sub(r"[^a-z0-9]", "", str(v or "").lower())
+
+def _status_rows_index(status):
+    """Index the aggregator's per-check list by every alias (id/validator/file/basename)."""
+    if not isinstance(status, dict):
+        return {}
+    rows_list = []
+    for key in ("checks", "controls", "results", "rows", "verdicts", "checks_list", "items"):
+        val = status.get(key)
+        if isinstance(val, list):
+            rows_list = [r for r in val if isinstance(r, dict)]
+            break
+        if isinstance(val, dict):
+            for k, v in val.items():
+                if isinstance(v, dict):
+                    r = dict(v); r.setdefault("_key", k); rows_list.append(r)
+            break
+    idx = {}
+    for r in rows_list:
+        for src in (r.get("id"), r.get("control"), r.get("control_id"), r.get("validator"),
+                    r.get("name"), r.get("file"), r.get("artifact"), r.get("_key")):
+            if src:
+                idx.setdefault(_norm_key(src), r)
+                base = os.path.splitext(os.path.basename(str(src)))[0]
+                idx.setdefault(_norm_key(base), r)
+    return idx
+
+def _row_field(row, *keys):
+    if not isinstance(row, dict):
+        return None
+    for k in keys:
+        if k in row and row[k] not in (None, ""):
+            return row[k]
+    return None
+
+def parse_compliance_status():
+    """Render-ready A.1-A.10 verdicts from compliance-status.json (the signed aggregate gate).
+
+    We RENDER, we do not recompute. Absent file -> available:False, every control NOT REPORTED;
+    never a fabricated PASS. A BLOCKING FAIL (e.g. overdue access review) is surfaced honestly with
+    its measured value + remediation pointer so the gate's fail-closed behaviour is visible."""
+    status = compliance_status
+    available = isinstance(status, dict) and bool(status)
+    overall = (_row_field(status, "overall_status", "overall", "status", "result")
+               if available else None)
+    idx = _status_rows_index(status)
+    controls = []
+    for cid, title, clause, files, validator in COMPLIANCE_AS_CODE_CATALOG:
+        aliases = [cid, cid.replace(".", ""), validator]
+        for f in files:
+            aliases += [f, os.path.splitext(f)[0]]
+        row = None
+        for a in aliases:
+            row = idx.get(_norm_key(a))
+            if row is not None:
+                break
+        measured = _row_field(row, "measured", "value", "measurement")
+        if isinstance(measured, (dict, list)):
+            measured = json.dumps(measured)[:120]
+        st = _row_field(row, "status", "result", "state")
+        rem = _row_field(row, "remediation", "remediation_hint", "hint", "fix", "next_step")
+        detail = _row_field(row, "detail", "message", "description")
+        if (str(st or "").upper() != "PASS") and not rem and row is not None:
+            rem = detail
+        controls.append({
+            "id": cid, "title": title, "clause": clause,
+            "validator": validator, "evidence": files[0] if files else "",
+            "status": st, "tier": _row_field(row, "tier"),
+            "measured": measured, "threshold": _row_field(row, "threshold"),
+            "detail": detail,
+            "remediation": rem if (str(st or "").upper() != "PASS") else None,
+            "reported": row is not None,
+        })
+    counts = {"pass": 0, "fail": 0, "indeterminate": 0, "not_reported": 0, "blocking_fail": 0}
+    for c in controls:
+        s = str(c["status"] or "").upper()
+        if s == "PASS": counts["pass"] += 1
+        elif s == "FAIL":
+            counts["fail"] += 1
+            if str(c["tier"] or "").upper() == "BLOCKING":
+                counts["blocking_fail"] += 1
+        elif s == "INDETERMINATE": counts["indeterminate"] += 1
+        if not c["reported"]: counts["not_reported"] += 1
+    return {"available": available, "overall": overall, "controls": controls, "counts": counts}
+
 def parse_codeql():
     if not codeql:
         return {"findings": [], "rules_count": 0}
@@ -270,7 +387,7 @@ EVIDENCE_FILES = [
     ("security-report.json", "Consolidated scan results", "DORA Art.16, NIS2 Art.21"),
     ("sbom.cyclonedx.json", "Software Bill of Materials", "DORA Art.28, NIS2 Art.21.2.d"),
     ("cosign-verification.log", "Image signature proof", "ISO A.8.24, SOC2 CC8.1"),
-    ("provenance.intoto.jsonl", "SLSA build provenance", "DORA Art.28, SLSA L2+"),
+    ("provenance.intoto.jsonl", "SLSA build provenance", "DORA Art.28, SLSA Build L2"),
     ("zap-report.json", "DAST scan results (JSON)", "NIS2 Art.21.2.e, ISO A.8.28"),
     ("zap-report.html", "DAST scan results (HTML)", "NIS2 Art.21.2.e, ISO A.8.28"),
     ("compliance-matrix.json", "Framework control mapping", "All frameworks"),
@@ -308,6 +425,7 @@ PAYLOAD = {
     "generated_at": os.environ.get("GENERATED_AT") or datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
     "pipeline": parse_pipeline(),
     "compliance": parse_compliance(),
+    "compliance_status": parse_compliance_status(),
     "trivy_sca": parse_trivy(trivy_sca, "filesystem"),
     "trivy_image": parse_trivy(trivy_image, "container"),
     "sbom": parse_sbom(),
@@ -348,6 +466,23 @@ PAYLOAD["stats"] = {
 
 # Serialise as embedded JSON, escape </ to avoid breaking <script> block
 DATA_JSON = json.dumps(PAYLOAD, default=str).replace("</", "<\\/")
+
+# WORM footer wording is DRIVEN by the manifest's worm_state, never hardcoded —
+# mirrors build-audit-document.py's honesty banner. The absolute locked-archive
+# claim is asserted ONLY when the live policy reads locked; until then
+# (pending/unlocked/missing) the report says "WORM-designed (unlocked)".
+worm_state = manifest_json.get("worm_state")
+if isinstance(worm_state, dict):
+    worm_state_label = worm_state.get("state") or json.dumps(worm_state)
+else:
+    worm_state_label = worm_state
+if (str(worm_state_label or "").strip().lower()) == "locked":
+    WORM_FOOTER = ("This pack is held in an immutable WORM archive — LOCKED "
+                   "(Azure Blob, 1825-day retention).")
+else:
+    WORM_FOOTER = ("This pack is WORM-designed (unlocked) — retention enforced by "
+                   "Azure immutable-blob policy (target); object-lock is not yet "
+                   "engaged (worm_state read live from manifest, never hardcoded).")
 
 # ── HTML template ────────────────────────────────────────────────────────────
 HTML = r"""<!DOCTYPE html>
@@ -439,6 +574,9 @@ tbody tr.hide{display:none}
 .badge-pass{background:#ECFDF5;color:var(--green);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
 .badge-fail{background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
 .badge-skip{background:var(--fog);color:var(--mid);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-indet{background:#FFFBEB;color:#92400E;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-blocking{background:#FEE2E2;color:#991B1B;padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
+.badge-evidence{background:#EEF2FB;color:var(--blue);padding:2px 8px;border-radius:3px;font-family:var(--mono);font-size:.62rem;font-weight:600}
 
 /* ── Filters ─────────────────────────────────────────────────────────────── */
 .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
@@ -544,6 +682,7 @@ footer p{margin:4px 0}
   <button class="tab" data-tab="sbom">SBOM <span class="tab-count" id="cnt-sbom">0</span></button>
   <button class="tab" data-tab="dast">DAST <span class="tab-count" id="cnt-dast">0</span></button>
   <button class="tab" data-tab="compliance">Compliance</button>
+  <button class="tab" data-tab="compliance-code">Compliance-as-Code</button>
   <button class="tab" data-tab="signing">Signing</button>
   <button class="tab" data-tab="files">Files <span class="tab-count" id="cnt-files">0</span></button>
   <button class="tab" data-tab="dpa">Vendors</button>
@@ -714,6 +853,27 @@ footer p{margin:4px 0}
 <div id="fwControls"></div>
 </section>
 
+<!-- ──────────────────────── COMPLIANCE-AS-CODE (Part A) ──────────────────────── -->
+<section class="panel" id="panel-compliance-code">
+<h2>Compliance-as-Code — Organizational-Control Verdicts (Part A)</h2>
+<p>The signed organizational-control layer (struktura &sect;6 compliance gate). Each A.1-A.10 control
+is checked by a content validator that emits <strong>PASS only</strong> when it parsed a value that
+met a stated threshold &mdash; never a silent PASS. Verdicts aggregate into the fail-closed gate
+below. This is the proof the differentiator is machine-checked: signed PASS/FAIL org-control
+verdicts, not just DevSecOps SARIF.</p>
+<div class="card" id="ccGateCard">
+  <h3>Aggregate compliance gate</h3>
+  <p id="ccGateLine"></p>
+  <p class="empty" id="ccCounts" style="font-size:.82rem"></p>
+</div>
+<div id="ccTableWrap"></div>
+<p style="font-size:.82rem;color:var(--mid);margin-top:10px"><strong>Golden thread (struktura
+&sect;1):</strong> each row maps control &rarr; evidence verdict (SHA-bound in the manifest) &rarr;
+framework clause. A BLOCKING FAIL (e.g. a past-due access review under A.8, or 'restore not yet
+conducted' under A.10) makes the aggregate gate exit non-zero on a non-PR run &mdash; honest,
+fail-closed enforcement with a concrete remediation pointer, not a green-for-show banner.</p>
+</section>
+
 <!-- ────────────────────────────── SIGNING ────────────────────────────── -->
 <section class="panel" id="panel-signing">
 <h2>Cosign Verification</h2>
@@ -848,7 +1008,7 @@ footer p{margin:4px 0}
 <footer>
 <div class="wrap">
   <p>Evidence Pack generated <span id="genAt"></span> · CyberForge DevSecOps Pipeline · <a href="https://cyberforge.agency">cyberforge.agency</a></p>
-  <p>This pack is part of an immutable WORM archive (Azure Blob, 1825-day retention). SHA256-manifested. Tampering is detectable.</p>
+  <p>__WORM_FOOTER__ SHA256-manifested — auditors can re-hash any file and compare to detect tampering.</p>
 </div>
 </footer>
 
@@ -1117,6 +1277,63 @@ function renderCompliance() {
   }));
 }
 
+// ── COMPLIANCE-AS-CODE (A.1-A.10 signed org-control verdicts) ─────────
+function ccStatusBadge(s) {
+  const n = String(s ?? '').toUpperCase();
+  if (n === 'PASS') return '<span class="badge-pass">PASS</span>';
+  if (n === 'FAIL') return '<span class="badge-fail">FAIL</span>';
+  if (n === 'INDETERMINATE') return '<span class="badge-indet">INDETERMINATE</span>';
+  if (n) return '<span class="badge-skip">' + esc(n) + '</span>';
+  return '<span class="badge-skip">NOT REPORTED</span>';
+}
+function ccTierBadge(t) {
+  const n = String(t ?? '').toUpperCase();
+  if (n === 'BLOCKING') return '<span class="badge-blocking">BLOCKING</span>';
+  if (n === 'EVIDENCE-ONLY' || n === 'EVIDENCE_ONLY') return '<span class="badge-evidence">EVIDENCE-ONLY</span>';
+  if (n) return '<span class="badge-skip">' + esc(n) + '</span>';
+  return '—';
+}
+function renderComplianceCode() {
+  const cc = DATA.compliance_status || {available:false, overall:null, controls:[], counts:{}};
+  // Gate verdict line — honest: NOT AVAILABLE when the signed status file is absent.
+  if (cc.available) {
+    $('ccGateLine').innerHTML = ccStatusBadge(cc.overall) +
+      ' <span style="font-size:.82rem;color:var(--mid)">read from compliance-status.json ' +
+      'overall_status — the signed, fail-closed verdict; not recomputed here.</span>';
+  } else {
+    $('ccGateLine').innerHTML = '<span class="badge-skip">NOT AVAILABLE</span> ' +
+      '<span style="font-size:.82rem;color:var(--mid)">compliance-status.json was not present in ' +
+      'this evidence pack; controls below show NOT REPORTED rather than a fabricated PASS.</span>';
+  }
+  const k = cc.counts || {};
+  $('ccCounts').textContent =
+    'A.1-A.10 verdicts: ' + (k.pass||0) + ' PASS, ' + (k.fail||0) + ' FAIL (' +
+    (k.blocking_fail||0) + ' BLOCKING), ' + (k.indeterminate||0) + ' INDETERMINATE, ' +
+    (k.not_reported||0) + ' NOT REPORTED. Only a BLOCKING FAIL fails the gate; an EVIDENCE-ONLY ' +
+    'FAIL is recorded but does not break the build (libcompliance tiers).';
+  const rows = (cc.controls || []).map(c => {
+    let measured = (c.measured === null || c.measured === undefined || c.measured === '') ? '—'
+      : '<code style="font-size:.72rem">' + esc(c.measured) + '</code>';
+    if (c.threshold !== null && c.threshold !== undefined && c.threshold !== '')
+      measured += ' <span style="color:var(--mid);font-size:.72rem">/ thr ' + esc(c.threshold) + '</span>';
+    const rem = c.remediation ? esc(c.remediation) : '—';
+    const ev = c.evidence ? '<code style="font-size:.72rem">' + esc(c.evidence) + '</code>' : '—';
+    return '<tr>' +
+      '<td><strong>' + esc(c.id) + '</strong></td>' +
+      '<td>' + esc(c.title) + '</td>' +
+      '<td style="font-size:.78rem">' + esc(c.clause) + '</td>' +
+      '<td>' + ev + '</td>' +
+      '<td>' + ccTierBadge(c.tier) + '</td>' +
+      '<td>' + ccStatusBadge(c.status) + '<br>' + measured + '</td>' +
+      '<td style="font-size:.78rem">' + rem + '</td>' +
+      '</tr>';
+  }).join('');
+  $('ccTableWrap').innerHTML =
+    '<table><thead><tr><th>Control</th><th>Organizational control</th><th>Framework clause</th>' +
+    '<th>Evidence verdict</th><th>Tier</th><th>Result / measured</th><th>Remediation pointer</th>' +
+    '</tr></thead><tbody>' + rows + '</tbody></table>';
+}
+
 // ── SIGNING ──────────────────────────────────────────────────────────
 function renderSigning() {
   const c = DATA.cosign;
@@ -1132,7 +1349,7 @@ function renderSigning() {
   const img = DATA.pipeline.image_uri || '';
   const dig = DATA.pipeline.image_digest || '';
   $('cosignCmd').textContent =
-    `cosign verify \\\n  --certificate-identity-regexp='https://github.com/${repo}/' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
+    `cosign verify \\\n  --certificate-identity-regexp='^https://github.com/${repo}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$' \\\n  --certificate-oidc-issuer='https://token.actions.githubusercontent.com' \\\n  ${img}@${dig}`;
   $('cosignRaw').textContent = c.raw || '(no log captured)';
   $('provExcerpt').textContent = DATA.provenance_excerpt || '(no provenance captured)';
 }
@@ -1236,6 +1453,7 @@ renderVulns();
 renderSbom();
 renderDast();
 renderCompliance();
+renderComplianceCode();
 renderSigning();
 renderFiles();
 renderDpa();
@@ -1255,6 +1473,7 @@ HTML = (HTML
     .replace("__SHA_SHORT__", escape(str(p["sha_short"])))
     .replace("__TIMESTAMP__", escape(str(p["timestamp"])))
     .replace("__RUN_ID__", escape(str(p["run_id"])))
+    .replace("__WORM_FOOTER__", escape(WORM_FOOTER))
     .replace("__DATA__", DATA_JSON))
 
 OUTPUT.parent.mkdir(parents=True, exist_ok=True)

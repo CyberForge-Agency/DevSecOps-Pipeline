@@ -61,7 +61,9 @@ jobs:
           if report_path.exists():
               try:
                   report = json.loads(report_path.read_text(encoding="utf-8"))
-                  alerts = report.get("site", [{}])[0].get("alerts", [])
+                  alerts = []
+                  for site in report.get("site", []):
+                      alerts += site.get("alerts", [])
                   count = sum(1 for alert in alerts if int(alert.get("riskcode", 0)) >= 3)
               except Exception as exc:
                   print(f"::warning::Unable to parse zap-report.json: {exc}")
@@ -76,13 +78,18 @@ jobs:
 
       - name: Job Summary
         if: always()
+        env:
+          # Route the (untrusted) target URL through an env var instead of
+          # expanding ${{ inputs.target_url }} directly into the shell script
+          # body — defense-in-depth against script injection (T-07). The value
+          # is appended below with printf, never interpolated into a command.
+          TARGET_URL: ${{ inputs.target_url }}
         run: |
           HC_COUNT="${{ steps.zap-summary.outputs.high_critical_count }}"
           cat >> "$GITHUB_STEP_SUMMARY" << 'EOF'
           ## DAST (OWASP ZAP Baseline Scan)
-
-          **Target:** `${{ inputs.target_url }}`
           EOF
+          printf '\n**Target:** `%s`\n' "$TARGET_URL" >> "$GITHUB_STEP_SUMMARY"
           python3 - <<'PY'
           import json, os
           from pathlib import Path
@@ -93,7 +100,9 @@ jobs:
           if report_path.exists():
               try:
                   report = json.loads(report_path.read_text(encoding="utf-8"))
-                  alerts = report.get("site", [{}])[0].get("alerts", [])
+                  alerts = []
+                  for site in report.get("site", []):
+                      alerts += site.get("alerts", [])
                   risk_labels = {0: "Informational", 1: "Low", 2: "Medium", 3: "High"}
 
                   with open(summary, "a") as fh:
@@ -137,13 +146,15 @@ jobs:
       - name: Create incident issue on HIGH/CRITICAL findings
         if: always() && steps.zap-summary.outputs.high_critical_count != '0'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
         with:
           script: |
             const fs = require('fs');
             let findings = 'Unable to parse ZAP report';
             try {
               const report = JSON.parse(fs.readFileSync('zap-report.json', 'utf8'));
-              const alerts = report.site?.[0]?.alerts || [];
+              const alerts = (report.site || []).flatMap(s => s.alerts || []);
               const critical = alerts.filter(a => parseInt(a.riskcode) >= 3);
               findings = critical.map(a => `- **${a.riskdesc}**: ${a.name} (${a.count} instances)`).join('\n');
             } catch (e) {
@@ -157,7 +168,7 @@ jobs:
               body: `## Security Incident - DAST Findings\n\n` +
                 `**Pipeline run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n` +
                 `**Commit:** ${context.sha}\n` +
-                `**Scan target:** ${{ inputs.target_url }}\n\n` +
+                `**Scan target:** ${process.env.TARGET_URL}\n\n` +
                 `### Findings\n${findings}\n\n` +
                 `### SLA\n- **Triage:** Within 4 hours\n- **Fix committed:** Within 48 hours\n- **Deployed:** Within 72 hours\n\n` +
                 `### Required Actions\n- [ ] Triage findings\n- [ ] Assign to developer\n- [ ] Fix and deploy\n- [ ] Verify fix with rescan\n- [ ] Update evidence pack`,

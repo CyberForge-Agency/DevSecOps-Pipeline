@@ -1,0 +1,344 @@
+{
+  "schema": "cyberforge-evidence-manifest/v1",
+  "report_id": "cyberforge-demo-20260618",
+  "generated_at": "2026-06-18T10:41:41Z",
+  "git_sha": "",
+  "image_digest": "",
+  "period": {
+    "start": "",
+    "end": ""
+  },
+  "artifacts": [
+    {
+      "path": "access-log-posture.json",
+      "sha256": "268691434bfc0e7f2fdd1695317c290f66a4b44fe5952112ab7502a4cda19d81",
+      "size": 603,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "access-review.json",
+      "sha256": "a37d24c41834b4dd875b9de04ce190a12fe07c9ace8728fe5e2687ee46f88410",
+      "size": 534,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "asset-map.json",
+      "sha256": "ab014a2de1a5e65a89e5fedfece2c613e9ea3633ebdde38f3b5b847babe88761",
+      "size": 714,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "audit-document.html",
+      "sha256": "e187848fe2098970cddb18a6d4eed428d6b414ee9f3887fee5b6876e9f55fe43",
+      "size": 131608,
+      "mime": "text/html",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "cloud-posture.json",
+      "sha256": "0a5a0f4d41f96a4b55c12be964aa51f360c60fbbf16fb5c213bebabadfca6726",
+      "size": 1013,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "compliance-matrix.json",
+      "sha256": "c1b93164e104c49ce5b89c991e1f6d0643a2a09cdda01af0a9e43090a4846f60",
+      "size": 21717,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "compliance-status.json",
+      "sha256": "0350c09e04a2622fb691b5ec71de7f229a4ee0a0424502bd66cb5d8099936b67",
+      "size": 22034,
+      "mime": "application/json",
+      "source": "compliance-aggregator",
+      "provenance": "static"
+    },
+    {
+      "path": "crosswalk.json",
+      "sha256": "d0aa9f2d8a326f9e71a7a60daff277d9316cbbb83e24a17084dd8d1c387b8324",
+      "size": 13132,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "dpa-compliance-check.json",
+      "sha256": "ed7bd2a693c8badb1ff69d82dedb287d9247a1018723165d9071d7e1da6cff38",
+      "size": 8507,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "evidence-report.html",
+      "sha256": "5a0237877bbe88b11da8a8f7ba0d3ffce0b75148712f6046dd2ba011fe427278",
+      "size": 90561,
+      "mime": "text/html",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "evidence-report.pdf.MISSING",
+      "sha256": "8fe48dc162410029bf551051dac8cd2eabac8395790e452db19a6c2621fba8b2",
+      "size": 324,
+      "mime": "application/octet-stream",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "gap-register.json",
+      "sha256": "508c0f80bb468afca296b4062a5bdb88d186da279a87fddeb73368a63b6406b3",
+      "size": 22945,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "gap-register.md",
+      "sha256": "1b63add3b929c4c8868bde9933f6b65875cc5a7625b755955df6005cac9074aa",
+      "size": 15381,
+      "mime": "text/markdown",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "governance-evidence.json",
+      "sha256": "d33b00e3e191b74105d6ecb2bd5f65d9dc22ad6f199e1e94e0a1ec1dae2f3dd2",
+      "size": 2115,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "ict-risk-framework.json",
+      "sha256": "188aea3b8a77383c2e27e63032821563ae45674e3daa78138b20d90c6fdfb5ae",
+      "size": 1242,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "incident-readiness.json",
+      "sha256": "70ffc7ed3de169e0f8e35f7edefdf679619dcf164ad57beb0ffd7bf463560f43",
+      "size": 809,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "pentest-report.json",
+      "sha256": "6a54b9f562512de4f73a6ec8420557c4a244804b85b2084a4b5ee8a2d2b2224e",
+      "size": 592,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "reproducibility-statement.json",
+      "sha256": "9135c939c1e58ea9ec37800541b06427be8deb11680201be42657ed65700ec89",
+      "size": 1573,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "residency.json",
+      "sha256": "64cf2231ba13341e9b5ff9714977ef4410e37a3c62f802ed430bb9a272e78793",
+      "size": 1096,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "residual-risk.json",
+      "sha256": "425b80e4757cff5c9a18b802fc11ba6a030b09e80a884b808885903d91ba5411",
+      "size": 1989,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "resilience-programme.json",
+      "sha256": "441c29dc4623c15e090667a5651faa92e65f210ff1b6ea4baeec69e18db3175d",
+      "size": 1609,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "restore-test.json",
+      "sha256": "7bae4a3408bb74293faea3ade45e525ea37ea2f074e7388dfc1ff82949ca2a04",
+      "size": 512,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "retention-policy.json",
+      "sha256": "25c2b79b76b236850b11651387e69c4bf9dfe651e40cb57a20abb7bbb0b0202d",
+      "size": 824,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "roi-validation.json",
+      "sha256": "2eb454f9d6ffb19342ba32dc434efa8399892bcbe0b3a27dadd6406a9a128520",
+      "size": 988,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "ropa-completeness.json",
+      "sha256": "62f967f5c861b790ff6317fea8d5d380fffc53f010b0ec196ef9d35f93ff6764",
+      "size": 548,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "runtime-hardening.json",
+      "sha256": "24ce1b881360236781ed7ed15c29963869ea435ab5c152207c126259612d2435",
+      "size": 1537,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "sbom.cyclonedx.json",
+      "sha256": "8c3b2d48a07e203c6cede3978ce0a01b7e4072cce3eda15fde3bc42fec9cd791",
+      "size": 47029,
+      "mime": "application/json",
+      "source": "sbom-generator",
+      "provenance": "live"
+    },
+    {
+      "path": "scope-determination.json",
+      "sha256": "9397bc07a626bd04e8458059eb26915b7eec1a9f96080616f65d3f3f2a1dfd49",
+      "size": 784,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "soa-maturity.json",
+      "sha256": "c8b6984a6b4d502683d4f92fa53f1ed8aa69d474c7a12ccb9dd7f51c80ad64d7",
+      "size": 4998,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "threat-model-validation.json",
+      "sha256": "230589b2bfb7d4c90c95719897ec13a5eb818647a34ade8b7a86c31d7a003c18",
+      "size": 918,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "threat-model.yaml",
+      "sha256": "73155adc89de4059012adf8a866a6da516b0533852c935a97f97d84d3cf142c9",
+      "size": 26275,
+      "mime": "application/yaml",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "tlpt-record.json",
+      "sha256": "b501aca6fa95db5493acc1b7bb905e6969d48366697be172b745ea9def43e3fa",
+      "size": 1216,
+      "mime": "application/json",
+      "source": "asserted-document",
+      "provenance": "static"
+    },
+    {
+      "path": "tpp-clauses.json",
+      "sha256": "fb3f4fb0e413fdeb512ee60a3abf1e6314d57a49d7b9b8de0aef3c2e81aac928",
+      "size": 4108,
+      "mime": "application/json",
+      "source": "compliance-validator",
+      "provenance": "static"
+    },
+    {
+      "path": "trivy-results.sarif",
+      "sha256": "594f96c0da8b6aa2a93f9e88cf8eac33bfe72fa8ddec92e19fb3d26881a6696e",
+      "size": 14327,
+      "mime": "application/sarif+json",
+      "source": "static-analysis-scanner",
+      "provenance": "live"
+    },
+    {
+      "path": "trivy-sca-results.json",
+      "sha256": "3376e1290ceea48f0c335651cf40766416904ac88a16f5ed6fac21a371f757c9",
+      "size": 47694,
+      "mime": "application/json",
+      "source": "vulnerability-scanner",
+      "provenance": "live"
+    },
+    {
+      "path": "vex.openvex.json",
+      "sha256": "27b8d9984f92b364f444fc087c2e38eadb46b84ef0e5a9bc98a3b59f10f98c29",
+      "size": 8680,
+      "mime": "application/json",
+      "source": "vex-generator",
+      "provenance": "live"
+    }
+  ],
+  "merkle_root": "2ca49f9ccaf8e8b83fd8769776e443b175cb9c89ddbe347694a5a4fd21fa3e65",
+  "merkle_algorithm": "RFC6962-SHA256",
+  "tooling": {
+    "qpdf": "skipped-preserves-pdfa",
+    "verapdf": "absent",
+    "cosign": "absent",
+    "openssl": "OpenSSL 3.6.3 9 Jun 2026 (Library: OpenSSL 3.6.3 9 Jun 2026)",
+    "pyhanko": "absent",
+    "weasyprint": "absent",
+    "gs": "10.07.1",
+    "pdfsig": "present",
+    "sha256sum": "sha256sum (GNU coreutils) 9.11\npresent(version-unknown)"
+  },
+  "worm_state": "pending",
+  "signatures": {
+    "pdf_self": {
+      "sha256": "",
+      "status": "pdf-absent-degraded"
+    },
+    "verapdf": {
+      "status": "unavailable",
+      "reason": "tool-or-pdf-absent"
+    },
+    "cosign": {
+      "status": "unavailable"
+    },
+    "rfc3161": {
+      "merkle-root_tsr": "merkle-root.tsr",
+      "merkle-root_status": "stamped",
+      "manifest_tsr": "manifest.tsr",
+      "manifest_status": "stamped",
+      "qualified": false,
+      "provider": "freetsa.org (non-qualified, default)",
+      "ca_file": "<unset>",
+      "tsa_url": "https://freetsa.org/tsr",
+      "ca_shipped": false
+    },
+    "pades": {
+      "status": "unavailable",
+      "reason": "tool-or-pdf-absent",
+      "note": "external cosign+Rekor+RFC-3161 is the authoritative verification path"
+    }
+  }
+}

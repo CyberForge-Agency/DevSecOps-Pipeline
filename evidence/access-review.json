@@ -1,0 +1,41 @@
+{
+  "status": "FAIL",
+  "tier": "BLOCKING",
+  "measured": {
+    "max_days_overdue": 1,
+    "overdue_count": 4,
+    "in_cycle_count": 3,
+    "total_rows": 7,
+    "overdue": [
+      {
+        "review_type": "Privileged: GitHub Org Owners",
+        "next_due": "2026-06-15",
+        "days_overdue": 1
+      },
+      {
+        "review_type": "Privileged: Azure roles",
+        "next_due": "2026-06-15",
+        "days_overdue": 1
+      },
+      {
+        "review_type": "Service principals",
+        "next_due": "2026-06-15",
+        "days_overdue": 1
+      },
+      {
+        "review_type": "Branch protection",
+        "next_due": "2026-06-15",
+        "days_overdue": 1
+      }
+    ],
+    "unparseable": []
+  },
+  "threshold": {
+    "rule": "every 'Next Due' >= today (no overdue access review)",
+    "max_days_overdue": 0
+  },
+  "detail": "FAIL: 4 access review(s) overdue (worst: Privileged: GitHub Org Owners by 1d): Privileged: GitHub Org Owners (due 2026-06-15, 1d overdue), Privileged: Azure roles (due 2026-06-15, 1d overdue), Service principals (due 2026-06-15, 1d overdue), Branch protection (due 2026-06-15, 1d overdue)",
+  "tool_version": null,
+  "validator": "check-access-reviews",
+  "checked_at": "2026-06-16T14:14:20Z"
+}

@@ -1,0 +1,85 @@
+# Policy self-test — `opa test` + `opa fmt` for the Rego admission policies (T-64)
+#
+# Why this exists
+#   The three OPA policies (deployment-gate, evidence-completeness, retention-policy)
+#   are the admission-control layer that deploy.yml (T-60/T-62) and evidence-pack.yml
+#   (T-61/T-11) enforce on. A policy edit that breaks a rule would otherwise ship
+#   green because no workflow ran `opa test`. This is the cheapest self-defence for
+#   the layer everything else depends on. The master spec requires `opa test` green
+#   on push AND pull_request.
+#
+# Disjointness note: this is a NEW standalone workflow (same pattern as
+#   scorecard.yml). It does not edit any existing workflow. It self-triggers on
+#   push and pull_request so the policy tests gate both events independently and
+#   can be registered as a required status check in branch-protection.json (T-67).
+#
+# fmt note: the policies are now `opa fmt`-clean (tab-indented, reformatted via
+#   `opa fmt -w policies/`), so BOTH gates are BLOCKING: `opa test` fails on a broken
+#   rule (PASS 14/14 today) and `opa fmt -l` fails the job on any formatting drift.
+
+name: "Policy Test (OPA)"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+# Least privilege: the policy self-test only needs to read the repo.
+permissions:
+  contents: read
+
+concurrency:
+  group: policy-test-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  opa-test:
+    name: "opa test + opa fmt"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@002fdce3c6a235733a90a27c80493a3241e56863 # v2.12.1
+        with:
+          egress-policy: audit
+
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup OPA
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.17.1
+
+      # BLOCKING: a broken rule (e.g. flipping `>=` to `>`) turns this red.
+      - name: opa test policies/
+        run: opa test policies/ -v
+
+      # BLOCKING (T-64): the policies are now `opa fmt`-clean (tab-indented), so any
+      # formatting drift fails the job and cannot land on main.
+      - name: opa fmt -l policies/ (blocking)
+        run: |
+          set -uo pipefail
+          UNFORMATTED="$(opa fmt -l policies/)"
+          {
+            echo "## OPA Policy Self-Test (T-64)"
+            echo ""
+            if [ -n "${UNFORMATTED}" ]; then
+              echo ":x: The following Rego files are not \`opa fmt\`-clean (run \`opa fmt -w policies/\`):"
+              echo ""
+              echo '```'
+              echo "${UNFORMATTED}"
+              echo '```'
+            else
+              echo ":white_check_mark: All Rego policies are \`opa fmt\`-clean."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "${UNFORMATTED}" ]; then
+            echo "::error::opa fmt: unformatted Rego — run 'opa fmt -w policies/':"
+            echo "${UNFORMATTED}"
+            exit 1
+          fi

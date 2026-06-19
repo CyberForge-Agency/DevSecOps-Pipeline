@@ -1,0 +1,216 @@
+{
+  "generated_at": "2026-06-16T14:14:18Z",
+  "description": "DPA compliance verification for pipeline third-party processors",
+  "vendor_risk_register_ref": "docs/governance/vendor-risk-register.md",
+  "last_reviewed": "2026-03-15",
+  "status": "FAIL",
+  "envelope": {
+    "status": "FAIL",
+    "tier": "BLOCKING",
+    "measured": 93,
+    "threshold": 92,
+    "detail": "vendor register last updated 2026-03-15 (93 days ago); limit 92 days",
+    "tool_version": null,
+    "validator": "libcompliance",
+    "checked_at": "2026-06-16T14:14:18Z"
+  },
+  "freshness": {
+    "status": "FAIL",
+    "tier": "BLOCKING",
+    "measured": 93,
+    "threshold": 92,
+    "detail": "vendor register last updated 2026-03-15 (93 days ago); limit 92 days",
+    "tool_version": null,
+    "validator": "libcompliance",
+    "checked_at": "2026-06-16T14:14:18Z"
+  },
+  "retention_policy": {
+    "evidence_pack_retention_days": 1825,
+    "log_retention_days": 90,
+    "deletion_schedule": "Automated via Azure lifecycle management policy"
+  },
+  "processors": [
+    {
+      "name": "GitHub (Microsoft)",
+      "service": "GitHub Actions, GitHub Advanced Security, CodeQL",
+      "dpa_status": "ACTIVE",
+      "data_location": "EU (GitHub data residency)",
+      "data_types": "Source code, build logs, developer metadata, PR/issue data",
+      "justification": "",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "ACTIVE",
+        "threshold": "documented DPA status",
+        "detail": "GitHub (Microsoft): DPA status ACTIVE (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      },
+      "dpa_url": "https://github.com/customer-terms/github-data-protection-agreement"
+    },
+    {
+      "name": "Microsoft Azure",
+      "service": "ACR, Container Apps, Key Vault, Blob Storage",
+      "dpa_status": "ACTIVE",
+      "data_location": "Poland Central (EU)",
+      "data_types": "Container images, application logs, evidence packs, secrets (encrypted)",
+      "justification": "",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "ACTIVE",
+        "threshold": "documented DPA status",
+        "detail": "Microsoft Azure: DPA status ACTIVE (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      },
+      "dpa_url": "https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA"
+    },
+    {
+      "name": "Sigstore (Linux Foundation)",
+      "service": "Fulcio, Rekor transparency log",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "Global (US-hosted infrastructure)",
+      "data_types": "OIDC identity tokens, cryptographic signatures",
+      "justification": "N/A - Public transparency log; no personal data beyond GitHub OIDC identity",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "Sigstore (Linux Foundation): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "OWASP Foundation",
+      "service": "OWASP ZAP",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (local execution)",
+      "data_types": "No data sent externally (self-hosted on runner)",
+      "justification": "N/A - Self-hosted, no external data transmission",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "OWASP Foundation: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "Aqua Security",
+      "service": "Trivy (OSS)",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (client-side only)",
+      "data_types": "Vulnerability database downloads (inbound only); scan results remain local",
+      "justification": "N/A - No data sent externally; vulnerability DB fetched read-only",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "Aqua Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "Bridgecrew (Palo Alto Networks)",
+      "service": "Checkov (OSS)",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (client-side only)",
+      "data_types": "IaC scan results (local only)",
+      "justification": "N/A - All processing local; no telemetry enabled",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "Bridgecrew (Palo Alto Networks): DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "Anchore",
+      "service": "Syft (OSS)",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (client-side only)",
+      "data_types": "SBOM generation output (local only)",
+      "justification": "N/A - All processing local; SBOM stored in pipeline artifacts",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "Anchore: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "OxSecurity",
+      "service": "MegaLinter (OSS)",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (client-side only)",
+      "data_types": "Linting results (local only)",
+      "justification": "N/A - All processing local; no external reporting enabled",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "OxSecurity: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "Mend (formerly WhiteSource)",
+      "service": "Renovate (OSS)",
+      "dpa_status": "COVERED_BY_GITHUB_DPA",
+      "data_location": "GitHub (via GitHub App integration)",
+      "data_types": "Dependency metadata (package names, versions)",
+      "justification": "Operates within GitHub environment; covered under [GitHub DPA](https://github.com/customer-terms/github-data-protection-agreement)",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "COVERED_BY_GITHUB_DPA",
+        "threshold": "documented DPA status",
+        "detail": "Mend (formerly WhiteSource): DPA status COVERED_BY_GITHUB_DPA (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    },
+    {
+      "name": "Truffle Security",
+      "service": "TruffleHog (OSS)",
+      "dpa_status": "NOT_REQUIRED",
+      "data_location": "N/A (client-side only)",
+      "data_types": "Secret scan results (local only)",
+      "justification": "N/A - All processing local; no data exfiltration",
+      "envelope": {
+        "status": "PASS",
+        "tier": "EVIDENCE-ONLY",
+        "measured": "NOT_REQUIRED",
+        "threshold": "documented DPA status",
+        "detail": "Truffle Security: DPA status NOT_REQUIRED (register-sourced; not pipeline-verifiable)",
+        "tool_version": null,
+        "validator": "check_dpa_validator",
+        "checked_at": "2026-06-16T14:14:18Z"
+      }
+    }
+  ]
+}

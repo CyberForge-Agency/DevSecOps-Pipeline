@@ -1,0 +1,41 @@
+{
+  "format_version": "1.2",
+  "terraform_version": "1.15.2",
+  "planned_values": {
+    "root_module": {
+      "resources": [],
+      "child_modules": [
+        {
+          "address": "module.storage",
+          "resources": [
+            {
+              "address": "module.storage.azurerm_storage_account.this",
+              "type": "azurerm_storage_account",
+              "name": "this",
+              "values": {
+                "name": "cyberforgeprodevidence",
+                "min_tls_version": "TLS1_0",
+                "infrastructure_encryption_enabled": false
+              }
+            }
+          ]
+        },
+        {
+          "address": "module.keyvault",
+          "resources": [
+            {
+              "address": "module.keyvault.azurerm_key_vault.this",
+              "type": "azurerm_key_vault",
+              "name": "this",
+              "values": {
+                "name": "cyberforge-prod-kv",
+                "min_tls_version": "TLS1_2",
+                "purge_protection_enabled": true
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

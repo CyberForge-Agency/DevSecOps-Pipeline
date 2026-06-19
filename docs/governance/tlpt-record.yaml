@@ -1,0 +1,69 @@
+# TLPT Record -- C.9 (DORA Art. 26-27 / Commission Delegated Regulation (EU) 2025/1190)
+# =============================================================================
+# Source of truth for the `check_tlpt.py` validator (control C.9).
+#
+# WHAT TLPT IS
+# ------------
+# Threat-Led Penetration Testing (TLPT, TIBER-EU aligned) is an advanced,
+# intelligence-led red-team test of an entity's *live production* critical
+# functions. Under DORA Art. 26-27 and the RTS in Commission Delegated
+# Regulation (EU) 2025/1190 it must be performed AT LEAST EVERY 3 YEARS, but
+# ONLY by financial entities that the competent authority has *identified as
+# significant for TLPT purposes* (DORA Art. 26(8)). It requires authority scope
+# sign-off, external testers meeting the RTS criteria (Art. 27), and a
+# documented remediation/closure process.
+#
+# WHY THIS FILE EXISTS / HONESTY
+# ------------------------------
+# TLPT is NOT universally mandatory. The first honest control is the *scope
+# determination*: is this entity in scope at all? CyberForge is an ICT service
+# provider and has NOT been identified by any competent authority as a
+# significant financial entity for TLPT purposes. It is therefore OUT OF SCOPE
+# for the mandatory TLPT obligation. The validator records this as an
+# EVIDENCE-ONLY documented determination -- NOT a fabricated "TLPT passed".
+#
+# If the entity's classification changes (e.g. CyberForge becomes a DORA-
+# identified significant entity, or a client contractually requires a TLPT),
+# flip `in_scope` to true. The validator then becomes BLOCKING and will
+# HONESTLY FAIL until a real TLPT (within 3 years, with authority sign-off,
+# external testers, and a closure status) is recorded under `tlpt:`.
+#
+# DO NOT set in_scope:true with a fabricated tlpt block to make a gate green.
+# A TLPT that did not happen has no entry here.
+#
+# SCHEMA: schemas/tlpt-record.schema.json
+# =============================================================================
+
+schema_version: "1.0"
+
+regulation:
+  framework: "DORA"
+  article: "Art. 26-27"
+  rts: "Commission Delegated Regulation (EU) 2025/1190"
+  methodology: "TIBER-EU"
+
+entity:
+  name: "CyberForge"
+  classification: "ICT third-party service provider (not a DORA-identified significant financial entity)"
+  lei: null
+
+# Honest default: out of scope. TLPT is mandatory only for competent-authority-
+# identified significant financial entities (DORA Art. 26(8)). CyberForge is a
+# service provider and has not been so identified, so the mandatory TLPT
+# obligation does not apply. This is a documented determination, not a fabricated
+# compliance pass -- the validator reports it EVIDENCE-ONLY.
+in_scope: false
+scope_rationale: >-
+  CyberForge is an ICT third-party service provider and has not been identified
+  by any competent authority as a financial entity significant for TLPT purposes
+  under DORA Art. 26(8). The mandatory triennial TLPT obligation (DORA Art. 26-27,
+  RTS 2025/1190) therefore does not currently apply. This determination is
+  reviewed whenever the entity's classification or a client contractual
+  requirement changes; should the entity become in scope, in_scope is set to true
+  and a real TLPT engagement is recorded under `tlpt` before this control can pass.
+determination_date: "2026-06-18"
+
+# No TLPT has been conducted (none is mandatory while in_scope is false).
+# This block stays null until a real, authority-signed-off TLPT is performed.
+# Fabricating it would defeat the control.
+tlpt: null

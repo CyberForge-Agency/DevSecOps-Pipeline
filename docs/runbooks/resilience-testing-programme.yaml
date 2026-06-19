@@ -1,0 +1,102 @@
+# Digital Operational Resilience Testing Programme -- E.4
+# (DORA Art. 24-25 / NIS2 21(2)(c) / ISO/IEC 27001 A.5.29-A.5.30)
+# =============================================================================
+# Source of truth for the `check_resilience_programme.py` validator (SPEC E.4).
+#
+# WHY THIS FILE EXISTS
+# --------------------
+# DORA Art. 24-25 require a *programme* of digital operational resilience
+# testing, not a single drill. The entity must define the scenario CLASSES it
+# exercises and run each on a stated cadence. This is broader than the A.10
+# restore-test (which proves ONE scenario -- backup/restore). This file declares
+# the full programme; the validator HONESTLY FAILS while scenarios remain
+# "not yet conducted" -- exactly like the A.10 restore-test honestly FAILs until
+# a real successful restore is logged.
+#
+# RELATIONSHIP TO THE A.10 RESTORE-TEST (NO DUPLICATION)
+# ------------------------------------------------------
+# The `backup-restore` scenario below (RT-01) is the SAME drill tracked in
+# docs/runbooks/restore-test-log.yaml and validated by check-restore-test.py.
+# Its authoritative result lives THERE, not here -- this programme only
+# cross-references it via `evidence_ref` and records its own last_run/cadence so
+# the resilience PROGRAMME view is complete. Do not copy restore RTO/RPO metrics
+# into this file; that is the restore-test log's job.
+#
+# REQUIRED SCENARIO CLASSES (enforced BLOCKING by the validator)
+# -------------------------------------------------------------
+#   backup-restore     -- recover data/state from backup (== A.10 restore-test)
+#   failover           -- fail over a component / region and continue serving
+#   DR-drill           -- full disaster-recovery exercise (bcdr-plan.md)
+#   dependency-outage  -- behaviour when a critical ICT third party is unavailable
+#   tabletop           -- crisis-management / incident tabletop exercise
+#
+# SCHEMA (per scenario) -- see schemas/resilience-programme.schema.json
+# ---------------------------------------------------------------------
+#   id            (str, required)  Stable id, RT-NN.
+#   name          (str, required)  Human name of the scenario.
+#   class         (str, required)  One of the required classes above.
+#   cadence_days  (int, required)  How often the scenario must be exercised.
+#   last_run      (obj|null, req.) {date, outcome} of the most recent run, OR
+#                                  null when NEVER conducted (honest seed state).
+#   next_due      (str|null, req.) Date next due (informational).
+#   evidence_ref  (str, optional)  Cross-ref to the authoritative log.
+#
+# HONESTY
+# -------
+# CyberForge has NOT yet conducted any of these resilience scenarios. Every
+# last_run below is therefore `null`. The validator will FAIL (BLOCKING) and list
+# the pending scenarios until real drills are conducted and logged. DO NOT set a
+# last_run to a date that did not happen -- fabricating a run defeats the control.
+# =============================================================================
+
+schema_version: "1.0"
+programme_owner: "Szymon Mytych"
+regulation:
+  framework: "DORA"
+  article: "Art.24-25 (digital operational resilience testing)"
+
+scenarios:
+  # backup-restore == the A.10 restore-test. Authoritative result lives in
+  # docs/runbooks/restore-test-log.yaml; never conducted yet -> last_run null.
+  - id: "RT-01"
+    name: "Terraform state / data restore drill"
+    class: "backup-restore"
+    cadence_days: 365
+    last_run: null
+    next_due: null
+    evidence_ref: "docs/runbooks/restore-test-log.yaml"
+    notes: "Cross-references the A.10 restore-test log; not yet conducted (bcdr-plan.md S.6.1)."
+
+  - id: "RT-02"
+    name: "Region / component failover exercise"
+    class: "failover"
+    cadence_days: 365
+    last_run: null
+    next_due: null
+    notes: "Not yet conducted."
+
+  - id: "RT-03"
+    name: "Full disaster-recovery drill"
+    class: "DR-drill"
+    cadence_days: 365
+    last_run: null
+    next_due: null
+    evidence_ref: "docs/runbooks/bcdr-plan.md"
+    notes: "Not yet conducted (bcdr-plan.md)."
+
+  - id: "RT-04"
+    name: "Critical ICT third-party outage simulation"
+    class: "dependency-outage"
+    cadence_days: 365
+    last_run: null
+    next_due: null
+    notes: "Not yet conducted; references register-of-information.yaml critical providers."
+
+  - id: "RT-05"
+    name: "Crisis-management tabletop exercise"
+    class: "tabletop"
+    cadence_days: 365
+    last_run: null
+    next_due: null
+    evidence_ref: "docs/runbooks/incident-response.md"
+    notes: "Not yet conducted."

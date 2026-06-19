@@ -1,0 +1,233 @@
+# =============================================================================
+# Register of Information (RoI) — DORA Art.28(3) / Commission Implementing
+# Regulation (EU) 2024/2956 (ITS on the register of information)
+# =============================================================================
+#
+# This is the machine-readable Register of Information mandated by DORA Art.28(3)
+# and the ITS 2024/2956. It is the single strongest compliance differentiator and
+# the seed of the Tier-2 Operated-Register product (blueprint/04 §6.3). KNF form
+# SPR-PF-18 maps onto the same dataset (blueprint/02:12).
+#
+# Provenance: seeded from docs/governance/vendor-risk-register.md (## Vendor
+# Inventory + ## Exit Plan References). Each vendor row there becomes one
+# ict_third_party entry here, enriched with the EBA template fields that the
+# Markdown register does not carry (LEI, contract dates, ICT service taxonomy,
+# function identifier, sub-outsourcing, notice period).
+#
+# Field-to-EBA-template mapping (ITS 2024/2956 relational model; the ITS uses the
+# B_xx.yy naming, struktura §6 A.1 references the RT.01/RT.05 working names):
+#   maintaining_entity.lei .......... B_01.01  Financial entity LEI
+#   ict_third_party[].lei ........... B_01.02 / B_05.01  ICT provider LEI
+#   ict_third_party[].function ...... B_06.01  Function identifier / supported function
+#   ict_third_party[].ict_service ... B_02.02 / B_05.01  ICT service (taxonomy)
+#   ict_third_party[].criticality ... B_05.01  Critical/Important Function (CIF) flag
+#   ict_third_party[].data_location . B_05.01  Storage / processing location
+#   ict_third_party[].substitutability . B_05.01  Substitutability of the provider
+#   ict_third_party[].exit_plan_ref . B_05.01  Exit plan availability / reference
+#   ict_third_party[].sub_outsourcing  B_05.02  Sub-outsourcing / supply chain flag
+#   ict_third_party[].notice_period_days  B_05.01  Termination notice period
+#   ict_third_party[].last_audit_date  B_05.01  Date of last audit
+#
+# HONESTY NOTE (validator tiering — see scripts/validators/validate-roi.py):
+#   * BLOCKING      — schema validity, LEI *format* (ISO 17442), and presence of
+#     exit_plan_ref + substitutability for every Critical/High vendor are
+#     deterministically checkable in the pipeline and therefore block.
+#   * EVIDENCE-ONLY — LEI *registration truth* (is this LEI actually issued and
+#     ACTIVE in the GLEIF database?) is NOT verifiable from inside the pipeline
+#     without a live GLEIF lookup, so it is recorded as a measured count, never a
+#     blocking PASS. CyberForge has not yet been issued its own LEI, so the
+#     maintaining-entity LEI is a documented PENDING placeholder (open question in
+#     struktura §6 A.1) and is reported EVIDENCE-ONLY.
+# =============================================================================
+
+schema_version: "1.0"
+regulation:
+  framework: DORA
+  article: "Art.28(3)"
+  its: "Commission Implementing Regulation (EU) 2024/2956"
+  knf_form: "SPR-PF-18"
+
+# ---------------------------------------------------------------------------
+# Maintaining (financial) entity — EBA template B_01.01
+# ---------------------------------------------------------------------------
+# CyberForge has NOT yet been issued an LEI. Per struktura §6 A.1 open question,
+# the LEI is a documented PENDING placeholder; the validator reports the
+# maintaining-entity LEI as EVIDENCE-ONLY (it cannot block on a format check of a
+# value that is legitimately not-yet-issued, but it MUST surface the gap).
+maintaining_entity:
+  name: "CyberForge"
+  lei: "PENDING-NOT-YET-ISSUED"   # EVIDENCE-ONLY: no LEI issued; flagged as gap
+  country: "PL"
+  competent_authority: "KNF"
+  last_updated: "2026-03-15"       # freshness anchor (BLOCKING vs review cadence)
+  review_cadence_days: 365         # ITS expects at least annual maintenance
+
+# ---------------------------------------------------------------------------
+# ICT third-party service providers — EBA templates B_01.02 / B_05.01 / B_05.02
+# ---------------------------------------------------------------------------
+# LEI values below are SYNTHETIC, ISO-17442-format-valid placeholders for the
+# providers' real LEIs (where the entity is LEI-eligible). They exercise the
+# FORMAT validator (BLOCKING) but their registration truth is EVIDENCE-ONLY.
+# Open-source foundations / locally-run tools that are not legal entities holding
+# an LEI carry lei: null and lei_status: NOT_LEI_ELIGIBLE — these are excluded
+# from the LEI-format BLOCKING set and reported EVIDENCE-ONLY.
+ict_third_party:
+  - id: TPP-001
+    provider: "GitHub (Microsoft)"
+    lei: "549300FX7K9Q8MR3LE12"        # synthetic ISO-17442 format placeholder
+    lei_status: PLACEHOLDER
+    function: "Source control, CI/CD orchestration, code scanning"
+    ict_service: "ICT project management / software development (GitHub Actions, GHAS, CodeQL)"
+    data_types: "Source code, build logs, developer metadata, PR/issue data"
+    data_location: "EU (GitHub data residency)"
+    criticality: Critical
+    substitutability: "Medium — migration to GitLab CI feasible with substantial effort"
+    exit_plan_ref: "EP-001"
+    sub_outsourcing: true
+    notice_period_days: 30
+    last_audit_date: "2026-03-15"
+    dpa_status: ACTIVE
+
+  - id: TPP-002
+    provider: "Microsoft Azure"
+    lei: "549300GY5L8Z2NB4QF34"        # synthetic ISO-17442 format placeholder
+    lei_status: PLACEHOLDER
+    function: "Cloud compute, container registry, secret store, evidence storage"
+    ict_service: "ICT services (ACR, Container Apps, Key Vault, Blob Storage)"
+    data_types: "Container images, application logs, evidence packs, encrypted secrets"
+    data_location: "Poland Central (EU)"
+    criticality: Critical
+    substitutability: "Low — core hosting; re-platforming requires migration project"
+    exit_plan_ref: "EP-002"
+    sub_outsourcing: true
+    notice_period_days: 30
+    last_audit_date: "2026-03-15"
+    dpa_status: ACTIVE
+
+  - id: TPP-003
+    provider: "Sigstore (Linux Foundation)"
+    lei: null                           # foundation infra; not LEI-eligible here
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Keyless signing + transparency log"
+    ict_service: "ICT security service (Fulcio, Rekor)"
+    data_types: "OIDC identity tokens, cryptographic signatures"
+    data_location: "Global (US-hosted infrastructure)"
+    criticality: High
+    substitutability: "Medium — replaceable with self-hosted Notation + managed CA"
+    exit_plan_ref: "EP-003"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-004
+    provider: "OWASP Foundation"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Dynamic application security testing (DAST)"
+    ict_service: "ICT security testing tool (OWASP ZAP, self-hosted on runner)"
+    data_types: "No data sent externally (self-hosted on runner)"
+    data_location: "N/A (local execution)"
+    criticality: Medium
+    substitutability: "High — replaceable with Nuclei or Burp Suite CI"
+    exit_plan_ref: "EP-004"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-005
+    provider: "Aqua Security"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Vulnerability + SCA scanning"
+    ict_service: "ICT security tool (Trivy OSS, client-side)"
+    data_types: "Vulnerability DB downloads (inbound only); scan results local"
+    data_location: "N/A (client-side only)"
+    criticality: Medium
+    substitutability: "High — replaceable with Grype or Snyk CLI"
+    exit_plan_ref: "EP-005"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-006
+    provider: "Bridgecrew (Palo Alto Networks)"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Infrastructure-as-code misconfiguration scanning"
+    ict_service: "ICT security tool (Checkov OSS, client-side)"
+    data_types: "IaC scan results (local only)"
+    data_location: "N/A (client-side only)"
+    criticality: Medium
+    substitutability: "High — replaceable with tfsec, KICS or Terrascan"
+    exit_plan_ref: "EP-006"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-007
+    provider: "Anchore"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "SBOM generation"
+    ict_service: "ICT supply-chain tool (Syft OSS, client-side)"
+    data_types: "SBOM generation output (local only)"
+    data_location: "N/A (client-side only)"
+    criticality: Medium
+    substitutability: "High — replaceable with Trivy SBOM or CycloneDX CLI"
+    exit_plan_ref: "EP-007"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-008
+    provider: "OxSecurity"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Linting / static analysis aggregation"
+    ict_service: "ICT quality tool (MegaLinter OSS, client-side)"
+    data_types: "Linting results (local only)"
+    data_location: "N/A (client-side only)"
+    criticality: Low
+    substitutability: "High — replaceable with individual linters"
+    exit_plan_ref: "EP-008"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED
+
+  - id: TPP-009
+    provider: "Mend (formerly WhiteSource)"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Automated dependency updates"
+    ict_service: "ICT maintenance tool (Renovate OSS, GitHub App)"
+    data_types: "Dependency metadata (package names, versions)"
+    data_location: "GitHub (via GitHub App integration)"
+    criticality: Low
+    substitutability: "High — replaceable with Dependabot or manual updates"
+    exit_plan_ref: "EP-009"
+    sub_outsourcing: true
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: COVERED_BY_GITHUB_DPA
+
+  - id: TPP-010
+    provider: "Truffle Security"
+    lei: null
+    lei_status: NOT_LEI_ELIGIBLE
+    function: "Secret scanning"
+    ict_service: "ICT security tool (TruffleHog OSS, client-side)"
+    data_types: "Secret scan results (local only)"
+    data_location: "N/A (client-side only)"
+    criticality: Medium
+    substitutability: "High — replaceable with Gitleaks or GitHub secret scanning"
+    exit_plan_ref: "EP-010"
+    sub_outsourcing: false
+    notice_period_days: 0
+    last_audit_date: "2026-03-15"
+    dpa_status: NOT_REQUIRED

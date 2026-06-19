@@ -77,7 +77,7 @@ Classification is assigned by the asset owner at the time of creation and review
 
 - **TA-001 and TA-002** are critical dependencies. Loss of either service halts all pipeline operations. Exit plans are documented in the [Vendor Risk Register](vendor-risk-register.md).
 - **TA-005 (Azure Key Vault)** stores no static pipeline secrets (OIDC federation is used), but serves as the designated secret management service for any future operational secrets.
-- **TA-008 (GitHub Actions Workflows)** consists of 7 reusable workflow files implementing the 6-phase pipeline. All GitHub Actions are pinned to full SHA to prevent supply chain attacks. Updates are managed by Renovate.
+- **TA-008 (GitHub Actions Workflows)** consists of 7 reusable workflow files implementing the 6-phase pipeline. All GitHub Actions are pinned to full SHA to prevent supply chain attacks. Renovate config (renovate.json) is present; automated updates are pending Renovate App installation.
 - **TA-009 (Security Scanning Tools)** are open-source tools that execute locally on ephemeral GitHub Actions runners. No scan data leaves the build environment except through Evidence Pack archival. See the [Vendor Risk Register](vendor-risk-register.md) for individual tool assessments.
 
 ---
