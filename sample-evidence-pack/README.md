@@ -12,28 +12,35 @@ attestation for any production system.
 
 ## How to verify this pack yourself
 
+This is a **degrade-mode (offline) pack**. Verify it with the documented command:
+
 ```bash
 cd Pipeline
-# Re-run the reproducer; it verifies as its last step and exits 0:
-bash sample-evidence-pack/make-sample-pack.sh
+make verify-pack        # degrade-aware verification of the committed sample — exits 0
 ```
 
 Expected (this offline demo): `RESULT: OK` with `5 PASS / 4 SKIP / 0 FAIL` —
 sha256 manifest, RFC-6962 Merkle root, and **both RFC-3161 timestamps verify
-cryptographically against the freetsa CA**. cosign keyless verification and PDF/A
-(veraPDF/pdfsig) **SKIP** because this box has no sigstore OIDC and no WeasyPrint.
+cryptographically against the freetsa CA** PASS. cosign keyless verification,
+Rekor inclusion, and PDF/A (veraPDF/pdfsig) **SKIP** because this pack was sealed
+offline (no sigstore OIDC, no WeasyPrint) — they are PENDING the production CI run.
 
-> **Why verify is run with cosign hidden.** This is a degrade-mode pack: the
-> Merkle-root cosign bundle is **PENDING the live CI run** and does not exist yet.
-> `verify-evidence-pack.sh` has an anti-regression rule (§6.2-A): if cosign is on
-> PATH but the bundle is absent while `merkle-root.txt` exists, it **FAILs on
-> purpose** — that is the exact silent-omission bug it guards against. So for this
-> offline pack the runbook is invoked under the documented *offline-no-sigstore*
-> model (cosign not visible), where the missing bundle is a clean **SKIP**. Once
-> the production CI run produces `merkle-root.cosign.bundle` + Rekor proof, the
-> pack verifies with real cosign on PATH and the SKIP becomes a PASS. Running
-> `bash scripts/verify-evidence-pack.sh sample-evidence-pack/evidence` with cosign
-> installed will (correctly) report the §6.2-A FAIL until then.
+> **Two verification modes — both honest.** `make verify-pack` runs with
+> `EVIDENCE_ALLOW_DEGRADE=1`, the *declared degrade* mode that matches how this
+> offline sample was sealed: the absent `merkle-root.cosign.bundle` / PDF are a
+> clean **SKIP**. The STRICT release gate is a separate command:
+>
+> ```bash
+> make verify-pack-strict      # or: bash scripts/verify-evidence-pack.sh sample-evidence-pack/evidence
+> ```
+>
+> Strict mode (env UNSET, cosign on PATH) **deliberately FAILs** this offline
+> sample via the §6.2-A anti-regression rule — a Merkle root with no cosign bundle
+> is exactly the silent-omission bug it guards against. That FAIL is correct: it is
+> the gate a **production** release pack must pass. Once the live CI run produces
+> `merkle-root.cosign.bundle` + Rekor proof + the PDF/A, `make verify-pack-strict`
+> goes green on the real release pack. The committed sample here is a structural
+> demo, not a release pack — verify it with `make verify-pack`.
 
 ## The 8 components (spec / struktura mapping)
 
@@ -45,7 +52,7 @@ works:
 | # | Component | File(s) in `evidence/` | Spec part | Status in this demo |
 |---|-----------|------------------------|-----------|---------------------|
 | 1 | **Board report (PDF)** | `audit-document.html`, `evidence-report.html` (+ `evidence-report.pdf.MISSING`) | Part 0.2 | **HTML present; PDF/A PENDING** (WeasyPrint absent offline → honest `.MISSING` marker; CI renders the PDF/A-3b) |
-| 2 | **Artifact manifest** | `manifest.json`, `manifest.sha256`, `merkle-root.txt` | Part 0.1 | **Present** (RFC-6962 Merkle root `2ca49f9c…`, rendered from `merkle-root.txt` by the reproducer — cannot drift) |
+| 2 | **Artifact manifest** | `manifest.json`, `manifest.sha256`, `merkle-root.txt` | Part 0.1 | **Present** (RFC-6962 Merkle root `989783ac…`, rendered from `merkle-root.txt` by the reproducer — cannot drift) |
 | 3 | **Scan results** | `trivy-sca-results.json`, `trivy-results.sarif` | §X.1 / Part C | **Present** (real Trivy scan of the demo app) |
 | 4 | **SBOM** | `sbom.cyclonedx.json` | Part C.10 | **Present** (real CycloneDX, 70 components) |
 | 5 | **Control matrix** | `compliance-matrix.json` | Part D.1 | **Present** (content-validated DORA/NIS2/GDPR/CRA/ISO/SOC2) |

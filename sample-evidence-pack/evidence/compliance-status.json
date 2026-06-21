@@ -1,6 +1,6 @@
 {
   "schema": "cyberforge-compliance-status/v1",
-  "generated_at": "2026-06-18T10:41:41Z",
+  "generated_at": "2026-06-21T22:56:21Z",
   "overall_status": "FAIL",
   "blocking_failures": 4,
   "missing_verdicts": [],
@@ -29,7 +29,7 @@
         "maintaining_entity_lei_pending": true,
         "schema_violations": 0,
         "completeness_violations": 0,
-        "register_age_days": 95,
+        "register_age_days": 98,
         "blocking_problem_count": 0
       },
       "threshold": {
@@ -38,7 +38,7 @@
         "completeness_violations": 0,
         "register_age_days_max": 365
       },
-      "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 95d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
+      "detail": "schema OK; 2/2 LEI-eligible providers carry a valid ISO 17442 LEI format; register 98d old (cadence 365d); LEI registration truth is EVIDENCE-ONLY (GLEIF lookup outside pipeline); maintaining-entity LEI PENDING (CyberForge has no issued LEI) \u2014 EVIDENCE-ONLY gap, not blocking",
       "source_file": "roi-validation.json"
     },
     {
@@ -47,9 +47,9 @@
       "label": "Processor DPA freshness (RODO Art.28)",
       "status": "PASS",
       "tier": "BLOCKING",
-      "measured": 2,
+      "measured": 5,
       "threshold": 92,
-      "detail": "vendor register last updated 2026-06-16 (2 days ago); limit 92 days",
+      "detail": "vendor register last updated 2026-06-16 (5 days ago); limit 92 days",
       "source_file": "dpa-compliance-check.json"
     },
     {
@@ -88,8 +88,8 @@
       "status": "PASS",
       "tier": "BLOCKING",
       "measured": {
-        "management_review_age_days": 95,
-        "training_record_age_days": 95,
+        "management_review_age_days": 98,
+        "training_record_age_days": 98,
         "board_approval_signoff": true,
         "training_attendees_recorded": 0
       },
@@ -129,7 +129,7 @@
         "rule": "every 'Next Due' >= today (no overdue access review)",
         "max_days_overdue": 0
       },
-      "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 89d out)",
+      "detail": "PASS: all 7 access review(s) in-cycle (soonest: Standard: GitHub teams due 2026-09-15, 86d out)",
       "source_file": "access-review.json"
     },
     {
@@ -245,12 +245,12 @@
         "gaps": 8,
         "version": "1.0.0",
         "reviewed_date": "2026-06-16",
-        "age_days": 2,
+        "age_days": 5,
         "review_window_days": 180,
         "violations": 0
       },
       "threshold": "schema-complete threats (each with id,stride,component,threat,mitigation,status,residual + traceability); >= 6 STRIDE categories; reviewed within review_window_days (<= 366)",
-      "detail": "threat model v1.0.0: 43 threats, STRIDE 6/6 categories, 8 gaps; reviewed 2026-06-16 (2d ago, window 180d). NOTE: structural completeness + coverage + freshness verified; that each control fully mitigates its threat is an EVIDENCE-ONLY human assertion.",
+      "detail": "threat model v1.0.0: 43 threats, STRIDE 6/6 categories, 8 gaps; reviewed 2026-06-16 (5d ago, window 180d). NOTE: structural completeness + coverage + freshness verified; that each control fully mitigates its threat is an EVIDENCE-ONLY human assertion.",
       "source_file": "threat-model-validation.json",
       "notes": [
         "part-c/d"

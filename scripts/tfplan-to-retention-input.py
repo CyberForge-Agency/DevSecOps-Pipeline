@@ -2,9 +2,11 @@
 """tfplan-to-retention-input — A.5 assert-retention validator (task T-24).
 
 Extracts the WORM / retention configuration from a Terraform plan and asserts it
-meets the statutory evidence-retention minimum of **1825 days (5 years)** that the
-project derives from DORA's audit-defensibility / record-keeping expectations
-(blueprint/04 §6.1; constant mirrored in ``policies/retention-policy.rego``).
+meets the configured evidence-retention floor of **1825 days (5 years)**. The
+number is grounded in the longest in-scope Polish statutory minimum (AML / tax /
+accounting); DORA & NIS2 impose no numeric retention period — they expect a
+proportionate, audit-defensible window (5y+). Constant mirrored in
+``policies/retention-policy.rego``.
 
 Two cooperating jobs (DoD T-24)
 -------------------------------
@@ -85,8 +87,9 @@ from scripts.validators import libcompliance as lc  # noqa: E402
 # Constants (the statutory minimum + the azurerm attribute/type names).        #
 # --------------------------------------------------------------------------- #
 
-# DORA 5-year evidence-retention minimum, mirrored from policies/retention-policy.rego:5.
-# This is the project's stated threshold; the *value below it* is a deterministic FAIL.
+# Configured 5-year evidence-retention floor (PL AML/tax/accounting statutory
+# basis; DORA/NIS2 = 5y+ audit-defensibility, no numeric mandate), mirrored from
+# policies/retention-policy.rego. The *value below it* is a deterministic FAIL.
 MINIMUM_RETENTION_DAYS = 1825
 
 # Terraform resource type names emitted by the azurerm provider (>= v4).
@@ -176,6 +179,21 @@ def _worm_enabled(resources: list[dict[str, Any]], immutability_days: int | None
     return immutability_days is not None and immutability_days > 0
 
 
+def _worm_locked(resources: list[dict[str, Any]]) -> bool:
+    """True iff a container immutability policy has the irreversible ``locked``
+    flag set. Mirrors assert-retention.py (azurerm exposes the one-way lock as the
+    resource's ``locked`` attribute). A05-3: emitted into the OPA input so the
+    retention-policy.rego ``warn`` rule (unlocked-WORM notice) can actually fire.
+    """
+    for res in resources:
+        if res.get("type") != TYPE_IMMUTABILITY:
+            continue
+        values = res.get("values") or {}
+        if values.get("locked") is True:
+            return True
+    return False
+
+
 def _deletion_schedule(resources: list[dict[str, Any]]) -> tuple[str, int | None]:
     """Describe the lifecycle deletion schedule and its delete-after threshold.
 
@@ -248,6 +266,7 @@ def extract(plan: dict[str, Any]) -> dict[str, Any]:
 
     immutability_days = _immutability_days(resources)
     worm = _worm_enabled(resources, immutability_days)
+    worm_locked = _worm_locked(resources)
     schedule, delete_after = _deletion_schedule(resources)
 
     # retention_days is the binding immutability period; if WORM is absent, fall
@@ -263,6 +282,7 @@ def extract(plan: dict[str, Any]) -> dict[str, Any]:
     return {
         "retention_days": retention_days,
         "worm_enabled": worm,
+        "worm_locked": worm_locked,
         "deletion_schedule": schedule,
         "delete_after_days": delete_after,
         "immutability_days": immutability_days,
@@ -305,6 +325,7 @@ def _opa_input(assessment: dict[str, Any]) -> dict[str, Any]:
     return {
         "retention_days": assessment["retention_days"],
         "worm_enabled": assessment["worm_enabled"],
+        "worm_locked": assessment.get("worm_locked", False),
         "deletion_schedule": assessment["deletion_schedule"],
         "delete_after_days": assessment.get("delete_after_days"),
     }
@@ -333,7 +354,7 @@ def build_envelope(assessment: dict[str, Any]) -> dict[str, Any]:
     reasons: list[str] = []
     if base["status"] == lc.Status.FAIL:
         reasons.append(
-            f"retention {measured} days < DORA minimum {MINIMUM_RETENTION_DAYS}"
+            f"retention {measured} days < configured 5-year floor {MINIMUM_RETENTION_DAYS} (PL statutory basis; no numeric DORA mandate)"
         )
     if not assessment["worm_enabled"]:
         reasons.append("WORM immutability not enabled")
@@ -393,7 +414,8 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
         prog=VALIDATOR_NAME,
         description=(
             "Extract WORM/retention config from `terraform show -json` and assert "
-            "it meets the 1825-day (5-year) DORA evidence-retention minimum."
+            "it meets the configured 1825-day (5-year) evidence-retention floor "
+            "(PL statutory basis; DORA/NIS2 set no numeric period)."
         ),
     )
     parser.add_argument(

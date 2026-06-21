@@ -38,5 +38,5 @@
   "detail": "runtime hardening posture consistent with IaC: non-root USER 65532 (BLOCKING invariant MET); ingress ports [3000]; identity SystemAssigned; platform-managed/not-IaC-expressible (INDETERMINATE, NOT fabricated): ['read_only_rootfs', 'seccomp_runtime_default']. NOTE: declared posture only \u2014 a live runtime scan + continuous drift alerting are TARGET-STATE (runtime-hardening.md \u00a76).",
   "tool_version": "python 3.14.5",
   "validator": "runtime_hardening",
-  "checked_at": "2026-06-18T10:41:40Z"
+  "checked_at": "2026-06-21T22:56:21Z"
 }

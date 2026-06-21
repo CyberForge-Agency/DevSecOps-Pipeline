@@ -14,5 +14,5 @@
   "detail": "CSPM design-stage / not-yet-scanned: no live CSPM scan and no cloud-posture.json present; design-stage posture documented at /cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/compliance/cspm-posture.md. Reporting INDETERMINATE (EVIDENCE-ONLY) \u2014 the static IaC-derived CIS mapping is design-stage context and is NOT a fabricated CIS PASS (cspm-posture.md \u00a71, \u00a75, \u00a76 #1). Continuous scan + drift alerting are TARGET-STATE.",
   "tool_version": "python 3.14.5",
   "validator": "cloud_posture",
-  "checked_at": "2026-06-18T10:41:40Z"
+  "checked_at": "2026-06-21T22:56:21Z"
 }

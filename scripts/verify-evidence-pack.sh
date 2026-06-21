@@ -41,6 +41,13 @@ LEGACY_MANIFEST="${EVIDENCE_DIR}/manifest.sha256"
 
 COSIGN_IDENTITY="${COSIGN_IDENTITY:-}"
 COSIGN_ISSUER="${COSIGN_ISSUER:-}"
+# A10-1: a pack sealed in DECLARED degrade mode (EVIDENCE_ALLOW_DEGRADE=1, e.g. the
+# committed offline sample pack built without keyless cosign) legitimately has no
+# cosign bundle. In that explicit mode the §6.2-A "bundle missing" condition is a
+# SKIP, not a FAIL. STRICT release verification (the default — env UNSET) keeps the
+# §6.2-A anti-regression FAIL so a real release pack that lost its headline bundle
+# is still rejected.
+ALLOW_DEGRADE="${EVIDENCE_ALLOW_DEGRADE:-}"
 
 FAIL_COUNT=0
 PASS_COUNT=0
@@ -212,10 +219,16 @@ if have cosign; then
     fi
   elif [ -f "${MERKLE_FILE}" ]; then
     # A Merkle root exists to sign but its cosign bundle is absent: the pack's
-    # headline cryptographic claim is missing. This is the §6.2-A regression
-    # surface — fail explicitly rather than silently skip (anti-regression).
+    # headline cryptographic claim is missing. In STRICT mode this is the §6.2-A
+    # regression surface — fail explicitly rather than silently skip. In DECLARED
+    # degrade mode (EVIDENCE_ALLOW_DEGRADE=1) the absence is expected (offline
+    # sample pack with no keyless cosign) and is a SKIP.
     COSIGN_CHECKED=1
-    fail "cosign verify-blob merkle-root — merkle-root.cosign.bundle missing while merkle-root.txt present (§6.2-A)"
+    if [ "${ALLOW_DEGRADE}" = "1" ]; then
+      skip "cosign verify-blob merkle-root — bundle absent; DECLARED degrade pack (EVIDENCE_ALLOW_DEGRADE=1). Strict release verify (unset env) treats this as §6.2-A FAIL."
+    else
+      fail "cosign verify-blob merkle-root — merkle-root.cosign.bundle missing while merkle-root.txt present (§6.2-A)"
+    fi
   fi
   PDF_BUNDLE="${EVIDENCE_DIR}/pdf-sha256.cosign.bundle"
   PDF_HASH_FILE="${EVIDENCE_DIR}/pdf.sha256"

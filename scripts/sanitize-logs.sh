@@ -3,9 +3,16 @@ set -euo pipefail
 
 # Sanitize PII from log files in evidence directory.
 # Uses Python for regex portability (GNU sed does not support PCRE lookaheads).
+#
+# A07-4: recurse into subdirectories (evidence/codeql, evidence/coverage,
+# evidence/source-control-export, evidence/provenance, ...) and cover more
+# textual artifact types (.sarif, .jsonl) — the previous top-level *.json/*.log
+# glob skipped the bulk of generated evidence (SARIF source snippets, the live
+# GitHub members/CODEOWNERS export). Run this AFTER all evidence is generated
+# (i.e. immediately before manifest/Merkle), not before.
 EVIDENCE_DIR="${1:-.}"
 
-for f in "${EVIDENCE_DIR}"/*.json "${EVIDENCE_DIR}"/*.log; do
+while IFS= read -r -d '' f; do
   [ -f "$f" ] || continue
   python3 - "$f" <<'PY'
 import pathlib
@@ -31,6 +38,6 @@ text = re.sub(
 
 path.write_text(text, encoding="utf-8")
 PY
-done
+done < <(find "${EVIDENCE_DIR}" -type f \( -name '*.json' -o -name '*.log' -o -name '*.sarif' -o -name '*.jsonl' \) -print0)
 
 echo "Log sanitization complete."

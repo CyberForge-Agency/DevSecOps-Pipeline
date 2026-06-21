@@ -1,12 +1,12 @@
 {
   "schema": "cyberforge.reproducibility-statement/v1",
-  "generated_at": "2026-06-18T10:41:41Z",
-  "git_commit": "849dd9414409bc92cfa3a1788a0a21536a133a3b",
+  "generated_at": "2026-06-21T22:56:21Z",
+  "git_commit": "7d4b600fc467f6507751d2080c1b951724970526",
   "git_ref": "unknown",
   "expected_image_digest": null,
-  "base_image": "cgr.dev/chainguard/node:latest@sha256:045335a479d6c59bab89e3caaaf9ed2aed5528d92e2431a3e2afcbf258dba9a6",
+  "base_image": "cgr.dev/chainguard/node:latest@sha256:e992bdbbe830f1bead95583d62b79dec13f48ee291cc6761c147e4ed0dcbbcc1",
   "base_image_pinned_by_digest": true,
-  "builder_base_pinned_by_digest": false,
+  "builder_base_pinned_by_digest": true,
   "dependency_lock": "app/package-lock.json (npm ci, --ignore-scripts)",
   "build_inputs": {
     "deterministic": [

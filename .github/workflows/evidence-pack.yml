@@ -354,12 +354,44 @@ jobs:
         run: bash scripts/sanitize-logs.sh evidence/
 
       # DPA check
+      # A07-1: guarded with the same degrade pattern used elsewhere in this
+      # always-green job. check-dpa.sh exits non-zero when the vendor register
+      # is STALE/indeterminate (a quarterly time-bomb). Left unguarded it would
+      # hard-fail Phase 6 BEFORE manifest/Merkle/seal/WORM-upload — producing
+      # ZERO archived evidence, the worst failure mode for an audit-record
+      # system. We record the FAIL inside the pack and keep sealing; the
+      # freshness verdict is enforced (if desired) by the post-seal compliance
+      # gate, not by skipping the seal.
       - name: Generate DPA compliance check
-        run: bash scripts/check-dpa.sh > evidence/dpa-compliance-check.json
+        run: |
+          set +e
+          bash scripts/check-dpa.sh > evidence/dpa-compliance-check.json
+          RC=$?
+          set -e
+          if [ ! -s evidence/dpa-compliance-check.json ]; then
+            printf '{"status":"ERROR","detail":"check-dpa.sh produced no output (exit %s)"}\n' "$RC" \
+              > evidence/dpa-compliance-check.json
+          fi
+          if [ "$RC" -ne 0 ]; then
+            echo "::warning::check-dpa.sh exited $RC (stale/indeterminate vendor register) — recorded in evidence/dpa-compliance-check.json; pack still sealed (A07-1)"
+            echo "| DPA freshness | NON-PASS (exit $RC) — recorded, not sealing-blocking |" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # Data flow diagram
       - name: Generate data flow diagram
-        run: bash scripts/generate-data-flow.sh > evidence/data-flow-diagram.json
+        run: |
+          set +e
+          bash scripts/generate-data-flow.sh > evidence/data-flow-diagram.json
+          RC=$?
+          set -e
+          if [ ! -s evidence/data-flow-diagram.json ]; then
+            printf '{"status":"ERROR","detail":"generate-data-flow.sh produced no output (exit %s)"}\n' "$RC" \
+              > evidence/data-flow-diagram.json
+          fi
+          if [ "$RC" -ne 0 ]; then
+            echo "::warning::generate-data-flow.sh exited $RC (missing/invalid data-flow.yaml) — recorded in evidence/data-flow-diagram.json; pack still sealed (A07-1)"
+            echo "| Data-flow diagram | NON-PASS (exit $RC) — recorded, not sealing-blocking |" >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       # Cosign is needed by the compliance-validate step below to sign-blob the
       # aggregated compliance-status.json. The PDF-sealing block installs cosign
@@ -1523,6 +1555,16 @@ jobs:
       - name: Generate HTML evidence report
         run: bash scripts/generate-html-report.sh evidence/ evidence/evidence-report.html
 
+      # A07-4: final PII sweep AFTER all evidence exists and BEFORE hashing/seal.
+      # The early "Sanitize logs" step (above) only saw the handful of files that
+      # existed at that point; almost all evidence (DPA, data-flow, compliance,
+      # source-control export, crosswalk/gap/residency, SARIF, coverage) is
+      # generated later and in subdirectories. This recursive pass (sanitize-logs.sh
+      # now find-based over json/log/sarif/jsonl) redacts the whole tree so nothing
+      # un-redacted is sealed into the 5-year WORM pack.
+      - name: Sanitize logs (final, recursive — pre-seal)
+        run: bash scripts/sanitize-logs.sh evidence/
+
       # Package
       - name: Generate SHA256 manifest
         working-directory: evidence/
@@ -1603,11 +1645,17 @@ jobs:
       # lives here (after the PDF exists) rather than relying solely on the
       # earlier first-pass manifest.sha256.
       #
-      # Fail-closed: EVIDENCE_ALLOW_DEGRADE is left UNSET for all non-PR runs.
-      # This reusable workflow is invoked via workflow_call (and the parent
-      # only triggers it on non-PR pushes/dispatches), so missing weasyprint /
-      # veraPDF / cosign HARD-FAIL the job. The conditional below documents the
-      # intent and keeps PR-scoped reuse degradable.
+      # Degrade policy (Option B — corrected per A11-1/A07-3): the seal block
+      # below runs with EVIDENCE_ALLOW_DEGRADE='1' on EVERY run (PR and non-PR).
+      # This is deliberate: Phase 6 is always-green so that an evidence pack is
+      # ALWAYS produced, sealed and archived — especially for a FAILED pipeline,
+      # where the pack is the audit record. A missing weasyprint / veraPDF /
+      # cosign therefore DEGRADES (records "unavailable") rather than hard-failing
+      # the job. Enforcement of a complete, strictly-sealed RELEASE pack is the
+      # job of the downstream verifier (verify-evidence-pack.sh in strict mode,
+      # §6.2-A) and the deploy/consumer gate — NOT of this producing job. (The
+      # earlier comment here claimed the opposite — UNSET/hard-fail — which never
+      # matched the code; corrected.)
       # ---------------------------------------------------------------------
       - name: Install WeasyPrint system libraries
         run: |
@@ -1629,8 +1677,16 @@ jobs:
           VERAPDF_VER="1.26.2"
           VERAPDF_MINOR="1.26"   # release dir = MINOR version; filename = patch version
           VERAPDF_ZIP="verapdf-greenfield-${VERAPDF_VER}-installer.zip"
+          # A11-2: pin the installer by SHA-256 and verify BEFORE unzip+java -jar.
+          # This step runs java on the downloaded artifact in a job that holds
+          # cosign OIDC and writes the sealed pack, so a poisoned/MITM'd download
+          # would be RCE in the most sensitive job. sha256 obtained from the
+          # official software.verapdf.org artifact (verapdf-greenfield-1.26.2).
+          VERAPDF_SHA256="b6c50ab65d574bff0cbc0449ffacf587e325a3a53f8a6ecc0d578966abc800ec"
           curl -fsSL -o "/tmp/${VERAPDF_ZIP}" \
             "https://software.verapdf.org/releases/${VERAPDF_MINOR}/${VERAPDF_ZIP}"
+          echo "${VERAPDF_SHA256}  /tmp/${VERAPDF_ZIP}" | sha256sum -c - \
+            || { echo "::error::veraPDF installer SHA-256 mismatch — refusing to execute (supply-chain integrity, A11-2)"; exit 1; }
           unzip -q "/tmp/${VERAPDF_ZIP}" -d /tmp/verapdf-installer
           INSTALLER_JAR="$(find /tmp/verapdf-installer -name 'verapdf-izpack-installer-*.jar' | head -n1)"
           cat > /tmp/verapdf-auto.xml <<'XML'

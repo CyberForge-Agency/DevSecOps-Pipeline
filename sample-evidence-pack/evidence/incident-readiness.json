@@ -9,7 +9,7 @@
   "detail": "2 incident(s); all entries carry classification + 4 reporting-clock fields",
   "tool_version": null,
   "validator": "check-incident-register",
-  "checked_at": "2026-06-18T10:41:38Z",
+  "checked_at": "2026-06-21T22:56:17Z",
   "register": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/docs/governance/incident-register.yaml",
   "schema": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/schemas/incident-register.schema.json",
   "errors": [],

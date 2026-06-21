@@ -27,6 +27,24 @@ jobs:
         with:
           persist-credentials: false
 
+      # A06-2: validate the (untrusted) target URL before handing it to ZAP.
+      # An empty/garbage FQDN makes ZAP scan nothing and produce no report; with
+      # the fail-closed gate below that now becomes a hard FAIL on non-PR rather
+      # than a silent count=0 PASS. Value routed via env (never interpolated).
+      - name: Validate target URL
+        env:
+          TARGET_URL: ${{ inputs.target_url }}
+        run: |
+          if [ -z "${TARGET_URL}" ]; then
+            echo "::error::DAST target_url is empty — refusing to run a no-op scan"
+            exit 1
+          fi
+          case "${TARGET_URL}" in
+            https://*|http://*) : ;;
+            *) echo "::error::DAST target_url must start with http:// or https:// (got: ${TARGET_URL})"; exit 1 ;;
+          esac
+          echo "target_url validated"
+
       - name: OWASP ZAP Baseline Scan
         uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
         with:
@@ -61,23 +79,41 @@ jobs:
 
           report_path = Path("zap-report.json")
           count = 0
+          # A06-1 / A11-5: distinguish a genuine clean scan from a degraded one.
+          # report_status: ok | missing | unparseable | no-site. Anything other
+          # than 'ok' is a fail-closed condition on non-PR (see the gate step),
+          # mirroring the honest matrix_rows.dast_findings INDETERMINATE-blocks
+          # semantics. A scanner that produced no parseable site data is NOT a
+          # pass — it is an unknown, and unknown must not look like zero findings.
+          report_status = "ok"
 
-          if report_path.exists():
+          if not report_path.exists():
+              report_status = "missing"
+              print("::warning::ZAP report not found")
+          elif report_path.stat().st_size == 0:
+              report_status = "unparseable"
+              print("::warning::ZAP report is zero-byte")
+          else:
               try:
                   report = json.loads(report_path.read_text(encoding="utf-8"))
-                  alerts = []
-                  for site in report.get("site", []):
-                      alerts += site.get("alerts", [])
-                  count = sum(1 for alert in alerts if int(alert.get("riskcode", 0)) >= 3)
               except Exception as exc:
+                  report_status = "unparseable"
                   print(f"::warning::Unable to parse zap-report.json: {exc}")
-          else:
-              print("::warning::ZAP report not found; skipping severity-based DAST gate evaluation")
+              else:
+                  if "site" not in report:
+                      report_status = "no-site"
+                      print("::warning::ZAP report has no 'site' key (schema drift or error page)")
+                  else:
+                      alerts = []
+                      for site in report.get("site", []):
+                          alerts += site.get("alerts", [])
+                      count = sum(1 for alert in alerts if int(alert.get("riskcode", 0)) >= 3)
 
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as fh:
               fh.write(f"high_critical_count={count}\n")
+              fh.write(f"report_status={report_status}\n")
 
-          print(f"HIGH/CRITICAL findings: {count}")
+          print(f"HIGH/CRITICAL findings: {count} (report_status={report_status})")
           PY
 
       - name: Job Summary
@@ -140,6 +176,21 @@ jobs:
               with open(summary, "a") as fh:
                   fh.write("\n:warning: ZAP report not found.\n")
           PY
+
+      # A06-1: fail closed when the scan was degraded (missing/zero-byte/
+      # unparseable/no-site report). On a PR this is a warning only; on a real
+      # (non-PR) run a degraded DAST result must NOT be indistinguishable from a
+      # clean scan, so it blocks the job.
+      - name: Fail on degraded/absent ZAP report
+        if: steps.zap-summary.outputs.report_status != 'ok'
+        run: |
+          MSG="DAST scan degraded — zap-report.json status: ${{ steps.zap-summary.outputs.report_status }}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "::warning::${MSG} (advisory on PR)"
+          else
+            echo "::error::${MSG} (fail-closed on non-PR — a broken scan is not a passing scan)"
+            exit 1
+          fi
 
       - name: Fail on HIGH/CRITICAL findings
         if: steps.zap-summary.outputs.high_critical_count != '0'

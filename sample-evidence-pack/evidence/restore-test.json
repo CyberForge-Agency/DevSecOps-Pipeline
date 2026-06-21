@@ -16,5 +16,5 @@
   "detail": "FAIL: no restore drill logged (bcdr-plan.md S.6.1: 'Not yet conducted')",
   "tool_version": null,
   "validator": "check-restore-test",
-  "checked_at": "2026-06-18T10:41:39Z"
+  "checked_at": "2026-06-21T22:56:18Z"
 }
