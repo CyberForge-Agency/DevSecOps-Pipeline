@@ -1,6 +1,6 @@
 {
   "schema": "cyberforge-gap-register/v1",
-  "generated_at": "2026-06-18T10:41:40Z",
+  "generated_at": "2026-06-21T22:56:20Z",
   "description": "Machine-readable gap register (spec 5.3 / struktura Part J): control -> gap -> severity -> root cause. Derived from the live A.1-A.10 verdicts and the content-validated matrix of THIS run. Narrative register: gap-register.md.",
   "note": "Most INDETERMINATE rows are honest 'evidence not produced offline' gaps: the live-CI / cloud-only artifacts (security-report.json, trivy-sca-summary.json, pipeline-run.json, provenance.intoto.jsonl, zap-report.json, codeql SARIF, image scan, oscal) are produced by the production CI run on the CyberForge Azure subscription, which is PENDING for this pack.",
   "total_gaps": 43,

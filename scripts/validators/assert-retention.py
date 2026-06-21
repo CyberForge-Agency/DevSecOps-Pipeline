@@ -12,8 +12,9 @@ What it asserts
 1. **Retention floor (BLOCKING)** — ``retention_days >= threshold`` where the
    threshold is read from ``docs/governance/evidence-retention-policy.md``
    (the ``Minimum evidence retention`` row), falling back to **1825** days
-   (5 years, DORA — mirrored from ``policies/retention-policy.rego:5``). A value
-   below the floor is a deterministic ``FAIL`` (exit 1).
+   (5 years — longest in-scope PL statutory minimum; DORA/NIS2 impose no numeric
+   period — mirrored from ``policies/retention-policy.rego``). A value below the
+   floor is a deterministic ``FAIL`` (exit 1).
 2. **WORM lock posture (honest)** — reports ``worm_locked``. When WORM is enabled
    but the time-based immutability policy is **not** irreversibly locked
    (``var.lock_worm = false``, the default — see ``infra/modules/storage``), the
@@ -73,7 +74,9 @@ DEFAULT_POLICY_DOC = (
 DEFAULT_OUT = "retention-content.json"
 TOOL_VERSION = "assert-retention/1.0 (T-48)"
 
-# DORA 5-year minimum, mirrored from policies/retention-policy.rego:5.
+# Configured 5-year evidence floor (PL statutory basis: AML/tax/accounting);
+# DORA/NIS2 = 5y+ audit-defensibility, no numeric mandate. Mirrored from
+# policies/retention-policy.rego.
 DEFAULT_THRESHOLD_DAYS = 1825
 
 # azurerm resource type names (>= provider v4).
@@ -95,15 +98,15 @@ def read_threshold(policy_path: Path) -> tuple[int, str]:
     """Read the retention floor (days) from the policy doc, else the default.
 
     Returns ``(threshold_days, source)``. The policy doc is human-readable spec;
-    when it is missing or unparseable we fall back to the DORA constant rather
-    than guessing, and say so in the source string.
+    when it is missing or unparseable we fall back to the configured 5-year floor
+    rather than guessing, and say so in the source string.
     """
     if policy_path.is_file():
         text = policy_path.read_text(encoding="utf-8")
         m = _THRESHOLD_RE.search(text)
         if m:
             return int(m.group(1)), f"{policy_path.name} (Minimum evidence retention)"
-    return DEFAULT_THRESHOLD_DAYS, "default (DORA 1825, retention-policy.rego:5)"
+    return DEFAULT_THRESHOLD_DAYS, "default (1825-day configured floor, retention-policy.rego)"
 
 
 # --------------------------------------------------------------------------- #

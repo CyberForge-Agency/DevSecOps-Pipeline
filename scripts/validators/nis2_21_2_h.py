@@ -430,10 +430,31 @@ def _check_signature(evidence_dir: Path) -> dict[str, Any]:
     else:
         live_note = "no image_uri@image_digest known (env/pipeline-run.json)"
 
-    # 2) LOGGED fall back to the signed proof in the pack.
+    # 2) LOGGED fall back to the sealed proof in the pack.
+    # A08-2: a sealed cosign-verification.log is human/JSON TEXT that whoever
+    # assembled the pack could author — a "Verified OK" substring (even with the
+    # digest present) is NOT independently re-verifiable cryptographic proof. So a
+    # logged *success* can only be INDETERMINATE for this BLOCKING row, never a
+    # silent PASS: the affirmative proof must come from the LIVE re-verify (above)
+    # or a verifiable cosign bundle/Rekor inclusion. A logged *failure* is still a
+    # meaningful FAIL (the pipeline itself recorded a bad verification).
     logged = _verify_signature_logged(evidence_dir, image_digest)
     if logged["available"]:
-        return {"status": "OK" if logged["ok"] else "FAIL",
+        if logged["ok"]:
+            return {"status": "INDETERMINATE",
+                    "method": f"sealed {_VERIFICATION_LOG} (not re-verifiable)",
+                    "image_ref": image_ref,
+                    "rekor_log_index": logged["rekor_log_index"],
+                    "cert_identity": logged["cert_identity"],
+                    "cert_issuer": logged["cert_issuer"],
+                    "detail": (
+                        "sealed cosign-verification.log records a successful signature, "
+                        "but a text-log substring is not independently re-verifiable "
+                        "cryptographic proof (forgeable by the pack author) — emit "
+                        "INDETERMINATE, not PASS; affirmative proof requires the LIVE "
+                        f"cosign re-verify or a verifiable bundle. ({logged['detail']})"
+                    )}
+        return {"status": "FAIL",
                 "method": f"sealed {_VERIFICATION_LOG}",
                 "image_ref": image_ref,
                 "rekor_log_index": logged["rekor_log_index"],

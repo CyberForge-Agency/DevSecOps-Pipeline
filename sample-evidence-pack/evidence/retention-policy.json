@@ -15,5 +15,5 @@
   "detail": "retention 1825 >= 1825 and WORM enabled, but the immutability policy is NOT locked (reversible): retention-by-policy, not tamper-proof WORM. The one-way lock is a deliberate owner decision (T-46). Parsed from terraform source (storage/*.tf defaults).",
   "tool_version": "assert-retention/1.0 (T-48)",
   "validator": "assert-retention",
-  "checked_at": "2026-06-18T10:41:41Z"
+  "checked_at": "2026-06-21T22:56:21Z"
 }

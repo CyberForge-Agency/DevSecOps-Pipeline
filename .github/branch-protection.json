@@ -20,9 +20,9 @@
         "Phase 2: Build & Scan / Unit Tests + Coverage",
         "Phase 2: Build & Scan / Docker Build + Image Scan + SBOM",
         "Policy Test (OPA) / opa test + opa fmt",
-        "Self-Test (pipeline quality gate) / opa test + pin-audit + pytest + bats",
-        "OpenSSF Scorecard / Scorecard analysis"
-      ]
+        "Self-Test (pipeline quality gate) / opa test + pin-audit + pytest + bats"
+      ],
+      "_removed_context_note": "OpenSSF Scorecard / Scorecard analysis removed as a required PR status check (A01-1): scorecard.yml runs on schedule/push/branch_protection_rule only and emits no pull_request status, so a required PR context can never be satisfied. Scorecard remains a scheduled posture scan, not a merge gate."
     },
     "required_signatures": true,
     "required_linear_history": true,

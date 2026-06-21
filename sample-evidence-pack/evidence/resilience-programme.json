@@ -49,5 +49,5 @@
   "detail": "FAIL: pending scenarios: RT-01 (backup-restore): never conducted (last_run null); RT-02 (failover): never conducted (last_run null); RT-03 (DR-drill): never conducted (last_run null); RT-04 (dependency-outage): never conducted (last_run null); RT-05 (tabletop): never conducted (last_run null)",
   "tool_version": null,
   "validator": "check_resilience_programme",
-  "checked_at": "2026-06-18T10:41:39Z"
+  "checked_at": "2026-06-21T22:56:18Z"
 }

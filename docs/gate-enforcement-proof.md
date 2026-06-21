@@ -72,7 +72,7 @@ shared T-33 envelope: `0 = PASS`, `1 = FAIL (blocking)`, `2 = INDETERMINATE
 | a | `security-report.json` with 1 **CRITICAL** CVE | `scripts/generate-compliance-matrix.sh` | exit `1` (vuln-scan row FAIL) |
 | b | **empty `{}`** evidence dir | `generate-compliance-matrix.sh` **and** `aggregate-compliance.py --no-run` | both non-zero (INDETERMINATE — no silent PASS) |
 | c | SARIF document with `version: 2.0.0` | `scripts/validators/sarif_conformance.py` | exit `1` (known-bad format FAIL) |
-| d | WORM retention of **365 days** (`< 1825` floor) | `scripts/validators/assert-retention.py` | exit `1` (below DORA 5-year floor FAIL) |
+| d | WORM retention of **365 days** (`< 1825` floor) | `scripts/validators/assert-retention.py` | exit `1` (below configured 5-year evidence floor FAIL) |
 | e | planted unpinned `actions/checkout@v4` | `scripts/check-action-pins.sh` | exit `1` (mutable-tag ref FAIL) |
 | f | OPA deployment-gate input `critical_cves: 1` | `opa eval … data.compliance.deployment.deny` | `deny` set **non-empty** (deploy blocked) |
 

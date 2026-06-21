@@ -218,4 +218,4 @@ All corrective actions from post-incident reviews must be:
 
 ### 7.3 Evidence Retention
 
-All incident evidence (logs, reports, communications, forensic data) must be retained in the evidence storage account for the WORM retention period (5 years) per DORA Art. 17(3) and the data retention policy.
+All incident evidence (logs, reports, communications, forensic data) must be retained in the evidence storage account for the WORM retention period (5 years). The 5-year period is the organisation's configured threshold, grounded in Polish statutory minima (AML art.49 / tax Ord.pod. art.70,86 / accounting art.74) and DORA's general audit-defensibility expectation for the ICT-risk and incident-management process (DORA Art.17 establishes the incident-management process and the duty to record incidents — it sets no numeric retention period). Confirm the applicable period per data class with legal/compliance.

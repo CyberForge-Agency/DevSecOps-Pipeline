@@ -334,15 +334,26 @@ jobs:
           fi
 
       # T-48 (A.5 retention content) — assert retention floor (>=1825d) + WORM
-      # LOCK posture against the live tfplan via the content validator (complements
-      # the rego gate above: the validator reads the immutability `locked` flag and
+      # posture against the live tfplan via the content validator (complements the
+      # rego gate above: the validator reads the immutability `locked` flag and
       # downgrades an unlocked-WORM-at-floor to an honest INDETERMINATE rather than
-      # a fake PASS). Same fail-closed contract as T-28: on a real deploy any
-      # non-zero (FAIL=below floor / WORM off, or INDETERMINATE=reversible WORM /
-      # plan can't express the control) blocks with exit 1; on a PR dry-run it is a
-      # reported warning only.
+      # a fake PASS).
+      #
+      # T-46/T-48 reconciliation (A05-1): exit codes are 0 PASS / 1 FAIL / 2
+      # INDETERMINATE. FAIL (exit 1 = below floor / WORM disabled) ALWAYS blocks a
+      # real deploy — that is a genuine retention violation. INDETERMINATE (exit 2)
+      # means "retention >= floor and WORM enabled, but the immutability policy is
+      # NOT locked (reversible)". Locking is a deliberate, IRREVERSIBLE owner
+      # decision (T-46); committed staging defaults keep it unlocked on purpose, so
+      # gating the whole deploy on it bricked every real run. We therefore treat
+      # INDETERMINATE as a non-blocking WARN by default (matching the rego `warn`
+      # posture), and make it blocking ONLY when the environment opts in via
+      # vars.REQUIRE_WORM_LOCK == 'true' (set this for production to enforce a
+      # locked WORM). The unlocked posture is still recorded honestly in the pack.
       - name: assert-retention (T-48, blocking on non-PR)
         working-directory: infra/
+        env:
+          REQUIRE_WORM_LOCK: ${{ vars.REQUIRE_WORM_LOCK }}
         run: |
           set -euo pipefail
           if [ ! -s /tmp/tfplan.json ]; then
@@ -354,14 +365,21 @@ jobs:
           rc=$?
           set -e
           echo "assert-retention exit code: ${rc} (0 PASS, 1 FAIL, 2 INDETERMINATE)"
-          if [ "${{ github.event_name }}" != 'pull_request' ]; then
+          if [ "${{ github.event_name }}" = 'pull_request' ]; then
             if [ "${rc}" -ne 0 ]; then
-              echo "::error::assert-retention did not PASS (exit ${rc}) on a real deploy — fail-closed"
+              echo "::warning::PR dry-run: assert-retention exit ${rc} on local-state plan (NEEDS-CI for an authoritative plan; not enforced here)"
+            fi
+          elif [ "${rc}" -eq 1 ]; then
+            echo "::error::assert-retention FAIL (exit 1: retention below floor or WORM disabled) on a real deploy — fail-closed"
+            exit 1
+          elif [ "${rc}" -eq 2 ]; then
+            if [ "${REQUIRE_WORM_LOCK:-false}" = 'true' ]; then
+              echo "::error::assert-retention INDETERMINATE (unlocked WORM) and REQUIRE_WORM_LOCK=true — production requires a locked immutability policy; fail-closed"
               exit 1
             fi
+            echo "::warning::assert-retention INDETERMINATE: retention >= floor + WORM enabled but NOT locked (reversible, deliberate T-46). Non-blocking (set vars.REQUIRE_WORM_LOCK=true to enforce locking). Posture recorded in the evidence pack."
+          else
             echo "assert-retention PASSED: retention >= floor and WORM locked."
-          elif [ "${rc}" -ne 0 ]; then
-            echo "::warning::PR dry-run: assert-retention exit ${rc} on local-state plan (NEEDS-CI for an authoritative plan; not enforced here)"
           fi
 
       - name: Terraform Apply

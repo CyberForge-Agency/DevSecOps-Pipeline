@@ -175,15 +175,20 @@ def test_extract_compliant_plan():
 def test_opa_input_is_exactly_the_rego_fields():
     a = t24.extract(_compliant_plan())
     opa = t24._opa_input(a)
+    # A05-3: worm_locked is now emitted so retention-policy.rego's `warn` rule
+    # (unlocked-WORM notice) can actually evaluate — previously it was omitted and
+    # the warn never fired in CI. The rego reads input.worm_locked.
     assert set(opa) == {
         "retention_days",
         "worm_enabled",
+        "worm_locked",
         "deletion_schedule",
         "delete_after_days",
     }
     assert opa["retention_days"] == 1825
     assert opa["delete_after_days"] == 1825
     assert opa["worm_enabled"] is True
+    assert "worm_locked" in opa
 
 
 def test_recurses_into_nested_child_modules():
@@ -353,9 +358,11 @@ def test_main_opa_input_mode_exit_zero(tmp_path, capsys):
     out = capsys.readouterr().out
     assert rc == 0
     payload = json.loads(out)
+    # A05-3: worm_locked added so the rego `warn` rule can fire.
     assert set(payload) == {
         "retention_days",
         "worm_enabled",
+        "worm_locked",
         "deletion_schedule",
         "delete_after_days",
     }

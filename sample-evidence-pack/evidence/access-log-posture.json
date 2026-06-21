@@ -13,5 +13,5 @@
   "detail": "/cyberforge-demo/Dokumenty/CyberForge/Pipeline/sample-evidence-pack/evidence/access-log.jsonl: no live evidence-store access log (needs Azure Storage diagnostic logs -> immutable container); cannot verify access trail",
   "tool_version": null,
   "validator": "check_access_log",
-  "checked_at": "2026-06-18T10:41:39Z"
+  "checked_at": "2026-06-21T22:56:18Z"
 }

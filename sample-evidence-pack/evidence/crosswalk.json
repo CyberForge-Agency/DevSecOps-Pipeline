@@ -1,6 +1,6 @@
 {
   "schema": "cyberforge-regulatory-crosswalk/v1",
-  "generated_at": "2026-06-18T10:41:40Z",
+  "generated_at": "2026-06-21T22:56:20Z",
   "description": "Multi-framework crosswalk (spec 5.2 / struktura D.2): one evidence item -> many framework clauses. Derived by grouping the content-validated compliance matrix rows + the A.1-A.10 organizational-control verdicts by evidence artifact. A clause is 'satisfied' only when present AND PASS; no verdicts are recomputed here.",
   "source": {
     "matrix": "compliance-matrix.json",

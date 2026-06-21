@@ -76,18 +76,23 @@ def _restore_live():
 
 
 # --------------------------------------------------------------------------- #
-# PASS: sealed log records success + the digest                               #
+# INDETERMINATE: sealed log records success + digest, but a text-log substring  #
+# is not independently re-verifiable cryptographic proof (A08-2). Offline (no   #
+# live cosign), a logged "Verified OK" can only be INDETERMINATE for this       #
+# BLOCKING row — never a silent PASS; affirmative proof needs the LIVE re-verify #
+# or a verifiable bundle. (A logged FAILURE is still a FAIL — see below.)        #
 # --------------------------------------------------------------------------- #
 
-def test_bound_success_log_passes(tmp_path):
+def test_bound_success_log_is_indeterminate_offline(tmp_path):
     _skip_live()
     try:
         env = nh.check(_evidence(tmp_path))
     finally:
         _restore_live()
-    assert env["status"] == lc.Status.PASS
+    assert env["status"] == lc.Status.INDETERMINATE
     assert env["tier"] == lc.Tier.BLOCKING
-    assert lc.exit_code_for(env["status"], env["tier"]) == 0
+    assert lc.exit_code_for(env["status"], env["tier"]) == 2
+    assert "not independently re-verifiable" in env["detail"]
 
 
 # --------------------------------------------------------------------------- #

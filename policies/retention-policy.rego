@@ -2,9 +2,13 @@ package compliance.retention
 
 import rego.v1
 
-minimum_retention_days := 1825 # 5 years (DORA)
+# 5 years — the longest in-scope statutory minimum (PL AML art.49 / tax Ord.pod.
+# art.70,86 / accounting art.74). DORA & NIS2 impose NO numeric retention period;
+# they expect a proportionate, audit-defensible window (5y+), so this floor is the
+# organisation's configured threshold grounded in PL statute, not a DORA mandate.
+minimum_retention_days := 1825
 
-# Compliant when no deny fires: retention meets the DORA floor, WORM is enabled,
+# Compliant when no deny fires: retention meets the configured floor, WORM is enabled,
 # and no lifecycle delete would purge evidence before the immutability period
 # expires. An ABSENT lifecycle delete is fine — deletion is then governed solely
 # by the WORM / legal-hold window (the recommended posture; the storage module
@@ -25,7 +29,7 @@ worm_locked if {
 
 deny contains msg if {
 	input.retention_days < minimum_retention_days
-	msg := sprintf("Retention %d days is below DORA minimum of %d days", [input.retention_days, minimum_retention_days])
+	msg := sprintf("Retention %d days is below the configured 5-year evidence floor of %d days (PL statutory basis; DORA/NIS2 = 5y+ audit-defensibility, no numeric mandate)", [input.retention_days, minimum_retention_days])
 }
 
 deny contains msg if {

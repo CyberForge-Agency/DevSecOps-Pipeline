@@ -2,10 +2,10 @@
   "$schema": "http://cyclonedx.org/schema/bom-1.7.schema.json",
   "bomFormat": "CycloneDX",
   "specVersion": "1.7",
-  "serialNumber": "urn:uuid:aec6f797-606f-4717-8265-15cc3a4aec7a",
+  "serialNumber": "urn:uuid:6d292ab8-c8bd-46a1-8b7a-8989ea2e66e7",
   "version": 1,
   "metadata": {
-    "timestamp": "2026-06-18T10:41:37+00:00",
+    "timestamp": "2026-06-21T22:56:16+00:00",
     "tools": {
       "components": [
         {
@@ -15,12 +15,12 @@
           },
           "group": "aquasecurity",
           "name": "trivy",
-          "version": "0.71.0"
+          "version": "0.71.1"
         }
       ]
     },
     "component": {
-      "bom-ref": "1f3aff9d-5a17-4b81-bdc4-54dab97b9b45",
+      "bom-ref": "d530d354-3608-48ae-a7f9-80ccd5bd653f",
       "type": "application",
       "name": "app",
       "properties": [
@@ -33,7 +33,7 @@
   },
   "components": [
     {
-      "bom-ref": "c2cc55fa-a339-4d4a-a381-4f848890094b",
+      "bom-ref": "f138d669-d5dd-4130-b214-759858208ec4",
       "type": "application",
       "name": "package-lock.json",
       "properties": [
@@ -96,10 +96,10 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/body-parser@1.20.4",
+      "bom-ref": "pkg:npm/body-parser@1.20.5",
       "type": "library",
       "name": "body-parser",
-      "version": "1.20.4",
+      "version": "1.20.5",
       "licenses": [
         {
           "license": {
@@ -107,11 +107,11 @@
           }
         }
       ],
-      "purl": "pkg:npm/body-parser@1.20.4",
+      "purl": "pkg:npm/body-parser@1.20.5",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "body-parser@1.20.4"
+          "value": "body-parser@1.20.5"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -552,10 +552,10 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/express@4.22.1",
+      "bom-ref": "pkg:npm/express@4.22.2",
       "type": "library",
       "name": "express",
-      "version": "4.22.1",
+      "version": "4.22.2",
       "licenses": [
         {
           "license": {
@@ -563,11 +563,11 @@
           }
         }
       ],
-      "purl": "pkg:npm/express@4.22.1",
+      "purl": "pkg:npm/express@4.22.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "express@4.22.1"
+          "value": "express@4.22.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -768,10 +768,10 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/hasown@2.0.2",
+      "bom-ref": "pkg:npm/hasown@2.0.4",
       "type": "library",
       "name": "hasown",
-      "version": "2.0.2",
+      "version": "2.0.4",
       "licenses": [
         {
           "license": {
@@ -779,11 +779,11 @@
           }
         }
       ],
-      "purl": "pkg:npm/hasown@2.0.2",
+      "purl": "pkg:npm/hasown@2.0.4",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "hasown@2.0.2"
+          "value": "hasown@2.0.4"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -1272,10 +1272,10 @@
       ]
     },
     {
-      "bom-ref": "pkg:npm/qs@6.14.2",
+      "bom-ref": "pkg:npm/qs@6.15.2",
       "type": "library",
       "name": "qs",
-      "version": "6.14.2",
+      "version": "6.15.2",
       "licenses": [
         {
           "license": {
@@ -1283,11 +1283,11 @@
           }
         }
       ],
-      "purl": "pkg:npm/qs@6.14.2",
+      "purl": "pkg:npm/qs@6.15.2",
       "properties": [
         {
           "name": "aquasecurity:trivy:PkgID",
-          "value": "qs@6.14.2"
+          "value": "qs@6.15.2"
         },
         {
           "name": "aquasecurity:trivy:PkgType",
@@ -1706,15 +1706,15 @@
   ],
   "dependencies": [
     {
-      "ref": "1f3aff9d-5a17-4b81-bdc4-54dab97b9b45",
+      "ref": "d530d354-3608-48ae-a7f9-80ccd5bd653f",
       "dependsOn": [
-        "c2cc55fa-a339-4d4a-a381-4f848890094b"
+        "f138d669-d5dd-4130-b214-759858208ec4"
       ]
     },
     {
-      "ref": "c2cc55fa-a339-4d4a-a381-4f848890094b",
+      "ref": "f138d669-d5dd-4130-b214-759858208ec4",
       "dependsOn": [
-        "pkg:npm/express@4.22.1",
+        "pkg:npm/express@4.22.2",
         "pkg:npm/helmet@8.1.0"
       ]
     },
@@ -1730,7 +1730,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/body-parser@1.20.4",
+      "ref": "pkg:npm/body-parser@1.20.5",
       "dependsOn": [
         "pkg:npm/bytes@3.1.2",
         "pkg:npm/content-type@1.0.5",
@@ -1740,7 +1740,7 @@
         "pkg:npm/http-errors@2.0.1",
         "pkg:npm/iconv-lite@0.4.24",
         "pkg:npm/on-finished@2.4.1",
-        "pkg:npm/qs@6.14.2",
+        "pkg:npm/qs@6.15.2",
         "pkg:npm/raw-body@2.5.3",
         "pkg:npm/type-is@1.6.18",
         "pkg:npm/unpipe@1.0.0"
@@ -1835,11 +1835,11 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/express@4.22.1",
+      "ref": "pkg:npm/express@4.22.2",
       "dependsOn": [
         "pkg:npm/accepts@1.3.8",
         "pkg:npm/array-flatten@1.1.1",
-        "pkg:npm/body-parser@1.20.4",
+        "pkg:npm/body-parser@1.20.5",
         "pkg:npm/content-disposition@0.5.4",
         "pkg:npm/content-type@1.0.5",
         "pkg:npm/cookie-signature@1.0.7",
@@ -1858,7 +1858,7 @@
         "pkg:npm/parseurl@1.3.3",
         "pkg:npm/path-to-regexp@0.1.13",
         "pkg:npm/proxy-addr@2.0.7",
-        "pkg:npm/qs@6.14.2",
+        "pkg:npm/qs@6.15.2",
         "pkg:npm/range-parser@1.2.1",
         "pkg:npm/safe-buffer@5.2.1",
         "pkg:npm/send@0.19.2",
@@ -1905,7 +1905,7 @@
         "pkg:npm/get-proto@1.0.1",
         "pkg:npm/gopd@1.2.0",
         "pkg:npm/has-symbols@1.1.0",
-        "pkg:npm/hasown@2.0.2",
+        "pkg:npm/hasown@2.0.4",
         "pkg:npm/math-intrinsics@1.1.0"
       ]
     },
@@ -1925,7 +1925,7 @@
       "dependsOn": []
     },
     {
-      "ref": "pkg:npm/hasown@2.0.2",
+      "ref": "pkg:npm/hasown@2.0.4",
       "dependsOn": [
         "pkg:npm/function-bind@1.1.2"
       ]
@@ -2026,7 +2026,7 @@
       ]
     },
     {
-      "ref": "pkg:npm/qs@6.14.2",
+      "ref": "pkg:npm/qs@6.15.2",
       "dependsOn": [
         "pkg:npm/side-channel@1.1.0"
       ]

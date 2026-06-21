@@ -98,7 +98,11 @@ app.get("/api/build-info", (_req: Request, res: Response) => {
     process.env.RUN_URL ||
     `https://github.com/${repo}/actions/runs/${runId}`;
 
-  const certIdentityPattern = `https://github.com/${repo}/.github/workflows/sign-and-attest.yml@.*`;
+  // A04-3 / A15-8: anchor the verifier identity to the exact signing workflow
+  // AND ref, matching deploy.yml admission (sign-and-attest.yml@refs/heads/main
+  // or a tag). A bare repo-prefix regex would accept a signature from ANY
+  // workflow in the repo, which is not verification of THIS pipeline's signer.
+  const certIdentityPattern = `^https://github.com/${repo}/.github/workflows/sign-and-attest.yml@refs/(heads/main|tags/.*)$`;
   const oidcIssuer = "https://token.actions.githubusercontent.com";
 
   // Rekor search by image digest. Anyone can paste this URL to see the
@@ -110,16 +114,21 @@ app.get("/api/build-info", (_req: Request, res: Response) => {
 
   const cosignVerify = imageUri && imageUri !== "unknown"
     ? `cosign verify \\
-  --certificate-identity-regexp='https://github.com/${repo}/' \\
+  --certificate-identity-regexp='${certIdentityPattern}' \\
   --certificate-oidc-issuer='${oidcIssuer}' \\
   ${imageUri}`
     : "cosign verify ... (image digest not yet available)";
 
+  // A04-3: verify (not merely download) the SBOM attestation, anchored to the
+  // same signer identity + issuer, so the printed command actually proves the
+  // attestation rather than just fetching it.
   const cosignAttest = imageUri && imageUri !== "unknown"
-    ? `cosign download attestation \\
-  --predicate-type=https://cyclonedx.org/bom \\
+    ? `cosign verify-attestation \\
+  --type=cyclonedx \\
+  --certificate-identity-regexp='${certIdentityPattern}' \\
+  --certificate-oidc-issuer='${oidcIssuer}' \\
   ${imageUri}`
-    : "cosign download attestation ... (image digest not yet available)";
+    : "cosign verify-attestation ... (image digest not yet available)";
 
   const info: DeploymentInfo = {
     ...buildInfo,
