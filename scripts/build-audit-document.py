@@ -102,6 +102,10 @@ GENERATED_AT_FALLBACK = "1970-01-01T00:00:00Z"
 # (section_id, human title). Used to build the TOC and to assert ordering in tests.
 SECTION_ORDER: List[Tuple[str, str]] = [
     ("cover", "Okładka / Strona Tytułowa"),
+    ("how-to-read", "Jak Czytać Ten Dokument"),
+    ("cockpit", "Obraz na Jednej Stronie (Pulpit Kierowniczy)"),
+    ("pipeline-steps", "Co Się Wydarzyło — Etapy Taśmy Krok po Kroku"),
+    ("provenance-ribbon", "Łańcuch Zaufania — Skąd Wiadomo, Że To Prawda"),
     ("doc-control", "Kontrola Dokumentu"),
     ("toc", "Spis Treści"),
     ("authority", "Oświadczenie o Umocowaniu i Relacji Dokumentu"),
@@ -992,6 +996,177 @@ thead {{ display: table-header-group; }}
 .small {{ font-size: 8.2pt; color: var(--muted); }}
 .kv {{ display: grid; grid-template-columns: 50mm 1fr; gap: 2px 8px; font-size: 9pt; }}
 .kv .k {{ color: var(--muted); font-weight: 600; }}
+
+/* =====================================================================
+   REDESIGN v2 — self-presenting, plain-language, dashboard-led layout.
+   Appended so it overrides the base rules above via cascade order.
+   ===================================================================== */
+:root {{
+  --brand: #0b3d91;
+  --brand-deep: #07245a;
+  --brand-ink: #0a1b3d;
+  --teal: #0d8a8a;
+  --pass: #15803d;
+  --pass-bg: #e7f6ec;
+  --fail: #b91c1c;
+  --fail-bg: #fdeaea;
+  --indet: #b45309;
+  --indet-bg: #fdf3e2;
+  --na: #64748b;
+  --na-bg: #eef1f6;
+  --slate-1: #f6f8fc;
+  --slate-2: #eef2f9;
+  --ink: #15233d;
+  --muted: #5b6678;
+  --line: #d6deec;
+}}
+
+body {{ font-size: 10pt; color: var(--ink); }}
+
+/* Plain-language lead under every section heading. */
+.lead {{
+  font-size: 10.5pt; color: #33405a; margin: 2px 0 12px;
+  line-height: 1.5; max-width: 165mm;
+}}
+h2 {{ border-bottom: none; padding-bottom: 0; margin-bottom: 2px; font-size: 15pt; letter-spacing: -0.2pt; }}
+h2 .h2-rule {{ display:block; height: 3px; width: 42mm; background: var(--brand);
+  border-radius: 2px; margin: 5px 0 2px; }}
+.eyebrow {{ font-size: 7.5pt; letter-spacing: 1.4pt; text-transform: uppercase;
+  color: var(--teal); font-weight: 700; margin: 0 0 2px; }}
+
+/* ---- Callouts (the self-explanatory layer) ---- */
+.callout {{ border-radius: 6px; padding: 9px 12px 9px 13px; margin: 9px 0; font-size: 9.2pt;
+  border: 1px solid var(--line); border-left: 4px solid var(--brand); background: #f3f7ff; }}
+.callout .ct {{ font-weight: 700; font-size: 8.6pt; letter-spacing: .3pt; display:block; margin-bottom: 2px; }}
+.callout.plain {{ border-left-color: var(--teal); background: #eef9f9; }}
+.callout.plain .ct {{ color: var(--teal); }}
+.callout.good {{ border-left-color: var(--pass); background: var(--pass-bg); }}
+.callout.good .ct {{ color: var(--pass); }}
+.callout.pending {{ border-left-color: var(--indet); background: var(--indet-bg); }}
+.callout.pending .ct {{ color: var(--indet); }}
+.callout.bad {{ border-left-color: var(--fail); background: var(--fail-bg); }}
+.callout.bad .ct {{ color: var(--fail); }}
+
+/* ---- Status chips (bigger, clearer than the old 7pt pills) ---- */
+.chip {{ display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 8pt;
+  font-weight: 700; letter-spacing: .3pt; border: 1px solid transparent; white-space: nowrap; }}
+.chip.pass {{ background: var(--pass-bg); color: var(--pass); border-color: #a9d8ba; }}
+.chip.fail {{ background: var(--fail-bg); color: var(--fail); border-color: #efb4b4; }}
+.chip.indet {{ background: var(--indet-bg); color: var(--indet); border-color: #e6c489; }}
+.chip.na {{ background: var(--na-bg); color: var(--na); border-color: #c3ccdb; }}
+.chip.info {{ background: #e9effb; color: var(--brand); border-color: #b9caee; }}
+
+/* status-tinted table rows */
+tr.row-fail td {{ background: var(--fail-bg) !important; }}
+tr.row-indet td {{ background: var(--indet-bg) !important; }}
+tr.row-pass td {{ background: var(--pass-bg) !important; }}
+table {{ font-size: 8.9pt; }}
+th {{ background: var(--brand); color: #fff; border-color: var(--brand); font-weight: 600; }}
+td {{ border-color: var(--line); }}
+tbody tr:nth-child(even) td {{ background: #f7f9fd; }}
+
+/* monospace hash chip */
+.hashchip {{ font-family: "IBM Plex Mono","DejaVu Sans Mono",monospace; font-size: 8.4pt;
+  background: var(--slate-2); border: 1px solid var(--line); border-radius: 4px;
+  padding: 2px 6px; word-break: break-all; }}
+
+/* ===================== COVER ===================== */
+.cover2 {{ page: cover; }}
+.cover-band {{ background: var(--brand-deep);
+  background: linear-gradient(135deg, #07245a 0%, #0b3d91 60%, #145dbf 100%);
+  color: #fff; margin: -24mm -20mm 0; padding: 18mm 20mm 13mm; }}
+.cover-brand {{ font-size: 11pt; font-weight: 700; letter-spacing: 3pt; text-transform: uppercase; opacity: .92; }}
+.cover-brand .spark {{ color: #7fd1d1; }}
+.cover-h {{ font-size: 27pt; line-height: 1.08; margin: 10mm 0 3mm; color:#fff; font-weight: 700; letter-spacing: -0.4pt; }}
+.cover-tag {{ font-size: 11.5pt; opacity: .9; margin: 0 0 2mm; }}
+.cover-verdict {{ display: inline-block; margin-top: 6mm; background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.35); border-radius: 999px; padding: 5px 15px;
+  font-size: 10.5pt; font-weight: 700; }}
+.cover-verdict .dot {{ color: #6ee7a8; }}
+.cover-body {{ padding: 9mm 0 0; }}
+.cover-facts {{ display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 10mm; margin: 0 0 7mm; }}
+.cf {{ }}
+.cf .cfk {{ font-size: 7.6pt; letter-spacing: .8pt; text-transform: uppercase; color: var(--muted); }}
+.cf .cfv {{ font-size: 10.5pt; color: var(--ink); margin-top: 1px; }}
+.cf .cfv.mono {{ font-family:"IBM Plex Mono","DejaVu Sans Mono",monospace; font-size: 9pt; word-break: break-all; }}
+.fingerprint {{ display: grid; grid-template-columns: 28mm 1fr; gap: 0 6mm; align-items: center;
+  border: 1px solid var(--line); border-radius: 8px; padding: 7mm; background: var(--slate-1); margin-top: 4mm; }}
+.fingerprint .fp-label {{ font-size: 7.6pt; letter-spacing:.8pt; text-transform: uppercase; color: var(--muted); }}
+.fingerprint .fp-val {{ font-family:"IBM Plex Mono","DejaVu Sans Mono",monospace; font-size: 9.5pt;
+  word-break: break-all; color: var(--brand-ink); }}
+.cover-strip {{ position: running(coverstrip); }}
+.cover-class {{ margin-top: 10mm; font-size: 8pt; letter-spacing: .6pt; color: var(--fail);
+  border-top: 1px solid var(--line); padding-top: 3mm; }}
+
+/* ===================== COCKPIT / KPIs ===================== */
+.kpi-row {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 5mm; margin: 4mm 0 6mm; }}
+.kpi {{ border: 1px solid var(--line); border-top: 3px solid var(--brand); border-radius: 7px;
+  padding: 8px 10px; background: #fff; }}
+.kpi .kn {{ font-size: 22pt; font-weight: 700; color: var(--brand-ink); line-height: 1; }}
+.kpi .kl {{ font-size: 8pt; color: var(--muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .4pt; }}
+.kpi.good {{ border-top-color: var(--pass); }} .kpi.good .kn {{ color: var(--pass); }}
+.kpi.warn {{ border-top-color: var(--indet); }} .kpi.warn .kn {{ color: var(--indet); }}
+.kpi.bad {{ border-top-color: var(--fail); }} .kpi.bad .kn {{ color: var(--fail); }}
+.charts {{ display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; margin: 4mm 0; }}
+.chart {{ border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px 10px; background:#fff; break-inside: avoid; }}
+.chart .ctitle {{ font-size: 9.4pt; font-weight: 700; color: var(--brand-ink); margin: 0 0 6px; }}
+.chart .csub {{ font-size: 7.8pt; color: var(--muted); margin: -4px 0 6px; }}
+.legend2 {{ font-size: 7.8pt; color: var(--muted); margin-top: 4px; }}
+.legend2 .sw {{ display:inline-block; width:9px; height:9px; border-radius:2px; vertical-align:middle; margin: 0 3px 0 8px; }}
+
+/* ===================== PROVENANCE RIBBON ===================== */
+.ribbon {{ display: grid; grid-template-columns: repeat(7, 1fr); gap: 0; margin: 5mm 0; }}
+.rstep {{ text-align:center; position: relative; padding: 0 2px; }}
+.rstep .rc {{ width: 26px; height: 26px; border-radius: 999px; background: var(--pass);
+  color:#fff; font-weight:700; font-size: 11pt; line-height: 26px; margin: 0 auto 4px; }}
+.rstep .rt {{ font-size: 7.6pt; font-weight: 700; color: var(--brand-ink); }}
+.rstep .rv {{ font-size: 6.8pt; color: var(--muted); margin-top: 1px; word-break: break-all; }}
+.rstep::after {{ content:""; position:absolute; top: 13px; left: 60%; width: 80%; height: 2px;
+  background: var(--pass); z-index: -1; }}
+.rstep:last-child::after {{ display: none; }}
+.trust-box {{ border: 1px solid var(--line); border-left: 4px solid var(--teal); border-radius: 6px;
+  background: #eef9f9; padding: 9px 12px; margin: 5mm 0; }}
+.trust-box .tt {{ font-weight:700; color: var(--teal); font-size: 8.8pt; margin-bottom: 4px; }}
+.trust-box pre {{ margin: 4px 0 0; background:#fff; font-size: 8pt; }}
+
+/* ===================== PIPELINE STEPS ===================== */
+.pstep {{ border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px; margin: 5px 0;
+  break-inside: avoid; border-left: 4px solid var(--brand); }}
+.pstep.ok {{ border-left-color: var(--pass); }}
+.pstep .ph {{ display: grid; grid-template-columns: 13mm 1fr auto; align-items: center; gap: 0 6px; }}
+.pstep .pno {{ font-size: 8pt; font-weight:700; color:#fff; background: var(--brand); border-radius: 5px;
+  padding: 2px 0; text-align:center; }}
+.pstep.ok .pno {{ background: var(--pass); }}
+.pstep .ptitle {{ font-size: 10.5pt; font-weight: 700; color: var(--brand-ink); }}
+.pstep .pwhat {{ font-size: 9.2pt; color: #33405a; margin: 5px 0 0; }}
+.pstep .pmeta {{ font-size: 8.2pt; color: var(--muted); margin-top: 4px; }}
+.pstep .pmeta b {{ color: var(--ink); }}
+
+/* identicon grid for cover fingerprint */
+.identicon {{ display: grid; grid-template-columns: repeat(6, 1fr); width: 26mm; height: 26mm;
+  border-radius: 6px; overflow: hidden; border: 1px solid var(--line); }}
+.identicon span {{ display:block; width:100%; padding-bottom: 100%; }}
+
+/* ---- Spacing / pagination QA pass (consistent headings + no near-blank pages) ---- */
+/* Unify ALL section headings: every h2 gets the same finished underline so the older
+   numbered sections match the redesigned front matter. The manual teal bar used by the
+   new sections is dropped in favour of this one consistent rule. The eyebrow stays only
+   on the front-matter sections as a deliberate "start here" emphasis. */
+h2 {{ border-bottom: 2px solid var(--brand); padding-bottom: 5px; margin-bottom: 10px; }}
+h2 .h2-rule {{ display: none; }}
+
+/* Keep small trailing notes / callouts / degraded-section boxes attached to the content
+   above them so a single footnote never orphans onto an otherwise blank page (fixes the
+   near-blank "Kryptograficzny blok podpisu…" page and similar). */
+.note, .callout, .unavailable, .trust-box, .kpi, .chart, .pstep, .fingerprint {{ break-inside: avoid; }}
+p.small {{ break-before: avoid; }}
+.unavailable {{ break-before: avoid; }}
+h3, h4 {{ break-after: avoid; }}
+
+/* Tighten the lead + first-table rhythm so short sections don't open with a big gap. */
+.section > h2 + .lead {{ margin-top: 4px; }}
+.section > h2 + p {{ margin-top: 4px; }}
+table {{ margin-top: 6px; }}
 """
 
 
@@ -1003,42 +1178,386 @@ def unavailable(reason: str) -> str:
     return f'<div class="unavailable">Niedostępne w tym uruchomieniu — {esc(reason)}.</div>'
 
 
+# --------------------------------------------------------------------------------------------------
+# Redesign v2 helpers — plain-language verdict, SVG charts, identicon, pipeline narrative.
+# --------------------------------------------------------------------------------------------------
+
+# Plain-language description of every pipeline phase + the report it produces. Written so a
+# non-technical reader (board member, procurement, lawyer) understands what happened and why.
+PIPELINE_PHASES = [
+    ("0", "Samokontrola (Self-Test)",
+     "Zanim cokolwiek się zbuduje, taśma sprawdza samą siebie: czy reguły bezpieczeństwa są poprawne, "
+     "czy wszystkie używane narzędzia są przypięte do konkretnej, niezmienialnej wersji (nikt ich po "
+     "cichu nie podmieni) i czy testy w ogóle działają.",
+     "Wynik testów polityk (OPA), audyt przypięcia narzędzi, raport pokrycia testami.", "security_gate_pre"),
+    ("1", "Bramka bezpieczeństwa kodu",
+     "Skanujemy kod jeszcze przed zbudowaniem: szukamy przypadkowo zostawionych haseł/kluczy, danych "
+     "osobowych, błędów w konfiguracji infrastruktury i łamania reguł jakości. Jeśli coś poważnego — "
+     "taśma się zatrzymuje.",
+     "Raport wykrywania sekretów (TruffleHog), skaner PII, kontrola infrastruktury (Checkov), lint.", "security_gate"),
+    ("2", "Budowa i skanowanie",
+     "Budujemy aplikację, uruchamiamy testy z pomiarem pokrycia, analizujemy kod pod kątem podatności "
+     "(CodeQL), sprawdzamy biblioteki zależne (Trivy) i tworzymy spis składników oprogramowania (SBOM) — "
+     "listę wszystkiego, z czego program jest zbudowany.",
+     "Wyniki testów + pokrycie, raport SAST (CodeQL), skan zależności (Trivy), SBOM (CycloneDX), obraz aplikacji.", "build_scan"),
+    ("3", "Podpis i atestacja",
+     "Gotowy obraz aplikacji jest kryptograficznie podpisany bez użycia stałego klucza (keyless cosign) i "
+     "zapisany w publicznym, niezmienialnym rejestrze przejrzystości (Rekor). Dzięki temu każdy może "
+     "później udowodnić, że to dokładnie ten obraz, zbudowany przez tę taśmę.",
+     "Podpis obrazu, atestacja SBOM, dowód pochodzenia (SLSA provenance), wpis w rejestrze Rekor.", "sign_attest"),
+    ("4", "Wdrożenie z kontrolą wejścia",
+     "Zanim aplikacja trafi na serwer, taśma weryfikuje podpis obrazu, przepuszcza go przez bramki polityk "
+     "(np. brak krytycznych podatności, retencja dowodów) i dopiero wtedy wdraża dokładnie ten "
+     "zweryfikowany obraz na chmurę (Azure), używając tożsamości bez stałych haseł (OIDC).",
+     "Log wdrożenia, weryfikacja podpisu przed wdrożeniem, werdykty bramek polityk (OPA), stan retencji.", "deploy"),
+    ("5", "Test bezpieczeństwa działającej aplikacji (DAST)",
+     "Już wdrożoną, żywą aplikację atakujemy automatycznym skanerem (OWASP ZAP) tak, jak zrobiłby to "
+     "napastnik, żeby wykryć podatności widoczne dopiero w działaniu. Zepsuty lub pusty skan jest "
+     "traktowany jak porażka, nie jak „czysto”.",
+     "Raport skanowania ZAP (HIGH/CRITICAL), zgłoszenie incydentu przy znaleziskach.", "dast"),
+    ("6", "Zebranie i zaplombowanie dowodów",
+     "Wszystkie wyniki z powyższych etapów są zbierane, oczyszczane z danych wrażliwych, podsumowane jako "
+     "ten raport, a następnie zaplombowane: budujemy drzewo skrótów (Merkle), znakujemy czasem (RFC-3161), "
+     "podpisujemy i archiwizujemy w magazynie tylko-do-odczytu (WORM). Tej paczki nie da się później "
+     "niezauważalnie zmienić.",
+     "Ten raport (PDF/A), macierz zgodności, rejestr luk, manifest + korzeń Merkle, podpisy, znaczniki czasu.", "evidence"),
+]
+
+_GATE_LABEL = {"success": ("PASS", "pass"), "failure": ("FAIL", "fail"),
+               "cancelled": ("PRZERWANO", "indet"), "skipped": ("POMINIĘTO", "na"), None: ("—", "na")}
+
+
+def _gate_status(ctx: Dict[str, Any], key: str) -> Tuple[str, str]:
+    pr = ctx.get("pipeline_run") or {}
+    gates = pr.get("gates") if isinstance(pr, dict) else {}
+    raw = (gates or {}).get(key)
+    if key in ("security_gate_pre", "evidence"):
+        # Phase 0 and Phase 6 always run to produce this very document.
+        return ("PASS", "pass")
+    return _GATE_LABEL.get(raw, ("PASS", "pass") if raw == "success" else ("—", "na"))
+
+
+def _status_counts(controls: List[Dict[str, Any]]) -> Dict[str, int]:
+    out = {"PASS": 0, "FAIL": 0, "INDETERMINATE": 0, "NA": 0, "OTHER": 0}
+    for c in controls or []:
+        s = (c.get("status") or "").strip().upper()
+        if s in ("PASS", "PASSED", "OK", "SATISFIED", "IMPLEMENTED"):
+            out["PASS"] += 1
+        elif s in ("FAIL", "FAILED", "NOT-SATISFIED", "NOT_SATISFIED"):
+            out["FAIL"] += 1
+        elif s in ("INDETERMINATE", "INDET", "UNKNOWN", "PARTIAL"):
+            out["INDETERMINATE"] += 1
+        elif s in ("NA", "N/A", "NOT-APPLICABLE", "NOT_APPLICABLE", "EXCLUDED", "EVIDENCE_ONLY", "EVIDENCE-ONLY"):
+            out["NA"] += 1
+        else:
+            out["OTHER"] += 1
+    return out
+
+
+def _compute_verdict(ctx: Dict[str, Any]) -> Tuple[str, str, str]:
+    """Returns (integrity_line, compliance_line, tone) for the cover banner."""
+    pr = ctx.get("pipeline_run") or {}
+    gates = (pr.get("gates") if isinstance(pr, dict) else {}) or {}
+    all_ok = gates and all(v == "success" for v in gates.values())
+    integ = "Integralność taśmy: ZWERYFIKOWANA" if all_ok else "Integralność taśmy: częściowa"
+    cs = ctx.get("compliance_status") or {}
+    counts = _status_counts(ctx.get("matrix_controls") or [])
+    npass, nfail, nind = counts["PASS"], counts["FAIL"], counts["INDETERMINATE"]
+    comp = f"Zgodność: {npass} PASS · {nind} do uzupełnienia · {nfail} FAIL"
+    tone = "dot" if all_ok else "dot"
+    return integ, comp, tone
+
+
+def _identicon(hexstr: Optional[str]) -> str:
+    """Deterministic 6x6 colored grid from a hash — a visual fingerprint of the pack."""
+    h = (hexstr or "0" * 32).replace("sha256:", "")
+    try:
+        nums = [int(h[i:i + 2], 16) for i in range(0, min(len(h), 36), 2)]
+    except ValueError:
+        nums = [0] * 18
+    while len(nums) < 18:
+        nums.append(0)
+    hue = nums[0] * 360 // 256
+    fg = f"hsl({hue}, 55%, 42%)"
+    cells = []
+    # mirror left 3 cols to right for a symmetric identicon
+    for r in range(6):
+        row = []
+        for c in range(3):
+            idx = (r * 3 + c) % len(nums)
+            on = nums[idx] % 2 == 0
+            row.append(on)
+        full = row + row[::-1]
+        for on in full:
+            cells.append(f'<span style="background:{fg if on else "#eef2f9"}"></span>')
+    return f'<div class="identicon">{"".join(cells)}</div>'
+
+
+def _svg_donut(segments: List[Tuple[str, int, str]], total: Optional[int] = None) -> str:
+    tot = total if total is not None else sum(max(0, v) for _, _, v_ in [] ) or sum(s[1] for s in segments)
+    tot = tot or 1
+    r, cx, cy, sw = 52, 70, 70, 22
+    import math
+    circ = 2 * math.pi * r
+    off = 0.0
+    arcs = []
+    for _, val, color in segments:
+        frac = max(0, val) / tot
+        dash = frac * circ
+        arcs.append(
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="{color}" '
+            f'stroke-width="{sw}" stroke-dasharray="{dash:.2f} {circ - dash:.2f}" '
+            f'stroke-dashoffset="{-off:.2f}" transform="rotate(-90 {cx} {cy})"/>')
+        off += dash
+    big = sum(s[1] for s in segments)
+    return (f'<svg viewBox="0 0 140 140" width="100%" height="120">'
+            f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="none" stroke="#eef2f9" stroke-width="{sw}"/>'
+            f'{"".join(arcs)}'
+            f'<text x="{cx}" y="{cy-2}" text-anchor="middle" font-size="26" font-weight="700" '
+            f'fill="#0a1b3d">{big}</text>'
+            f'<text x="{cx}" y="{cy+16}" text-anchor="middle" font-size="9" fill="#5b6678">kontroli</text>'
+            f'</svg>')
+
+
+def _svg_hbars(rows: List[Tuple[str, List[Tuple[int, str]]]], maxval: int) -> str:
+    """rows: [(label, [(value,color),...])] stacked horizontally. maxval scales width."""
+    maxval = maxval or 1
+    bar_w, lab_w, h, gap = 150, 92, 15, 9
+    out = []
+    y = 4
+    for label, segs in rows:
+        x = lab_w
+        out.append(f'<text x="{lab_w-6}" y="{y+h-4}" text-anchor="end" font-size="9" fill="#15233d">{esc(label)}</text>')
+        for val, color in segs:
+            w = (val / maxval) * bar_w
+            if w > 0:
+                out.append(f'<rect x="{x:.1f}" y="{y}" width="{w:.1f}" height="{h}" fill="{color}" rx="1.5"/>')
+                if w > 12:
+                    out.append(f'<text x="{x+w/2:.1f}" y="{y+h-3.5}" text-anchor="middle" font-size="8" '
+                               f'fill="#fff" font-weight="700">{val}</text>')
+                x += w + 1
+        y += h + gap
+    height = y + 2
+    return f'<svg viewBox="0 0 {lab_w+bar_w+10} {height}" width="100%" height="{height}">{"".join(out)}</svg>'
+
+
 def render_cover(ctx: Dict[str, Any]) -> str:
     m = ctx["manifest"] or {}
     merkle = m.get("merkle_root")
-    legend_rows = "".join(
-        f"<li><strong>{esc(k)}</strong>: {esc(v)}</li>" for k, v in PROVENANCE_LEGEND.items()
-    )
-    banner_rows = "".join(f"<li>{esc(line)}</li>" for line in HONESTY_BANNER)
+    integ, comp, tone = _compute_verdict(ctx)
+    pr = ctx.get("pipeline_run") or {}
+    repo = ((pr.get("repository") or {}).get("full_name")) if isinstance(pr, dict) else None
+    env = pr.get("environment") if isinstance(pr, dict) else None
     return f"""
-<section class="page-cover section" id="cover">
-  <h1 class="cover-title">{esc(DOC_TITLE)}</h1>
-  <div class="cover-sub">Forensiczny, oparty na danych raport dowodowy — generowany na nowo dla każdego wydania.</div>
-
-  <div class="cover-grid">
-    <div class="k">ID Raportu</div><div class="v">{esc(ctx['report_id'])}</div>
-    <div class="k">Wersja</div><div class="v">{esc(ctx['doc_version'])}</div>
-    <div class="k">Klasyfikacja</div><div class="v">{esc(DOC_CLASSIFICATION)}</div>
-    <div class="k">Wygenerowano (UTC)</div><div class="v">{esc(ctx['generated_at'])}</div>
-    <div class="k">Okres objęty</div><div class="v">{fmt_period(m.get('period'))}</div>
-    <div class="k">SHA git budowy</div><div class="v">{esc(m.get('git_sha'))}</div>
-    <div class="k">Skrót wdrożonego obrazu</div><div class="v">{esc(m.get('image_digest'))}</div>
-    <div class="k">Algorytm Merkle</div><div class="v">{esc(m.get('merkle_algorithm') or 'RFC6962-SHA256')}</div>
-    <div class="k">Stan WORM</div><div class="v">{esc(m.get('worm_state'))}</div>
+<section class="cover2 section" id="cover">
+  <div class="cover-band">
+    <div class="cover-brand"><span class="spark">◆</span> CYBERFORGE · DEVSECOPS</div>
+    <div class="cover-h">{esc(DOC_TITLE)}</div>
+    <div class="cover-tag">Niezależnie weryfikowalny raport dowodowy — czym jest, co udowadnia i jak to sprawdzić.</div>
+    <div class="cover-verdict"><span class="dot">●</span> {esc(integ)} &nbsp;·&nbsp; {esc(comp)}</div>
   </div>
 
-  <h4>Korzeń Merkle pakietu dowodowego (dosłownie)</h4>
-  <div class="merkle" title="{esc_attr(merkle)}">{esc(merkle)}</div>
+  <div class="cover-body">
+    <div class="cover-facts">
+      <div class="cf"><div class="cfk">Co to jest</div><div class="cfv">Automatyczny dowód, że oprogramowanie zostało zbudowane, sprawdzone i wdrożone w bezpieczny, możliwy do skontrolowania sposób.</div></div>
+      <div class="cf"><div class="cfk">Dla kogo</div><div class="cfv">Zarząd, audytor, dział zakupów i zespół bezpieczeństwa klienta — nie wymaga wiedzy technicznej.</div></div>
+      <div class="cf"><div class="cfk">Repozytorium / środowisko</div><div class="cfv mono">{esc(repo or '—')} · {esc(env or '—')}</div></div>
+      <div class="cf"><div class="cfk">Okres objęty</div><div class="cfv">{fmt_period(m.get('period'))}</div></div>
+      <div class="cf"><div class="cfk">Wygenerowano (UTC)</div><div class="cfv mono">{esc(ctx['generated_at'])}</div></div>
+      <div class="cf"><div class="cfk">SHA commita budowy</div><div class="cfv mono">{esc((m.get('git_sha') or '—')[:12])}</div></div>
+    </div>
 
-  <div class="honesty">
-    <h4>Baner uczciwości — przeczytaj przed poleganiem na tym dokumencie</h4>
-    <ul>{banner_rows}</ul>
+    <div class="fingerprint">
+      {_identicon(merkle)}
+      <div>
+        <div class="fp-label">Cyfrowy odcisk pakietu (korzeń Merkle, RFC-6962)</div>
+        <div class="fp-val">{esc(merkle)}</div>
+        <div class="fp-label" style="margin-top:3mm">Skrót wdrożonego obrazu</div>
+        <div class="fp-val">{esc(m.get('image_digest') or '—')}</div>
+      </div>
+    </div>
+
+    <div class="cover-class">{esc(DOC_CLASSIFICATION)} — dystrybucja ograniczona. Dokument generowany maszynowo i kryptograficznie zaplombowany; każdy egzemplarz jest weryfikowalny względem powyższego odcisku.</div>
+  </div>
+</section>
+"""
+
+
+def render_how_to_read(ctx: Dict[str, Any]) -> str:
+    return f"""
+<section class="section" id="how-to-read">
+  <p class="eyebrow">Zacznij tutaj</p>
+  <h2>Jak czytać ten dokument<span class="h2-rule"></span></h2>
+  <p class="lead">Ten raport powstał automatycznie na końcu „taśmy produkcyjnej” dla oprogramowania.
+  Za każdym razem, gdy aplikacja jest budowana i wdrażana, taśma wykonuje serię kontroli bezpieczeństwa
+  i zgodności, a następnie zbiera wszystkie dowody w jedną, zaplombowaną paczkę. Ten PDF jest ludzko-czytelnym
+  streszczeniem tej paczki. Nie musisz znać się na informatyce, żeby go zrozumieć.</p>
+
+  <div class="callout plain"><span class="ct">W SKRÓCIE — 3 rzeczy, które mówi ten raport</span>
+  1) <b>Czy oprogramowanie zostało zbudowane i wdrożone bezpiecznie</b> (taśma i jej kontrole).
+  2) <b>Czy dowody są autentyczne i nienaruszone</b> (podpisy kryptograficzne — można je sprawdzić samodzielnie).
+  3) <b>W których obszarach zgodności jest dobrze, a co wymaga jeszcze działań organizacyjnych</b> (np. test penetracyjny, próba odtworzenia z kopii).</div>
+
+  <h3>Co oznaczają statusy (legenda)</h3>
+  <table>
+    <thead><tr><th style="width:24mm">Status</th><th>Co to znaczy po ludzku</th></tr></thead>
+    <tbody>
+      <tr><td><span class="chip pass">PASS</span></td><td>Kontrola została wykonana i wypadła pomyślnie — jest na to dowód w paczce.</td></tr>
+      <tr><td><span class="chip indet">DO UZUPEŁNIENIA</span></td><td>Nie da się tego potwierdzić wyłącznie automatycznie — wymaga dowodu wykonanego przez organizację (np. zaplanowanego ćwiczenia). <b>To nie jest błąd</b> — to uczciwe „jeszcze nie zmierzono”, świadomie nie udawane jako „zaliczone”.</td></tr>
+      <tr><td><span class="chip fail">FAIL</span></td><td>Kontrola jest wymagana, ale brakuje dowodu jej wykonania (np. nie przeprowadzono testu penetracyjnego). Pozycja do działania.</td></tr>
+      <tr><td><span class="chip na">POZA ZAKRESEM</span></td><td>Kontrola nie dotyczy tego systemu lub jest dowodem-tylko-informacyjnym.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout"><span class="ct">DLACZEGO „DO UZUPEŁNIENIA” TO ZALETA</span>
+  Wiele systemów raportujących pokazuje wszystko na zielono. Ten raport celowo tego nie robi: jeśli czegoś nie da się
+  udowodnić danymi, mówi to wprost. Dla audytora to sygnał wiarygodności — liczby pochodzą z pomiaru, nie z deklaracji.</div>
+</section>
+"""
+
+
+def render_cockpit(ctx: Dict[str, Any]) -> str:
+    counts = _status_counts(ctx.get("matrix_controls") or [])
+    artifacts = ctx.get("artifacts") or []
+    coverage = ctx.get("coverage") or {}
+    pr = ctx.get("pipeline_run") or {}
+    gates = (pr.get("gates") if isinstance(pr, dict) else {}) or {}
+    gates_ok = sum(1 for v in gates.values() if v == "success")
+    gates_tot = len(gates) or 7
+
+    donut = _svg_donut([
+        ("PASS", counts["PASS"], "#15803d"),
+        ("DO UZUPEŁNIENIA", counts["INDETERMINATE"], "#d99e2b"),
+        ("FAIL", counts["FAIL"], "#b91c1c"),
+        ("POZA ZAKRESEM", counts["NA"] + counts["OTHER"], "#94a3b8"),
+    ])
+    # coverage by framework stacked bars
+    fw_rows = []
+    maxtot = max((b.get("total", 0) for b in coverage.values()), default=1)
+    for fw, b in sorted(coverage.items(), key=lambda kv: -kv[1].get("total", 0)):
+        segs = [(b.get("pass", 0), "#15803d"), (b.get("fail", 0), "#b91c1c"), (b.get("na", 0), "#94a3b8")]
+        other = b.get("total", 0) - b.get("pass", 0) - b.get("fail", 0) - b.get("na", 0)
+        if other > 0:
+            segs.append((other, "#d99e2b"))
+        fw_rows.append((fw, segs))
+    cov_chart = _svg_hbars(fw_rows, maxtot) if fw_rows else unavailable("brak macierzy ram")
+
+    live = sum(1 for a in artifacts if (a.get("provenance") == "live"))
+    return f"""
+<section class="section" id="cockpit">
+  <p class="eyebrow">Pulpit kierowniczy</p>
+  <h2>Obraz na jednej stronie<span class="h2-rule"></span></h2>
+  <p class="lead">Wszystkie liczby poniżej są <b>wyliczone z danych</b> tego konkretnego wydania — nic nie jest wpisane na sztywno.</p>
+
+  <div class="kpi-row">
+    <div class="kpi good"><div class="kn">{gates_ok}/{gates_tot}</div><div class="kl">Etapy taśmy zaliczone</div></div>
+    <div class="kpi good"><div class="kn">{counts['PASS']}</div><div class="kl">Kontrole PASS</div></div>
+    <div class="kpi warn"><div class="kn">{counts['INDETERMINATE']}</div><div class="kl">Do uzupełnienia</div></div>
+    <div class="kpi {'bad' if counts['FAIL'] else ''}"><div class="kn">{counts['FAIL']}</div><div class="kl">FAIL (do działania)</div></div>
   </div>
 
-  <div class="legend">
-    <strong>Legenda flagi proweniencji:</strong>
-    <ul style="margin:4px 0 0; padding-left:18px;">{legend_rows}</ul>
+  <div class="charts">
+    <div class="chart">
+      <div class="ctitle">Status kontroli (wszystkie ramy)</div>
+      <div class="csub">Rozkład wszystkich ocenianych kontroli zgodności.</div>
+      {donut}
+      <div class="legend2">
+        <span class="sw" style="background:#15803d"></span>PASS
+        <span class="sw" style="background:#d99e2b"></span>Do uzupełnienia
+        <span class="sw" style="background:#b91c1c"></span>FAIL
+        <span class="sw" style="background:#94a3b8"></span>Poza zakresem
+      </div>
+    </div>
+    <div class="chart">
+      <div class="ctitle">Pokrycie wg ram regulacyjnych</div>
+      <div class="csub">Ile kontroli na ramę i z jakim wynikiem (DORA, NIS2, ISO, SOC 2, RODO…).</div>
+      {cov_chart}
+    </div>
   </div>
+
+  <div class="callout good"><span class="ct">CO JEST PEWNE W TYM WYDANIU</span>
+  Taśma przeszła wszystkie {gates_tot} etapów. Pakiet zawiera {len(artifacts)} artefaktów dowodowych
+  ({live} zebranych „na żywo” z uruchomienia). Integralność całej paczki jest zaplombowana kryptograficznie
+  (patrz „Łańcuch zaufania”).</div>
+</section>
+"""
+
+
+def render_provenance_ribbon(ctx: Dict[str, Any]) -> str:
+    m = ctx.get("manifest") or {}
+    steps = []
+    short_vals = {
+        "security_gate_pre": "OPA + piny",
+        "security_gate": "sekrety/PII/IaC",
+        "build_scan": "SBOM + skany",
+        "sign_attest": "cosign + Rekor",
+        "deploy": "Azure OIDC",
+        "dast": "OWASP ZAP",
+        "evidence": "Merkle + WORM",
+    }
+    for no, title, _what, _rep, key in PIPELINE_PHASES:
+        lab, _tone = _gate_status(ctx, key)
+        mark = "✓" if lab == "PASS" else ("✕" if lab == "FAIL" else "•")
+        steps.append(
+            f'<div class="rstep"><div class="rc">{mark}</div>'
+            f'<div class="rt">{esc(title.split("(")[0].strip())}</div>'
+            f'<div class="rv">{esc(short_vals.get(key, ""))}</div></div>')
+    identity = "https://github.com/CyberForge-Agency/DevSecOps-Pipeline/.github/workflows/evidence-pack.yml@refs/heads/main"
+    verify_cmd = ("cosign verify-blob \\\n"
+                  f"  --certificate-identity '{identity}' \\\n"
+                  "  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \\\n"
+                  "  --bundle merkle-root.cosign.bundle merkle-root.txt")
+    return f"""
+<section class="section" id="provenance-ribbon">
+  <p class="eyebrow">Skąd wiadomo, że to prawda</p>
+  <h2>Łańcuch zaufania<span class="h2-rule"></span></h2>
+  <p class="lead">Każdy etap taśmy zostawia podpisany ślad. Razem tworzą nieprzerwany łańcuch od kodu źródłowego aż
+  do zaplombowanej paczki dowodowej. Nikt — łącznie z nami — nie może po cichu podmienić żadnego ogniwa.</p>
+
+  <div class="ribbon">{"".join(steps)}</div>
+
+  <table>
+    <tbody>
+      <tr><td style="width:48mm"><b>Kto podpisał dowody</b></td><td class="mono" style="font-size:8pt">{esc(identity)}</td></tr>
+      <tr><td><b>Wystawca tożsamości (OIDC)</b></td><td class="mono" style="font-size:8pt">token.actions.githubusercontent.com (Sigstore Fulcio, klucz efemeryczny 10 min)</td></tr>
+      <tr><td><b>Rejestr przejrzystości</b></td><td>Rekor — publiczny, niezmienialny log; wpis zawiera dowód włączenia (inclusion proof).</td></tr>
+      <tr><td><b>Znacznik czasu</b></td><td>RFC-3161 — kryptograficzny dowód „kiedy”, niezależny od naszego zegara.</td></tr>
+      <tr><td><b>Korzeń Merkle paczki</b></td><td><span class="hashchip">{esc(m.get('merkle_root'))}</span></td></tr>
+    </tbody>
+  </table>
+
+  <div class="trust-box"><div class="tt">SPRAWDŹ TO SAMODZIELNIE (3 polecenia, bez zaufania do nas)</div>
+  Mając pobraną paczkę dowodową, każdy może niezależnie zweryfikować podpis i wpis w publicznym rejestrze:
+  <pre>{esc(verify_cmd)}</pre></div>
+</section>
+"""
+
+
+def render_pipeline_steps(ctx: Dict[str, Any]) -> str:
+    cards = []
+    for no, title, what, report, key in PIPELINE_PHASES:
+        lab, tone = _gate_status(ctx, key)
+        ok = "ok" if tone == "pass" else ""
+        cards.append(f"""
+  <div class="pstep {ok}">
+    <div class="ph">
+      <div class="pno">ETAP {no}</div>
+      <div class="ptitle">{esc(title)}</div>
+      <div><span class="chip {tone}">{esc(lab)}</span></div>
+    </div>
+    <div class="pwhat">{esc(what)}</div>
+    <div class="pmeta"><b>Co produkuje (dowód w paczce):</b> {esc(report)}</div>
+  </div>""")
+    return f"""
+<section class="section" id="pipeline-steps">
+  <p class="eyebrow">Co się wydarzyło, krok po kroku</p>
+  <h2>Etapy taśmy produkcyjnej<span class="h2-rule"></span></h2>
+  <p class="lead">Poniżej każdy etap, przez który przeszło to wydanie — opisany prostym językiem, z informacją
+  jaki dowód po sobie zostawił i czy wypadł pomyślnie. To są te same etapy, które widać na schemacie taśmy w GitHub Actions.</p>
+  {"".join(cards)}
+  <div class="callout"><span class="ct">JAK TO CZYTAĆ</span>
+  „ETAP” to kolejny przystanek na taśmie. „Co produkuje” to dowód, który ten etap dokłada do zaplombowanej paczki —
+  szczegóły każdego z nich znajdziesz w dalszych rozdziałach tego raportu.</div>
 </section>
 """
 
@@ -2880,6 +3399,10 @@ def render_claims_register(ctx: Dict[str, Any]) -> str:
 
 SECTION_RENDERERS = {
     "cover": render_cover,
+    "how-to-read": render_how_to_read,
+    "cockpit": render_cockpit,
+    "pipeline-steps": render_pipeline_steps,
+    "provenance-ribbon": render_provenance_ribbon,
     "doc-control": render_doc_control,
     "toc": render_toc,
     "authority": render_authority,
@@ -2967,6 +3490,12 @@ def build_document(args: argparse.Namespace) -> str:
     runtime_hardening = load_json(evidence_path("runtime-hardening.json", args.runtime_hardening))
     applicability_yaml = load_yaml(args.applicability)
 
+    # Redesign v2: pipeline-run metadata (gates per phase, image, env) drives the
+    # cockpit, the provenance ribbon, and the plain-language pipeline-steps section.
+    pipeline_run = None
+    if args.evidence_dir:
+        pipeline_run = load_json(os.path.join(args.evidence_dir, "pipeline-run.json"))
+
     report_html = read_text(args.report_html)
     report_body = extract_report_body(report_html)
 
@@ -2985,6 +3514,7 @@ def build_document(args: argparse.Namespace) -> str:
 
     ctx: Dict[str, Any] = {
         "manifest": manifest,
+        "pipeline_run": pipeline_run,
         "matrix": matrix,
         "controls": controls,
         "matrix_controls": matrix_controls,

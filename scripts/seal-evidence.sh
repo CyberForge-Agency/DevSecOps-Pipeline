@@ -165,11 +165,40 @@ Usage:
   _manifest_sig_helper.py <manifest.json> set-tool  <name> <version>
   _manifest_sig_helper.py <manifest.json> get        <dotted.path>     (prints value)
   _manifest_sig_helper.py <manifest.json> set-worm  <state>
+  _manifest_sig_helper.py <manifest.json> record-bundle-sigs <evidence_dir>
+  _manifest_sig_helper.py <manifest.json> set-worm-from-marker <marker_path>
 All edits write the manifest back atomically (deterministic 2-space indent).
+
+record-bundle-sigs (EP-02): scans <evidence_dir> for every *.cosign.bundle and
+records, under manifest.signatures.bundles[], one self-documenting entry per
+bundle parsed from the Sigstore bundle (v0.3) verificationMaterial:
+  {artifact, cert_identity, oidc_issuer, rekor_log_index, signed_sha256,
+   bundle_path}
+This makes the manifest self-documenting: today the sidecar *.cosign.bundle
+files exist but manifest.signatures stays {}. The parser is degrade-honest:
+fields it cannot extract are recorded as null (never fabricated). It relies only
+on the Python stdlib + an optional `openssl` for the X.509 identity extraction;
+when openssl is absent, cert_identity / oidc_issuer degrade to null rather than
+crash. signed_sha256 / rekor_log_index come straight from the bundle JSON.
+
+set-worm-from-marker (EP-02): when a WORM-upload marker file is present, stamp
+manifest.worm_state from it (the marker's text, or a JSON {"state":...}); absent
+marker => leave worm_state untouched (honest: stays "pending" until WORM upload
+is proven). NEVER fabricates a "locked" state.
 """
+import base64
+import binascii
 import json
+import os
+import re
+import shutil
+import subprocess  # nosec B404 - used only to call the trusted local `openssl` binary
 import sys
 from pathlib import Path
+
+# Fulcio OID carrying the OIDC issuer of the identity that requested the cert.
+# https://github.com/sigstore/fulcio/blob/main/docs/oid-info.md
+FULCIO_ISSUER_OID = "1.3.6.1.4.1.57264.1.1"
 
 
 def load(p):
@@ -195,6 +224,237 @@ def parse_kv(args):
         else:
             out[k] = v
     return out
+
+
+# ---------------------------------------------------------------------------
+# EP-02: Sigstore-bundle parsing (self-documenting manifest.signatures).
+# ---------------------------------------------------------------------------
+def _b64_to_hex(b64):
+    """Decode a base64 digest to lowercase hex, or None on any failure."""
+    if not isinstance(b64, str) or not b64:
+        return None
+    try:
+        return binascii.hexlify(base64.b64decode(b64, validate=True)).decode("ascii")
+    except Exception:
+        return None
+
+
+def _extract_signed_sha256(bundle):
+    """Pull the SHA-256 of the signed blob out of a Sigstore bundle.
+
+    Covers BOTH bundle content variants:
+      * messageSignature.messageDigest{algorithm:"SHA2_256", digest:<b64>}
+        (cosign sign-blob over a raw artifact — the merkle-root / pdf bundles)
+      * dsseEnvelope (an attestation) — there is no single blob digest, so None.
+    Returns lowercase hex or None (degrade-honest, never fabricated).
+    """
+    if not isinstance(bundle, dict):
+        return None
+    ms = bundle.get("messageSignature")
+    if isinstance(ms, dict):
+        md = ms.get("messageDigest")
+        if isinstance(md, dict):
+            return _b64_to_hex(md.get("digest"))
+    return None
+
+
+def _extract_rekor_log_index(bundle):
+    """Return the Rekor transparency-log index (int) or None.
+
+    Handles the cosign-v3 sigstore bundle shape
+    (verificationMaterial.tlogEntries[].logIndex) and the legacy cosign-v2 shape
+    (rekorBundle.Payload.logIndex). Degrade-honest: None when absent.
+    """
+    if not isinstance(bundle, dict):
+        return None
+    vm = bundle.get("verificationMaterial")
+    if isinstance(vm, dict):
+        for e in (vm.get("tlogEntries") or []):
+            if isinstance(e, dict) and e.get("logIndex") is not None:
+                try:
+                    return int(str(e["logIndex"]))
+                except (TypeError, ValueError):
+                    pass
+    rb = bundle.get("rekorBundle")
+    if isinstance(rb, dict):
+        p = rb.get("Payload", rb.get("payload", {}))
+        if isinstance(p, dict) and p.get("logIndex") is not None:
+            try:
+                return int(str(p["logIndex"]))
+            except (TypeError, ValueError):
+                pass
+    return None
+
+
+def _cert_der_from_bundle(bundle):
+    """Return the leaf-cert DER bytes from a Sigstore bundle, or None.
+
+    The v0.3 bundle stores the leaf cert at
+    verificationMaterial.certificate.rawBytes (base64 DER). Older shapes used
+    x509CertificateChain.certificates[0].rawBytes. Degrade-honest.
+    """
+    if not isinstance(bundle, dict):
+        return None
+    vm = bundle.get("verificationMaterial")
+    if not isinstance(vm, dict):
+        return None
+    cert = vm.get("certificate")
+    if isinstance(cert, dict) and cert.get("rawBytes"):
+        try:
+            return base64.b64decode(cert["rawBytes"], validate=True)
+        except Exception:
+            return None
+    chain = vm.get("x509CertificateChain")
+    if isinstance(chain, dict):
+        certs = chain.get("certificates") or []
+        if certs and isinstance(certs[0], dict) and certs[0].get("rawBytes"):
+            try:
+                return base64.b64decode(certs[0]["rawBytes"], validate=True)
+            except Exception:
+                return None
+    return None
+
+
+def _extract_identity_issuer(bundle):
+    """Return (cert_identity, oidc_issuer) parsed from the leaf cert via openssl.
+
+    cert_identity  = the SAN (URI/email) — the workload/user identity Fulcio
+                     bound into the cert.
+    oidc_issuer    = the OIDC issuer URI from Fulcio OID 1.3.6.1.4.1.57264.1.1.
+    Degrade-honest: if openssl is absent or the cert cannot be parsed, BOTH are
+    returned as None — the manifest never fabricates an identity.
+    """
+    der = _cert_der_from_bundle(bundle)
+    if der is None:
+        return None, None
+    openssl = shutil.which("openssl")
+    if not openssl:
+        return None, None
+    try:
+        proc = subprocess.run(  # nosec B603 - fixed argv to the local openssl
+            [openssl, "x509", "-inform", "DER", "-noout", "-text"],
+            input=der,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=30,
+            check=False,
+        )
+    except Exception:
+        return None, None
+    text = proc.stdout.decode("utf-8", errors="replace")
+
+    identity = None
+    # SAN: "X509v3 Subject Alternative Name: [critical]\n   URI:... / email:..."
+    san_m = re.search(r"Subject Alternative Name:[^\n]*\n\s*([^\n]+)", text)
+    if san_m:
+        san_line = san_m.group(1).strip()
+        for part in san_line.split(","):
+            part = part.strip()
+            for prefix in ("URI:", "email:", "DNS:", "IP Address:"):
+                if part.startswith(prefix):
+                    identity = part[len(prefix):].strip()
+                    break
+            if identity:
+                break
+        if identity is None and san_line:
+            identity = san_line
+
+    issuer = None
+    # Fulcio issuer OID block: "1.3.6.1.4.1.57264.1.1:\n    https://issuer"
+    oid_m = re.search(
+        re.escape(FULCIO_ISSUER_OID) + r":[^\n]*\n\s*([^\n]+)", text
+    )
+    if oid_m:
+        # The value is a UTF8String; strip any leading non-printable framing.
+        raw = oid_m.group(1).strip()
+        url_m = re.search(r"https?://\S+", raw)
+        issuer = url_m.group(0) if url_m else raw
+
+    return identity, issuer
+
+
+def record_bundle_sigs(manifest_path, evidence_dir):
+    """EP-02: populate manifest.signatures.bundles[] from every *.cosign.bundle."""
+    data = load(manifest_path)
+    bundles_out = []
+    names = sorted(
+        f for f in os.listdir(evidence_dir) if f.endswith(".cosign.bundle")
+    )
+    for name in names:
+        full = os.path.join(evidence_dir, name)
+        try:
+            bundle = json.loads(Path(full).read_text(encoding="utf-8"))
+        except Exception:
+            # Corrupt/half-written bundle: record honestly with nulls, never skip
+            # silently (the completeness self-test FAILs corrupt bundles anyway).
+            bundles_out.append({
+                "artifact": name[: -len(".cosign.bundle")],
+                "cert_identity": None,
+                "oidc_issuer": None,
+                "rekor_log_index": None,
+                "signed_sha256": None,
+                "bundle_path": name,
+                "parse_error": "bundle not valid JSON",
+            })
+            continue
+        identity, issuer = _extract_identity_issuer(bundle)
+        bundles_out.append({
+            # The signed artifact is the bundle filename minus the suffix; e.g.
+            # merkle-root.cosign.bundle -> "merkle-root" (the merkle-root.txt blob).
+            "artifact": name[: -len(".cosign.bundle")],
+            "cert_identity": identity,
+            "oidc_issuer": issuer,
+            "rekor_log_index": _extract_rekor_log_index(bundle),
+            "signed_sha256": _extract_signed_sha256(bundle),
+            "bundle_path": name,
+        })
+    sigs = data.setdefault("signatures", {})
+    if not isinstance(sigs, dict):
+        sigs = {}
+        data["signatures"] = sigs
+    sigs["bundles"] = bundles_out
+    save(manifest_path, data)
+    sys.stdout.write(str(len(bundles_out)))
+    return 0
+
+
+def set_worm_from_marker(manifest_path, marker_path):
+    """EP-02: stamp manifest.worm_state from a WORM-upload marker, if present.
+
+    Degrade-honest: an absent / empty marker leaves worm_state UNCHANGED (it
+    stays "pending"), so the pack never over-claims an immutable archive. A
+    present marker may contain either plain text (used verbatim as the state) or
+    JSON {"state": ..., ...} (the whole object is recorded so the audit trail
+    keeps blob URL / timestamp / container provenance).
+    """
+    if not marker_path or not os.path.isfile(marker_path):
+        sys.stdout.write("absent")
+        return 0
+    try:
+        raw = Path(marker_path).read_text(encoding="utf-8").strip()
+    except Exception:
+        sys.stdout.write("unreadable")
+        return 0
+    if not raw:
+        sys.stdout.write("empty")
+        return 0
+    data = load(manifest_path)
+    try:
+        parsed = json.loads(raw)
+    except Exception:
+        parsed = None
+    if isinstance(parsed, dict):
+        # Preserve the full marker object for provenance; ensure a state field.
+        if "state" not in parsed:
+            parsed["state"] = "locked"
+        data["worm_state"] = parsed
+        state_label = str(parsed.get("state"))
+    else:
+        data["worm_state"] = raw
+        state_label = raw
+    save(manifest_path, data)
+    sys.stdout.write(state_label)
+    return 0
 
 
 def main(argv):
@@ -229,6 +489,12 @@ def main(argv):
         save(path, data)
         return 0
 
+    if cmd == "record-bundle-sigs":
+        return record_bundle_sigs(path, argv[2])
+
+    if cmd == "set-worm-from-marker":
+        return set_worm_from_marker(path, argv[2])
+
     if cmd == "get":
         cur = data
         for part in argv[2].split("."):
@@ -255,6 +521,8 @@ chmod +x "${HELPER}"
 set_sig()  { python3 "${HELPER}" "${MANIFEST_JSON}" set-sig "$@"; }
 set_tool() { python3 "${HELPER}" "${MANIFEST_JSON}" set-tool "$@"; }
 get_field(){ python3 "${HELPER}" "${MANIFEST_JSON}" get "$1"; }
+record_bundle_sigs() { python3 "${HELPER}" "${MANIFEST_JSON}" record-bundle-sigs "$1"; }
+set_worm_marker()    { python3 "${HELPER}" "${MANIFEST_JSON}" set-worm-from-marker "$1"; }
 
 # sha256 of a file -> hex (portable: prefer sha256sum, fall back to openssl).
 sha256_of() {
@@ -645,6 +913,47 @@ set_tool weasyprint "$(python3 -c 'import weasyprint,sys; sys.stdout.write(weasy
 set_tool gs "$(tool_version gs --version)"
 set_tool pdfsig "$( { have pdfsig && echo present; } || echo absent )"
 set_tool sha256sum "$(tool_version sha256sum --version)"
+
+# ---------------------------------------------------------------------------
+# Step 6a — EP-02: make the manifest self-documenting.
+#
+# Until now manifest.signatures stayed {} even though the seal produced
+# *.cosign.bundle sidecars, and worm_state stayed "pending" forever. Here we:
+#
+#   (1) Re-stamp manifest.json from the bundles that ACTUALLY landed on disk:
+#       for EACH *.cosign.bundle, record one self-documenting entry under
+#       signatures.bundles[] parsed from the Sigstore bundle (cert identity +
+#       OIDC issuer from the Fulcio cert, Rekor log index, the signed SHA-256,
+#       and the sidecar path). Degrade-honest: any field that cannot be parsed
+#       is recorded as null — never fabricated.
+#
+#   (2) Stamp worm_state IF a WORM-upload marker is present (env WORM_MARKER, or
+#       ${EVIDENCE_DIR}/worm-upload.marker). Absent marker => worm_state is left
+#       UNCHANGED ("pending") so the pack never over-claims an immutable archive.
+#
+# CRITICAL — Merkle consistency: this re-stamp ONLY mutates manifest.json (and
+# never the Merkle root or any leaf-hashed artifact). manifest.json is excluded
+# from the Merkle leaf set (EXCLUDED_NAMES in generate-evidence-manifest.py), and
+# the *.cosign.bundle sidecars are excluded too (EXCLUDED_SUFFIXES). So recording
+# the bundle metadata back into manifest.json perturbs neither merkle_root nor
+# any signed/timestamped blob — the seal outputs were produced over merkle-root
+# .txt / pdf.sha256, both also Merkle-excluded. The post-seal manifest therefore
+# stays consistent with the existing exclusion rules.
+# ---------------------------------------------------------------------------
+WORM_MARKER="${WORM_MARKER:-${EVIDENCE_DIR}/worm-upload.marker}"
+
+BUNDLE_COUNT="$(record_bundle_sigs "${EVIDENCE_DIR}" 2>/dev/null || echo 0)"
+log "manifest: recorded ${BUNDLE_COUNT:-0} cosign-bundle signature entry(ies) into signatures.bundles[]"
+
+WORM_RESULT="$(set_worm_marker "${WORM_MARKER}" 2>/dev/null || echo error)"
+case "${WORM_RESULT}" in
+  absent|empty|unreadable|error)
+    log "manifest: worm_state left as-is (WORM marker ${WORM_MARKER} ${WORM_RESULT}; honest: not over-claiming locked archive)"
+    ;;
+  *)
+    log "manifest: worm_state stamped from marker -> ${WORM_RESULT}"
+    ;;
+esac
 
 # Surface a quick summary.
 log "seal complete. signatures recorded in $(basename "${MANIFEST_JSON}"):"

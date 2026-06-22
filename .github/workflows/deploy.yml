@@ -382,6 +382,38 @@ jobs:
             echo "assert-retention PASSED: retention >= floor and WORM locked."
           fi
 
+      # EP-04 — eksport REALNEGO planu Terraform jako artefakt dla Fazy 6.
+      # /tmp/tfplan.json to wynik `terraform show -json tfplan` zapisany przez
+      # krok OPA retention powyżej (regenerowany tu tylko jeśli go brak, więc krok
+      # jest niezależny od kolejności). Dotąd walidator A.9 (assert-crypto) działał
+      # WYŁĄCZNIE tu, a Faza 6 nie miała planu do oceny — matryca zgodności
+      # raportowała "brak planu" zamiast realnego pomiaru posturze kryptograficznej.
+      # Ten artefakt przenosi autorytatywny plan do joba evidence-pack, który
+      # ponownie uruchamia assert-crypto i pieczętuje crypto-posture.json w paczce.
+      # Plan jest publikowany tylko na realnym (nie-PR) deployu: w PR plan powstaje
+      # na lokalnym stanie (patrz strażnik T-74), więc nie jest autorytatywny.
+      - name: Export Terraform plan JSON for evidence pack (EP-04)
+        if: github.event_name != 'pull_request'
+        working-directory: infra/
+        run: |
+          set -euo pipefail
+          if [ ! -s /tmp/tfplan.json ]; then
+            terraform show -json tfplan > /tmp/tfplan.json
+          fi
+          # Walidacja: plik MUSI być poprawnym JSON-em, inaczej Faza 6 i tak
+          # zdegraduje do INDETERMINATE (assert-crypto zwraca uczciwy envelope).
+          python3 -c 'import json,sys; json.load(open("/tmp/tfplan.json")); print("tfplan.json poprawny JSON")'
+          mkdir -p /tmp/tfplan-artifact
+          cp /tmp/tfplan.json /tmp/tfplan-artifact/tfplan.json
+
+      - name: Upload Terraform plan JSON artifact (EP-04)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: terraform-plan
+          path: /tmp/tfplan-artifact/tfplan.json
+          if-no-files-found: warn
+
       - name: Terraform Apply
         id: tf-apply
         working-directory: infra/

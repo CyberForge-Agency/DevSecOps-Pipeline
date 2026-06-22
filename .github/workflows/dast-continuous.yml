@@ -1,0 +1,240 @@
+name: "Continuous Authenticated DAST (proof-trail)"
+
+# =============================================================================
+# EP-10 — Ciągły, UWIERZYTELNIONY DAST (ZAP full-scan + opcjonalny nuclei).
+# -----------------------------------------------------------------------------
+# WAŻNE (HONESTY IS THE SPEC): to NIE jest formalny DORA TLPT (Threat-Led
+# Penetration Test). TLPT wymaga niezależnego, akredytowanego zespołu red-team i
+# zewnętrznej atestacji (DORA art. 26-27, RTS TLPT). Ten workflow utrzymuje
+# CIĄGŁY ślad dowodowy (proof-trail) uwierzytelnionych skanów dynamicznych
+# POMIĘDZY formalnymi testami TLPT — uzupełnia je, ale ich NIE zastępuje.
+#
+# Mechanika:
+#   * cron (codziennie) + ręczny workflow_dispatch z możliwością nadpisania celu.
+#   * wywołuje scripts/run-authenticated-dast.sh (własność innego lane) — skrypt
+#     wykonuje uwierzytelniony ZAP full-scan i opcjonalnie nuclei wobec
+#     wdrożonej aplikacji; sekrety uwierzytelnienia podawane przez env.
+#   * wynik (zap/nuclei) jest podpisywany keyless cosign (Fulcio OIDC + Rekor)
+#     i publikowany jako artefakt "proof-trail".
+#   * degrade-honest: brak skryptu/celu/sekretu -> uczciwy INDETERMINATE w
+#     dast-continuous-result.json, NIGDY sfabrykowany PASS; job się nie wywraca.
+# =============================================================================
+
+on:
+  schedule:
+    # 03:17 UTC codziennie — poza szczytem; ciągły ślad między formalnymi TLPT.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Nadpisanie URL celu (domyślnie vars.DAST_TARGET_URL)"
+        required: false
+        type: string
+        default: ""
+
+# Least privilege (OpenSSF Scorecard Token-Permissions): top-level read-only.
+permissions:
+  contents: read
+
+concurrency:
+  # Jeden ciągły skan naraz — kolejny cron czeka / wypiera poprzedni.
+  group: dast-continuous
+  cancel-in-progress: false
+
+jobs:
+  authenticated-dast:
+    name: "Authenticated ZAP full-scan + nuclei (signed proof-trail)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read        # actions/checkout + odczyt scripts/run-authenticated-dast.sh
+      id-token: write       # cosign keyless (Fulcio OIDC) sign-blob wyniku skanu
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      # Cel: nadpisanie z workflow_dispatch, inaczej vars.DAST_TARGET_URL.
+      # Walidacja schematu URL (defense-in-depth, jak w dast.yml) — wartość
+      # przekazywana wyłącznie przez env, nigdy interpolowana do ciała shella.
+      - name: Resolve + validate target URL
+        id: target
+        env:
+          DISPATCH_URL: ${{ github.event.inputs.target_url }}
+          VAR_URL: ${{ vars.DAST_TARGET_URL }}
+        run: |
+          set -euo pipefail
+          TARGET_URL="${DISPATCH_URL:-}"
+          if [ -z "${TARGET_URL}" ]; then
+            TARGET_URL="${VAR_URL:-}"
+          fi
+          TARGET_OK=true
+          if [ -z "${TARGET_URL}" ]; then
+            echo "::warning::Brak celu DAST (workflow_dispatch.target_url ani vars.DAST_TARGET_URL) — degrade-honest INDETERMINATE"
+            TARGET_OK=false
+          else
+            case "${TARGET_URL}" in
+              https://*|http://*) : ;;
+              *) echo "::warning::DAST target_url musi zaczynać się od http:// lub https:// (otrzymano: ${TARGET_URL}) — INDETERMINATE"; TARGET_OK=false ;;
+            esac
+          fi
+          {
+            echo "target_url=${TARGET_URL}"
+            echo "target_ok=${TARGET_OK}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@cad07c2e89fa2edd6e2d7bab4c1aa38e53f76003 # v4.1.1
+
+      # Uruchom uwierzytelniony skan przez skrypt innego lane. Skrypt sam wykonuje
+      # ZAP full-scan (uwierzytelniony) i opcjonalnie nuclei; sekrety logowania
+      # przekazujemy przez env. Degrade-honest: gdy skryptu brak lub cel/sekret
+      # niedostępny, zapisujemy uczciwy INDETERMINATE — nigdy sfabrykowany PASS.
+      - name: Run authenticated DAST (ZAP full-scan + optional nuclei)
+        id: scan
+        env:
+          DAST_TARGET_URL: ${{ steps.target.outputs.target_url }}
+          TARGET_OK: ${{ steps.target.outputs.target_ok }}
+          # Sekrety uwierzytelnienia (konsumowane przez run-authenticated-dast.sh).
+          # Brak sekretu -> skrypt/krok degraduje do INDETERMINATE, nie do PASS.
+          DAST_AUTH_USERNAME: ${{ secrets.DAST_AUTH_USERNAME }}
+          DAST_AUTH_PASSWORD: ${{ secrets.DAST_AUTH_PASSWORD }}
+          DAST_AUTH_LOGIN_URL: ${{ vars.DAST_AUTH_LOGIN_URL }}
+          DAST_OUTPUT_DIR: ${{ github.workspace }}/dast-out
+        run: |
+          set -uo pipefail
+          mkdir -p "${DAST_OUTPUT_DIR}"
+          SCAN_STATUS="INDETERMINATE"
+          SCAN_RC=0
+          SCRIPT="scripts/run-authenticated-dast.sh"
+
+          if [ "${TARGET_OK}" != "true" ]; then
+            echo "::warning::Cel DAST nieprawidłowy/pusty — pomijam skan, zapisuję INDETERMINATE"
+          elif [ ! -f "${SCRIPT}" ]; then
+            echo "::warning::${SCRIPT} nieobecny (własność innego lane, jeszcze niezaimplementowany) — INDETERMINATE (NEEDS-CI)"
+          else
+            set +e
+            bash "${SCRIPT}" \
+              --target "${DAST_TARGET_URL}" \
+              --output-dir "${DAST_OUTPUT_DIR}" \
+              2>&1 | tee "${DAST_OUTPUT_DIR}/run-authenticated-dast.log"
+            SCAN_RC=${PIPESTATUS[0]}
+            set -e
+            if [ "${SCAN_RC}" -eq 0 ]; then
+              SCAN_STATUS="PASS"
+            else
+              # rc!=0 oznacza realne findings lub błąd skanu — zapisywany uczciwie
+              # jako FAIL w wyniku; job pozostaje always-green (egzekucja to rola
+              # weryfikatora paczki / SLA reakcji na incydent, nie tego crona).
+              SCAN_STATUS="FAIL"
+              echo "::warning::run-authenticated-dast.sh zakończony rc=${SCAN_RC} — zapisuję FAIL w proof-trail"
+            fi
+          fi
+          echo "scan_status=${SCAN_STATUS}" >> "$GITHUB_OUTPUT"
+          echo "scan_rc=${SCAN_RC}" >> "$GITHUB_OUTPUT"
+
+      # Zbuduj jeden uczciwy rekord wyniku ciągłego DAST (proof-trail).
+      - name: Build proof-trail result JSON
+        id: result
+        env:
+          DAST_OUTPUT_DIR: ${{ github.workspace }}/dast-out
+          SCAN_STATUS: ${{ steps.scan.outputs.scan_status }}
+          SCAN_RC: ${{ steps.scan.outputs.scan_rc }}
+          TARGET_URL: ${{ steps.target.outputs.target_url }}
+          GH_RUN_ID: ${{ github.run_id }}
+          GH_SHA: ${{ github.sha }}
+          GH_EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${DAST_OUTPUT_DIR}"
+          python3 - <<'PY'
+          import json, os, datetime, glob
+          out_dir = os.environ["DAST_OUTPUT_DIR"]
+          status = os.environ.get("SCAN_STATUS", "INDETERMINATE")
+          artifacts = sorted(
+              os.path.basename(p) for p in glob.glob(os.path.join(out_dir, "*"))
+              if os.path.isfile(p)
+          )
+          doc = {
+              "schema": "cyberforge.dast-continuous-result/v1",
+              "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "generated_by": "dast-continuous.yml (EP-10)",
+              "kind": "continuous-authenticated-dast",
+              # Granica honesty — to NIE jest formalny DORA TLPT.
+              "is_formal_tlpt": False,
+              "tlpt_disclaimer": (
+                  "Ciągły uwierzytelniony DAST utrzymujący ślad dowodowy POMIĘDZY "
+                  "formalnymi testami TLPT (DORA art. 26-27). NIE zastępuje TLPT, "
+                  "który wymaga niezależnego red-teamu i zewnętrznej atestacji."
+              ),
+              "target_url": os.environ.get("TARGET_URL", ""),
+              "status": status,
+              "scan_rc": os.environ.get("SCAN_RC", ""),
+              "run": {
+                  "run_id": os.environ.get("GH_RUN_ID", ""),
+                  "sha": os.environ.get("GH_SHA", ""),
+                  "event": os.environ.get("GH_EVENT", ""),
+              },
+              "artifacts": artifacts,
+              "tools": ["OWASP ZAP full-scan (authenticated)", "nuclei (optional)"],
+          }
+          with open(os.path.join(out_dir, "dast-continuous-result.json"), "w", encoding="utf-8") as fh:
+              json.dump(doc, fh, indent=2)
+          print(f"dast-continuous-result.json status={status} artifacts={len(artifacts)}")
+          PY
+          {
+            echo "## Continuous Authenticated DAST (EP-10)"
+            echo ""
+            echo "> NIE jest to formalny DORA TLPT — ciągły ślad dowodowy między testami TLPT."
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Status | ${SCAN_STATUS} |"
+            echo "| Cel | ${TARGET_URL:-<brak>} |"
+            echo "| Zdarzenie | ${GH_EVENT} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Podpis keyless cosign (Fulcio OIDC + Rekor) wyniku — proof-trail jest
+      # kryptograficznie przypisany ("kto, co, kiedy"). Degrade-honest: retry jak
+      # w seal-evidence.sh; brak podpisu nie wywraca always-green crona.
+      - name: Sign proof-trail result (keyless cosign)
+        env:
+          DAST_OUTPUT_DIR: ${{ github.workspace }}/dast-out
+        run: |
+          set -uo pipefail
+          RESULT="${DAST_OUTPUT_DIR}/dast-continuous-result.json"
+          if [ ! -s "${RESULT}" ]; then
+            echo "::warning::brak ${RESULT} — pomijam podpis"
+            exit 0
+          fi
+          COSIGN_OK=0
+          if command -v cosign >/dev/null 2>&1; then
+            for attempt in 1 2 3 4 5; do
+              rc=0
+              COSIGN_EXPERIMENTAL=1 cosign sign-blob --yes \
+                --bundle "${DAST_OUTPUT_DIR}/dast-continuous-result.cosign.bundle" \
+                "${RESULT}" >/dev/null 2>/tmp/cosign-dast.err || rc=$?
+              if [ "${rc}" -eq 0 ] && [ -s "${DAST_OUTPUT_DIR}/dast-continuous-result.cosign.bundle" ]; then
+                COSIGN_OK=1
+                echo "cosign: podpisano dast-continuous-result.json -> dast-continuous-result.cosign.bundle"
+                break
+              fi
+              echo "::warning::cosign sign-blob próba ${attempt}/5 nieudana (rc=${rc})"
+              tail -n 3 /tmp/cosign-dast.err 2>/dev/null | sed 's/^/  cosign: /' || true
+              sleep $((attempt * 3))
+            done
+          else
+            echo "::warning::cosign niedostępny — wynik pozostaje niepodpisany (NEEDS-CI)"
+          fi
+          if [ "${COSIGN_OK}" -ne 1 ]; then
+            echo "::warning::podpis wyniku ciągłego DAST nieudany — proof-trail nadal publikowany (always-green)"
+          fi
+
+      - name: Upload signed DAST proof-trail
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: dast-continuous-proof-trail
+          path: dast-out/
+          if-no-files-found: warn
