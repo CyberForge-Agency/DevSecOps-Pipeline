@@ -247,7 +247,7 @@ GENERATED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 # yields PASS. The measured SHAs are carried so an auditor reads the values.
 sha_provenance_binding() {
   EVIDENCE_DIR="${EVIDENCE_DIR}" python3 - <<'PY'
-import json, os
+import base64, json, os
 from pathlib import Path
 
 ev = Path(os.environ["EVIDENCE_DIR"])
@@ -279,22 +279,57 @@ if not run_sha or run_sha.lower() in PLACEHOLDER:
     print(json.dumps(indeterminate("pipeline-run.json has no usable trigger.sha", run_sha)))
     raise SystemExit
 
-# 2) provenance commit from provenance.intoto.jsonl (first in-toto Statement's
-#    SLSA resolvedDependencies[].digest.gitCommit).
+# 2) provenance commit from provenance.intoto.jsonl. Each JSONL line may be EITHER
+#    a bare in-toto Statement OR a Sigstore *bundle* wrapping the DSSE envelope
+#    (mediaType=application/vnd.dev.sigstore.bundle...; the GitHub Artifact-
+#    Attestation / cosign attest default). For the bundle case the in-toto
+#    Statement lives base64-encoded in .dsseEnvelope.payload, so reading
+#    .predicate off the bundle's top level finds nothing — the historical false
+#    negative. We unwrap the DSSE first, then read the SLSA provenance v1 path
+#    predicate.buildDefinition.resolvedDependencies[].digest.gitCommit
+#    (slsa.dev/spec/v1.0/provenance; Sigstore bundle docs.sigstore.dev/about/bundle).
 prov_path = ev / "provenance.intoto.jsonl"
 if not prov_path.is_file() or prov_path.stat().st_size == 0:
     print(json.dumps(indeterminate(
         f"provenance.intoto.jsonl: {'missing' if not prov_path.is_file() else 'empty'}", run_sha)))
     raise SystemExit
+
+
+def _unwrap_statement(obj):
+    """Return the in-toto Statement dict for a JSONL line.
+
+    Accepts a bare Statement (has 'predicate'/'predicateType') OR a Sigstore
+    bundle whose DSSE payload (base64 in .dsseEnvelope.payload, or the bare
+    DSSE shape .payload) decodes to the Statement. Returns {} when nothing
+    parseable is found (never raises)."""
+    if not isinstance(obj, dict):
+        return {}
+    # Bare in-toto Statement already.
+    if "predicate" in obj or "predicateType" in obj:
+        return obj
+    # Sigstore bundle -> dsseEnvelope, or a bare DSSE envelope -> .payload.
+    env = obj.get("dsseEnvelope") if isinstance(obj.get("dsseEnvelope"), dict) else obj
+    payload = env.get("payload") if isinstance(env, dict) else None
+    if not isinstance(payload, str) or not payload:
+        return {}
+    try:
+        decoded = base64.b64decode(payload, validate=False)
+        stmt = json.loads(decoded.decode("utf-8"))
+        return stmt if isinstance(stmt, dict) else {}
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+
+
 prov_sha = None
 for line in prov_path.read_text(encoding="utf-8").splitlines():
     line = line.strip()
     if not line:
         continue
     try:
-        stmt = json.loads(line)
+        obj = json.loads(line)
     except json.JSONDecodeError:
         continue
+    stmt = _unwrap_statement(obj)
     pred = stmt.get("predicate", {}) if isinstance(stmt, dict) else {}
     bd = pred.get("buildDefinition", {}) if isinstance(pred, dict) else {}
     for dep in bd.get("resolvedDependencies", []) or []:

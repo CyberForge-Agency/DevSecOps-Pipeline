@@ -69,10 +69,12 @@ __all__ = [
     "exit_code_for",
     "days_since",
     "check_fresh",
+    "check_anchored_fresh",
     "check_threshold",
     "check_presence",
     "load_json",
     "gfm_table",
+    "attestation_for",
     "ValidatorError",
 ]
 
@@ -313,6 +315,178 @@ def check_fresh(
         measured=age,
         threshold=max_age_days,
         detail=detail,
+        tool_version=tool_version,
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Cryptographically-anchored freshness (EP-08)                                #
+# --------------------------------------------------------------------------- #
+# A plaintext "Last Reviewed: <date>" in a markdown file can be edited by anyone
+# to forge freshness. EP-08 replaces trust-in-a-string with trust-in-an-anchor:
+# a review is fresh ONLY if its date is corroborated by a tamper-evident marker
+# the reviewer cannot back-date —
+#   * a cosign-signed review marker (keyless: Fulcio cert + Rekor inclusion), or
+#   * an RFC-3161 timestamp token (.tsr) over the review record (freetsa is the
+#     default NON-QUALIFIED TSA; the genTime in the token is the trusted time).
+# If ONLY a plaintext date exists (no anchor), we DEGRADE to INDETERMINATE with a
+# note — we never silently trust a hand-editable date. This is the honest model:
+# an unanchored freshness claim "cannot be measured" rather than "passes".
+
+
+def _rfc3161_gentime(tsr_path: Path) -> date | None:
+    """Best-effort trusted-time (genTime) from an RFC-3161 .tsr token, or None.
+
+    Uses ``openssl ts -reply -in <tsr> -text`` and pulls the ``Time stamp:`` /
+    ``genTime`` line. We only need the DATE for a freshness comparison. Returns
+    None when openssl is unavailable or the token is unparseable (caller then
+    degrades honestly — never assumes freshness from a broken token).
+    """
+    import shutil
+    import subprocess
+
+    if not tsr_path.is_file() or tsr_path.stat().st_size == 0:
+        return None
+    if shutil.which("openssl") is None:
+        return None
+    try:
+        proc = subprocess.run(
+            ["openssl", "ts", "-reply", "-in", str(tsr_path), "-text"],
+            capture_output=True, text=True, check=False,
+        )
+    except OSError:
+        return None
+    if proc.returncode != 0:
+        return None
+    text = proc.stdout
+    # Require the token to have been GRANTED (a rejected token proves nothing).
+    if "Granted" not in text and "granted" not in text:
+        return None
+    m = _DATE_RE.search(text)
+    if not m:
+        return None
+    try:
+        return date.fromisoformat(m.group(0))
+    except ValueError:
+        return None
+
+
+def check_anchored_fresh(
+    date_str: str,
+    max_age_days: int,
+    *,
+    cosign_bundle: str | Path | None = None,
+    rfc3161_tsr: str | Path | None = None,
+    tier: str = Tier.BLOCKING,
+    label: str = "record",
+    tool_version: str | None = None,
+    today: date | None = None,
+) -> dict[str, Any]:
+    """Freshness anchored to a cryptographic marker, not a hand-editable date (EP-08).
+
+    PASS requires BOTH (a) a present, non-empty anchor — a cosign-signed review
+    marker bundle OR an RFC-3161 .tsr whose granted genTime corroborates the
+    review — AND (b) the anchored review being within ``max_age_days``.
+
+    Degradation ladder (honest, never a silent PASS):
+      * no anchor at all -> INDETERMINATE ("freshness cannot be cryptographically
+        verified; plaintext date is not trusted"). The plaintext age is recorded
+        in ``measured`` for the auditor, but it does NOT pass the gate.
+      * RFC-3161 anchor present: trusted time is the token's genTime; PASS iff
+        ``today - genTime <= max_age_days`` (the token cannot be back-dated).
+      * cosign bundle present but no .tsr: we cannot read a trusted *time* from a
+        keyless bundle offline (the Rekor inclusion time is the anchor, verified
+        by the verifier), so we PASS on the plaintext date ONLY when a signed
+        marker exists, and annotate that the time-anchor is the Rekor log entry.
+
+    Returns a ready envelope (does not exit).
+    """
+    cosign_present = bool(cosign_bundle) and Path(cosign_bundle).is_file() and (
+        Path(cosign_bundle).stat().st_size > 0
+    )
+    tsr_present = bool(rfc3161_tsr) and Path(rfc3161_tsr).is_file() and (
+        Path(rfc3161_tsr).stat().st_size > 0
+    )
+
+    # Always compute the plaintext age for the record (so the auditor sees it),
+    # but it is NEVER the sole basis for a PASS.
+    try:
+        plain_age: int | None = days_since(date_str, today=today)
+    except ValidatorError:
+        plain_age = None
+
+    if not cosign_present and not tsr_present:
+        return envelope(
+            Status.INDETERMINATE,
+            tier,
+            measured=plain_age,
+            threshold=max_age_days,
+            detail=(
+                f"{label}: brak kryptograficznej kotwicy świeżości (cosign / RFC-3161); "
+                f"data w dokumencie ({date_str}) nie jest zaufana — nie można "
+                f"zmierzyć świeżości"
+            ),
+            tool_version=tool_version,
+        )
+
+    # Prefer the RFC-3161 trusted time (genTime) — it is non-back-datable offline.
+    if tsr_present:
+        gentime = _rfc3161_gentime(Path(rfc3161_tsr))
+        if gentime is None:
+            return envelope(
+                Status.INDETERMINATE,
+                tier,
+                measured=plain_age,
+                threshold=max_age_days,
+                detail=(
+                    f"{label}: token RFC-3161 obecny, ale nie udało się odczytać "
+                    f"zaufanego czasu (genTime) — świeżość niezmierzona"
+                ),
+                tool_version=tool_version,
+            )
+        ref = today if today is not None else datetime.now(timezone.utc).date()
+        anchored_age = (ref - gentime).days
+        status = Status.PASS if anchored_age <= max_age_days else Status.FAIL
+        return envelope(
+            status,
+            tier,
+            measured=anchored_age,
+            threshold=max_age_days,
+            detail=(
+                f"{label}: świeżość zakotwiczona znacznikiem czasu RFC-3161 "
+                f"(genTime {gentime.isoformat()}, {anchored_age} dni temu); "
+                f"limit {max_age_days} dni"
+            ),
+            tool_version=tool_version,
+        )
+
+    # cosign bundle present (no .tsr): the trusted time anchor is the Rekor
+    # transparency-log inclusion time, verified at verify-time. The presence of a
+    # signed marker lifts the date from "hand-editable" to "signed by an identity",
+    # so we evaluate the plaintext date but annotate the anchor.
+    if plain_age is None:
+        return envelope(
+            Status.INDETERMINATE,
+            tier,
+            measured=None,
+            threshold=max_age_days,
+            detail=(
+                f"{label}: podpisany znacznik cosign obecny, ale data przeglądu "
+                f"({date_str}) jest nieczytelna — świeżość niezmierzona"
+            ),
+            tool_version=tool_version,
+        )
+    status = Status.PASS if plain_age <= max_age_days else Status.FAIL
+    return envelope(
+        status,
+        tier,
+        measured=plain_age,
+        threshold=max_age_days,
+        detail=(
+            f"{label}: świeżość zakotwiczona podpisem cosign (keyless; kotwicą czasu "
+            f"jest wpis w logu Rekor weryfikowany przy weryfikacji); data {date_str} "
+            f"({plain_age} dni temu); limit {max_age_days} dni"
+        ),
         tool_version=tool_version,
     )
 
@@ -577,6 +751,69 @@ def gfm_table(
 
 
 # --------------------------------------------------------------------------- #
+# In-toto attestation seam (EP-07)                                            #
+# --------------------------------------------------------------------------- #
+# Every control envelope can ADDITIONALLY emit a signed in-toto attestation that
+# wraps its verdict as a Statement over the evidence artifact (subject) and signs
+# it keyless with cosign. This converts an "asserted-document" verdict into a
+# Rekor-loggable, independently verifiable attestation. It is PURELY ADDITIVE:
+# the envelope output is unchanged; this just produces an extra .intoto.json (+
+# .cosign.bundle) alongside the verdict file. libattest is imported LAZILY so the
+# gate keeps running (and unit-testing) even where libattest is unavailable.
+
+
+def attestation_for(
+    env: dict[str, Any],
+    *,
+    evidence_name: str,
+    evidence_sha256: str | None = None,
+    evidence_path: str | Path | None = None,
+    control_id: str | None = None,
+    out_dir: str | Path | None = None,
+    sign: bool = True,
+) -> dict[str, Any] | None:
+    """Emit a signed in-toto attestation for a libcompliance envelope (EP-07).
+
+    Thin, dependency-tolerant wrapper over ``libattest.attestation_envelope``: it
+    feeds the envelope's verdict (status/tier/measured/validator/tool_version/
+    checked_at) into an in-toto Statement whose subject is the evidence artifact
+    (name + sha256), then keyless-cosign-signs it (degrade-honest).
+
+    Honesty: the attestation NEVER upgrades a verdict — an INDETERMINATE envelope
+    yields an INDETERMINATE predicate; a missing cosign/OIDC context yields a
+    ``signature.status == "unavailable"`` record, never a fabricated signature.
+
+    Returns the libattest result dict ``{statement, statement_errors, signature,
+    attestation_path}``, or ``None`` if libattest cannot be imported (the caller
+    treats a None as "attestation layer unavailable" and proceeds — the verdict
+    JSON is still the source of truth). This keeps backwards-compatibility: the
+    envelope-only path is wholly unaffected.
+    """
+    try:
+        from . import libattest  # type: ignore
+    except ImportError:
+        try:
+            import libattest  # type: ignore  # direct-invocation fallback
+        except ImportError:
+            return None
+    try:
+        return libattest.attestation_envelope(
+            env,
+            evidence_name=evidence_name,
+            evidence_sha256=evidence_sha256,
+            evidence_path=evidence_path,
+            control_id=control_id,
+            out_dir=out_dir,
+            sign=sign,
+        )
+    except libattest.AttestError:
+        # Library misuse (e.g. no digest and no readable path) must not crash a
+        # producing validator — record nothing rather than fabricate. The caller
+        # already has the authoritative verdict envelope.
+        return None
+
+
+# --------------------------------------------------------------------------- #
 # Internals                                                                    #
 # --------------------------------------------------------------------------- #
 
@@ -638,6 +875,26 @@ def _selftest() -> int:
         rows = gfm_table(str(reg), "Vendor Inventory")
         check("vendor inventory 10 rows", len(rows) == 10)
         check("vendor inventory has Vendor col", "Vendor" in rows[0])
+
+    # EP-08: anchored freshness degrades to INDETERMINATE without an anchor, and
+    # never silently trusts a plaintext date.
+    af = check_anchored_fresh("2026-06-16", 92, today=ref)
+    check("anchored_fresh no-anchor -> INDETERMINATE", af["status"] == "INDETERMINATE")
+    check("anchored_fresh records plaintext age", af["measured"] == 0)
+
+    # EP-07: attestation seam wraps an envelope as a schema-correct in-toto
+    # Statement (unsigned path), preserving the verdict status.
+    env_indet = envelope(Status.INDETERMINATE, Tier.BLOCKING, None, 92, "no date")
+    att = attestation_for(
+        env_indet, evidence_name="access-review.json",
+        evidence_sha256="a" * 64, control_id="A.8", sign=False,
+    )
+    if att is not None:  # libattest available
+        check("attestation schema-correct", att["statement_errors"] == [])
+        check("attestation preserves INDETERMINATE",
+              att["statement"]["predicate"]["status"] == "INDETERMINATE")
+        check("attestation never fake-signs",
+              att["signature"]["status"] in {"unavailable", "failed"})
 
     if failures:
         print("SELFTEST FAIL: " + ", ".join(failures), file=sys.stderr)

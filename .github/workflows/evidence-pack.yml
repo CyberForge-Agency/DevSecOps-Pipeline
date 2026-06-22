@@ -35,6 +35,22 @@ jobs:
     name: "Collect, Sanitize, Package, Archive"
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    # EP-05 — least-privilege scopes dla joba evidence-pack.
+    # WAŻNE odkrycie: eksport D.SCM czyta `GET /repos/{o}/{r}/branches/main/protection`,
+    # który wymaga uprawnienia repozytorium "Administration: read". Klucz workflow
+    # `permissions:` dla GITHUB_TOKEN NIE udostępnia scope'u "administration" (lista
+    # dozwolonych: actions/attestations/checks/contents/deployments/discussions/
+    # id-token/issues/models/packages/pages/pull-requests/repository-projects/
+    # security-events/statuses — patrz docs.github.com "Controlling permissions for
+    # GITHUB_TOKEN" oraz actionlint). Dlatego automatyczny GITHUB_TOKEN FUNDAMENTALNIE
+    # nie odczyta branch protection i to była przyczyna "Export failed for branch
+    # protection". Realny fix (poniżej, w kroku T-119): użyć tokenu z Administration:read
+    # (fine-grained PAT / GitHub App) podanego jako secrets.SCM_READ_TOKEN; gdy go brak,
+    # eksport degraduje do uczciwego INDETERMINATE (NEEDS-CI), nigdy fake PASS.
+    # Tu zachowujemy least-privilege: tylko read + id-token (do podpisu werdyktu).
+    permissions:
+      contents: read        # actions/checkout + odczyt skryptów/walidatorów
+      id-token: write       # cosign keyless (Fulcio OIDC) sign-blob werdyktów
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -94,6 +110,16 @@ jobs:
           path: evidence/provenance/
         continue-on-error: true
 
+      # EP-11 — zmierzony poziom SLSA provenance (slsa-provenance-level.json)
+      # wyprodukowany przez sign-and-attest.yml. Trafia do evidence/ i jest
+      # leaf-hashowany do manifestu + pieczętowany w paczce (Faza 6).
+      - name: Download SLSA provenance level marker (EP-11)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: slsa-provenance-level
+          path: evidence/
+        continue-on-error: true
+
       - name: Download ZAP results
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
@@ -106,6 +132,19 @@ jobs:
         with:
           name: coverage-report
           path: evidence/coverage/
+        continue-on-error: true
+
+      # EP-04 — pobranie REALNEGO planu Terraform (terraform-plan) wyeksportowanego
+      # przez deploy.yml. Trafia do evidence/infra/tfplan.json, skąd krok A.9
+      # (assert-crypto) ocenia rzeczywistą posturę kryptograficzną IaC zamiast
+      # raportować "brak planu". continue-on-error + degrade-honest: gdy artefaktu
+      # brak (np. dry-run PR, deploy się nie wykonał), assert-crypto zwróci uczciwy
+      # INDETERMINATE — nigdy sfabrykowany PASS.
+      - name: Download Terraform plan JSON (A.9 real plan, EP-04)
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: terraform-plan
+          path: evidence/infra/
         continue-on-error: true
 
       # Consolidate security reports into single file (T-43).
@@ -884,12 +923,25 @@ jobs:
               --doc docs/compliance/cspm-posture.md \
               --out evidence/cloud-posture.json
 
+          # (4) A.9 crypto posture (T-28, EP-04). assert-crypto.py ocenia REALNY plan
+          #     Terraform pobrany jako artefakt terraform-plan (evidence/infra/tfplan.json,
+          #     wyeksportowany przez deploy.yml). Walidator jest degrade-honest: przy
+          #     braku/uszkodzonym planie zwraca BLOCKING INDETERMINATE ("terraform JSON
+          #     error"), NIGDY sfabrykowany PASS. Tier BLOCKING — realny FAIL (regresja
+          #     TLS poniżej progu / brak szyfrowania at-rest / brak zarządzania kluczami)
+          #     na nie-PR słusznie zapala czerwone; INDETERMINATE bez planu to uczciwy
+          #     stan, który NIE wywraca joba (Faza 6 always-green; gate właściwy w
+          #     deploy.yml ocenia plan przed apply). Envelope jest pieczętowany do paczki.
+          gen_artifact "Crypto posture (A.9)" "evidence/crypto-posture.json" "BLOCKING" \
+            python3 scripts/validators/assert-crypto.py evidence/infra/tfplan.json \
+              --out evidence/crypto-posture.json
+
           {
             echo "## Part C Runtime/Threat/Cloud Evidence (T-115/T-117/T-118)"
             echo ""
             echo "| Artifact | Status |"
             echo "|----------|--------|"
-            for f in threat-model-validation.json runtime-hardening.json cloud-posture.json; do
+            for f in threat-model-validation.json runtime-hardening.json cloud-posture.json crypto-posture.json; do
               if [ -s "evidence/${f}" ]; then
                 st="$(jq -r '.status // .envelope.status // "present"' "evidence/${f}" 2>/dev/null || echo present)"
                 echo "| \`${f}\` | ${st} |"
@@ -1080,7 +1132,15 @@ jobs:
         env:
           IS_PR: ${{ github.event_name == 'pull_request' }}
           REPO_FULL: ${{ github.repository }}
-          GH_TOKEN: ${{ github.token }}
+          # EP-05 — eksport D.SCM czyta branch protection (Administration: read),
+          # czego automatyczny GITHUB_TOKEN NIE potrafi (brak scope'u w `permissions:`).
+          # Preferuj fine-grained PAT / GitHub App z Administration:read podany jako
+          # secrets.SCM_READ_TOKEN; gdy go brak, użyj github.token (eksport branch
+          # protection wtedy zwróci 403 -> {"error":...} -> source_control.py
+          # INDETERMINATE = uczciwy NEEDS-CI, nigdy fake PASS). To NIE osłabia
+          # least-privilege: token jest read-only do odczytu konfiguracji SCM.
+          SCM_READ_TOKEN: ${{ secrets.SCM_READ_TOKEN }}
+          GITHUB_FALLBACK_TOKEN: ${{ github.token }}
           COSIGN_IDENTITY: ${{ github.server_url }}/${{ github.repository }}/.github/workflows/evidence-pack.yml@${{ github.ref }}
           COSIGN_ISSUER: https://token.actions.githubusercontent.com
         run: |
@@ -1089,8 +1149,21 @@ jobs:
           REPO="${REPO_FULL##*/}"
           EXPORT_DIR=evidence/source-control-export
 
+          # Wybór tokenu: SCM_READ_TOKEN (z Administration:read) > github.token.
+          if [ -n "${SCM_READ_TOKEN:-}" ]; then
+            export GH_TOKEN="${SCM_READ_TOKEN}"
+            echo "source-control export: używam secrets.SCM_READ_TOKEN (oczekiwany Administration:read dla branch protection)"
+            SCM_TOKEN_SOURCE="SCM_READ_TOKEN"
+          else
+            export GH_TOKEN="${GITHUB_FALLBACK_TOKEN}"
+            echo "::warning::secrets.SCM_READ_TOKEN nieustawiony — fallback na GITHUB_TOKEN; eksport branch protection prawdopodobnie zwróci 403 (Administration:read niedostępne dla GITHUB_TOKEN) -> source_control.py INDETERMINATE (NEEDS-CI). Ustaw fine-grained PAT/App z Administration:read aby zmierzyć D.SCM."
+            SCM_TOKEN_SOURCE="github.token (fallback)"
+          fi
+          echo "| SCM export token | ${SCM_TOKEN_SOURCE} |" >> "$GITHUB_STEP_SUMMARY"
+
           # 1) Live export. The script self-degrades (exit 0 + {"error":...}
-          #    markers) when gh is unauthenticated/absent, so wrap defensively.
+          #    markers) when gh is unauthenticated/absent or an endpoint denies, so
+          #    wrap defensively. The {"error":...} markers ARE recorded as evidence.
           set +e
           bash scripts/export-github-security-config.sh "${ORG}" "${REPO}" "${EXPORT_DIR}" \
             > /tmp/sc-export.log 2>&1
@@ -1098,7 +1171,15 @@ jobs:
           set -e
           tail -n 5 /tmp/sc-export.log 2>/dev/null | sed 's/^/  export: /' || true
           if [ "${EXPORT_RC}" -ne 0 ]; then
-            echo "::warning::export-github-security-config.sh exited ${EXPORT_RC} (likely no GitHub token) — source_control.py will record INDETERMINATE"
+            echo "::warning::export-github-security-config.sh exited ${EXPORT_RC} (likely no/insufficient token) — source_control.py will record INDETERMINATE"
+          fi
+          # Surface czy branch-protection.json wyszedł realnie czy jako error-marker
+          # (to jest właśnie mierzony sygnał D.SCM, zapisywany do paczki).
+          BP="${EXPORT_DIR}/branch-protection.json"
+          if [ -s "${BP}" ] && ! jq -e 'has("error")' "${BP}" >/dev/null 2>&1; then
+            echo "source-control export: branch-protection.json pobrany realnie (D.SCM mierzalny)"
+          else
+            echo "::warning::source-control export: branch-protection.json brak/error-marker — D.SCM INDETERMINATE (token bez Administration:read)"
           fi
 
           # 2) Validate desired-vs-live drift -> source-control-evidence.json.

@@ -2,42 +2,55 @@
 set -euo pipefail
 
 # Sanitize PII from log files in evidence directory.
-# Uses Python for regex portability (GNU sed does not support PCRE lookaheads).
+# Deleguje redakcję do scripts/lib_pii_redact.py (warstwowa detekcja w stylu
+# Microsoft Presidio: format + walidacja sumy kontrolnej PESEL + allowlista
+# kluczy JSON). Czysty Python — GNU sed nie wspiera lookaheadów PCRE.
 #
-# A07-4: recurse into subdirectories (evidence/codeql, evidence/coverage,
-# evidence/source-control-export, evidence/provenance, ...) and cover more
-# textual artifact types (.sarif, .jsonl) — the previous top-level *.json/*.log
-# glob skipped the bulk of generated evidence (SARIF source snippets, the live
-# GitHub members/CODEOWNERS export). Run this AFTER all evidence is generated
-# (i.e. immediately before manifest/Merkle), not before.
+# EP-01: poprzedni "zachłanny" regex PESEL redagował po samym formacie daty,
+# przez co GitHub run_id (11 cyfr) w pipeline-run.json stawał się
+# "[REDACTED_PESEL]". Teraz PESEL jest redagowany TYLKO gdy przechodzi
+# oficjalną sumę kontrolną (wagi 1,3,7,9,1,3,7,9,1,3), a strukturalnie
+# bezpieczne klucze (run_id, run_number, *_digest, image_digest, merkle_root,
+# logIndex, sha, git_sha, *_sha256) są na allowliście i nigdy nie redagowane.
+#
+# A07-4: rekursja po podkatalogach (evidence/codeql, evidence/coverage,
+# evidence/source-control-export, evidence/provenance, ...) i pokrycie więcej
+# typów artefaktów tekstowych (.sarif, .jsonl). Uruchamiać PO wygenerowaniu
+# całości dowodów (tuż przed manifestem/Merkle), nie wcześniej.
 EVIDENCE_DIR="${1:-.}"
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB="${SCRIPT_DIR}/lib_pii_redact.py"
+
+# --selftest: deleguj do biblioteki (dowodzi: run_id przetrwa, ważny PESEL
+# zredagowany, nie-PESEL ze złym checksumem przetrwa).
+if [ "${1:-}" = "--selftest" ]; then
+  exec python3 "${LIB}" --selftest
+fi
+
+if [ ! -f "${LIB}" ]; then
+  echo "BŁĄD: brak biblioteki redakcji: ${LIB}" >&2
+  exit 1
+fi
+
+count=0
 while IFS= read -r -d '' f; do
   [ -f "$f" ] || continue
-  python3 - "$f" <<'PY'
-import pathlib
-import re
-import sys
-
-path = pathlib.Path(sys.argv[1])
-text = path.read_text(encoding="utf-8")
-
-# Remove email addresses except github.com and noreply domains
-text = re.sub(
-    r"\b[a-zA-Z0-9._%+-]+@(?![^@\s]*(?:github\.com|noreply)\b)[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b",
-    "[REDACTED_EMAIL]",
-    text,
-)
-
-# Remove potential PESEL numbers (format-level match)
-text = re.sub(
-    r"\b[0-9]{2}([02468]1|[13579][012])(0[1-9]|[12][0-9]|3[01])[0-9]{5}\b",
-    "[REDACTED_PESEL]",
-    text,
-)
-
-path.write_text(text, encoding="utf-8")
-PY
+  case "$f" in
+    *.json)
+      # Redakcja świadoma struktury JSON (honoruje allowlistę kluczy).
+      python3 "${LIB}" --json "$f"
+      ;;
+    *.jsonl)
+      # JSON Lines: każdy wiersz redagowany jako osobny obiekt JSON.
+      python3 "${LIB}" --jsonl "$f"
+      ;;
+    *)
+      # .log, .sarif i inne traktowane jako surowy tekst.
+      python3 "${LIB}" "$f"
+      ;;
+  esac
+  count=$((count + 1))
 done < <(find "${EVIDENCE_DIR}" -type f \( -name '*.json' -o -name '*.log' -o -name '*.sarif' -o -name '*.jsonl' \) -print0)
 
-echo "Log sanitization complete."
+echo "Sanityzacja logów zakończona (${count} plików)."

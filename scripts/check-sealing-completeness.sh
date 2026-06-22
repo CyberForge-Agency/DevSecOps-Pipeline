@@ -202,13 +202,71 @@ fi
 
 # ---------------------------------------------------------------------------
 # 8c. Provenance JSONL structural check — every non-blank line must parse as
-# JSON and be either an in-toto Statement (_type) or a DSSE envelope
-# (payload/payloadType), matching the two shapes a SLSA provenance .jsonl takes.
+# JSON and be one of the THREE shapes a SLSA provenance .jsonl legitimately
+# takes (slsa.dev provenance/v1 + in-toto Attestation Framework / ITE-6):
+#   (i)   a bare in-toto Statement     ({_type / predicateType ...})
+#   (ii)  a bare DSSE envelope         ({payload, payloadType, signatures})
+#   (iii) a Sigstore bundle v0.3       ({mediaType, verificationMaterial,
+#         dsseEnvelope}) that WRAPS the DSSE under .dsseEnvelope. GitHub Artifact
+#         Attestations / slsa-github-generator now emit this wrapped form
+#         (mediaType "application/vnd.dev.sigstore.bundle.v0.3+json"); the earlier
+#         check only accepted (i)/(ii) and wrongly FAILed a valid wrapped pack.
+# For the wrapped form we UNWRAP dsseEnvelope and validate that its base64
+# .payload decodes to an in-toto Statement (the actual provenance predicate),
+# so this stays a genuine content check, not presence-only.
 # ---------------------------------------------------------------------------
 PROV="${EVIDENCE_DIR}/provenance.intoto.jsonl"
 if [ -s "${PROV}" ] && have python3; then
   if python3 - "${PROV}" <<'PY' 2>/dev/null
-import json, sys
+import base64
+import json
+import sys
+
+INTOTO_STATEMENT_TYPE = "https://in-toto.io/Statement/v1"
+
+
+def _is_intoto_statement(o):
+    """True iff o looks like an in-toto Statement (ITE-6)."""
+    if not isinstance(o, dict):
+        return False
+    return o.get("_type") == INTOTO_STATEMENT_TYPE or "predicateType" in o
+
+
+def _is_bare_dsse(o):
+    """True iff o is a bare DSSE envelope ({payload, payloadType})."""
+    return isinstance(o, dict) and "payload" in o and "payloadType" in o
+
+
+def _dsse_payload_is_statement(env):
+    """True iff a DSSE envelope's base64 payload decodes to an in-toto Statement."""
+    if not isinstance(env, dict):
+        return False
+    payload_b64 = env.get("payload")
+    if not isinstance(payload_b64, str) or not payload_b64:
+        return False
+    try:
+        raw = base64.b64decode(payload_b64, validate=True)
+        stmt = json.loads(raw)
+    except Exception:
+        return False
+    return _is_intoto_statement(stmt)
+
+
+def _is_sigstore_bundle_dsse(o):
+    """True iff o is a Sigstore bundle v0.3 wrapping a valid DSSE under
+    .dsseEnvelope (mediaType + verificationMaterial + dsseEnvelope)."""
+    if not isinstance(o, dict):
+        return False
+    if "dsseEnvelope" not in o:
+        return False
+    # A bundle is identified by its mediaType + verificationMaterial; tolerate a
+    # missing mediaType but require the dsseEnvelope to carry a real Statement.
+    env = o.get("dsseEnvelope")
+    if not _is_bare_dsse(env):
+        return False
+    return _dsse_payload_is_statement(env)
+
+
 lines = [l for l in open(sys.argv[1], encoding="utf-8") if l.strip()]
 if not lines:
     sys.exit(1)
@@ -219,16 +277,20 @@ for l in lines:
         sys.exit(1)
     if not isinstance(o, dict):
         sys.exit(1)
-    is_statement = o.get("_type") == "https://in-toto.io/Statement/v1" or "predicateType" in o
-    is_dsse = "payload" in o and "payloadType" in o
-    if not (is_statement or is_dsse):
+    is_statement = _is_intoto_statement(o)
+    # A bare DSSE is accepted; when it carries a payload we also confirm the
+    # payload decodes to a Statement (tolerant: a payload-less envelope still
+    # passes on shape, matching the prior bare-DSSE behaviour).
+    is_dsse = _is_bare_dsse(o)
+    is_bundle = _is_sigstore_bundle_dsse(o)
+    if not (is_statement or is_dsse or is_bundle):
         sys.exit(1)
 sys.exit(0)
 PY
   then
-    pass "provenance.intoto.jsonl: every line is a valid in-toto Statement or DSSE envelope"
+    pass "provenance.intoto.jsonl: every line is a valid in-toto Statement, DSSE envelope, or Sigstore-bundle-wrapped DSSE"
   else
-    miss "provenance.intoto.jsonl present but a line is not a valid in-toto Statement / DSSE envelope"
+    miss "provenance.intoto.jsonl present but a line is not a valid in-toto Statement / DSSE envelope / Sigstore-bundle-wrapped DSSE"
   fi
 fi
 

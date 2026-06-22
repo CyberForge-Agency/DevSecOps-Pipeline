@@ -480,6 +480,48 @@ class Row:
     source_file: str
     remediation: str = ""
     notes: list[str] = field(default_factory=list)
+    # EP-07: the in-toto control attestation that accompanies this verdict, if any.
+    # Additive — a None/absent attestation never changes the verdict or the gate.
+    attestation: dict[str, Any] | None = None
+
+
+def _collect_attestation(evidence_dir: Path, out_name: str) -> dict[str, Any] | None:
+    """Locate the EP-07 in-toto attestation accompanying a verdict file, if present.
+
+    Convention (libattest.attestation_envelope): for a verdict ``<out_name>`` the
+    attestation Statement is ``<out_name>.intoto.json`` and the keyless cosign
+    bundle is ``<out_name>.cosign.bundle`` in the same evidence directory. This is
+    READ-ONLY and additive: a missing attestation yields None and never alters the
+    control's verdict, tier, or the overall gate. We record the attestation's
+    presence + signing status HONESTLY (signed / unavailable / unsigned), never a
+    fabricated "signed".
+    """
+    intoto = evidence_dir / f"{out_name}.intoto.json"
+    bundle = evidence_dir / f"{out_name}.cosign.bundle"
+    if not intoto.is_file():
+        return None
+    record: dict[str, Any] = {
+        "statement_file": intoto.name,
+        "predicate_type": None,
+        "subject_sha256": None,
+        "signature_status": "unsigned",
+    }
+    try:
+        stmt = json.loads(intoto.read_text(encoding="utf-8"))
+        record["predicate_type"] = stmt.get("predicateType")
+        subjects = stmt.get("subject")
+        if isinstance(subjects, list) and subjects:
+            digest = subjects[0].get("digest", {})
+            if isinstance(digest, dict):
+                record["subject_sha256"] = digest.get("sha256")
+    except (json.JSONDecodeError, OSError, AttributeError):
+        # Present-but-unparseable attestation: record honestly, do not crash.
+        record["signature_status"] = "unparseable"
+        return record
+    if bundle.is_file() and bundle.stat().st_size > 0:
+        record["bundle_file"] = bundle.name
+        record["signature_status"] = "signed"
+    return record
 
 
 def _now() -> str:
@@ -651,6 +693,7 @@ def _aggregate(
             measured=env.get("measured"), threshold=env.get("threshold"),
             detail=env.get("detail", ""), source_file=control.out_name,
             remediation=control.remediation if status != PASS else "",
+            attestation=_collect_attestation(evidence_dir, control.out_name),
         ))
         if not required and control.needs_tfplan:
             rows[-1].notes.append("optional-in-evidence-pack")
@@ -713,6 +756,14 @@ def _build_report(
         "fail": sum(1 for r in rows if r.status == FAIL),
         "indeterminate": sum(1 for r in rows if r.status == INDETERMINATE),
         "evidence_only": sum(1 for r in rows if r.tier == EVIDENCE_ONLY),
+        # EP-07: how many controls carry an in-toto attestation, and how many of
+        # those are cosign-signed (Rekor-loggable). Additive telemetry; it never
+        # affects overall_status. Raising "signed" raises the live/measured ratio.
+        "attested": sum(1 for r in rows if r.attestation is not None),
+        "attested_signed": sum(
+            1 for r in rows
+            if r.attestation is not None and r.attestation.get("signature_status") == "signed"
+        ),
     }
     matrix_block: dict[str, Any] = {
         "blocking_failures": matrix_blocking, "source": "compliance-matrix.json",
@@ -734,6 +785,7 @@ def _build_report(
                 "detail": r.detail, "source_file": r.source_file,
                 **({"remediation": r.remediation} if r.remediation else {}),
                 **({"notes": r.notes} if r.notes else {}),
+                **({"attestation": r.attestation} if r.attestation else {}),
             }
             for r in rows
         ],

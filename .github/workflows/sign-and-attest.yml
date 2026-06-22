@@ -80,7 +80,17 @@ jobs:
         env:
           IMAGE_URI: ${{ inputs.image_uri }}
 
-      - name: Generate build provenance attestation (GitHub native)
+      # EP-11 — provenance budowy w kierunku SLSA Build L3 (niefalsyfikowalna).
+      # actions/attest-build-provenance generuje atestację provenance podpisaną przez
+      # IZOLOWANĄ infrastrukturę GitHub (Fulcio OIDC + Rekor), której job NIE jest w
+      # stanie podrobić — to mechanizm L3 (provenance generowane poza kontrolą kroku
+      # budującego). v4 jest cienką nakładką na actions/attest; SHA przypięty do
+      # v4.1.0 (a2bbfa25... — najnowsze wydanie, zweryfikowane przez API tagów).
+      # continue-on-error pozostaje, bo atestacje natywne nie są dostępne dla
+      # prywatnych repo na kontach osobistych — w takim wypadku poniżej powstaje
+      # JAWNIE oznaczony fallback (forgeable, L1), a krok "Record SLSA provenance
+      # level" zapisuje UCZCIWY zmierzony poziom, nigdy sztywne "L3".
+      - name: Generate build provenance attestation (GitHub native, SLSA Build L3)
         id: provenance
         continue-on-error: true  # Not available for private repos on personal accounts
         uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
@@ -110,6 +120,72 @@ jobs:
           # provenance.intoto.jsonl is never uploaded and labelled DORA Art.28 / NIS2 Art.21.2.d.
           python3 -c 'import json;[json.loads(l) for l in open("provenance-out/provenance.intoto.jsonl") if l.strip()]'
           echo "PROVENANCE_JSONL_OK"
+
+      # EP-11 — UCZCIWY, ZMIERZONY poziom SLSA provenance (nigdy sztywne "L3").
+      # Rozróżnia dwie ścieżki realnie wykonane w tym jobie:
+      #   * native attestation OK (outcome=success, bundle-path niepusty) ->
+      #     non_falsifiable=true, provenance_level="SLSA_BUILD_L3_ASPIRING"
+      #     (provenance generowane przez izolowaną infrastrukturę GitHub poza
+      #     kontrolą kroku budującego; pełna certyfikacja L3 wymaga niezależnej
+      #     weryfikacji buildera — stąd "ASPIRING", nie zadeklarowane L3).
+      #   * fallback skryptowy -> non_falsifiable=false, provenance_level=
+      #     "SLSA_BUILD_L1" (atestacja wygenerowana przez sam job = forgeable).
+      # Marker jest pieczętowany do paczki (Faza 6 leaf-hashuje evidence/), aby
+      # audytor widział ZMIERZONY poziom niefalsyfikowalności, a nie deklarację.
+      - name: Record SLSA provenance level (measured, EP-11)
+        if: always()
+        env:
+          PROV_OUTCOME: ${{ steps.provenance.outcome }}
+          PROV_BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          IMAGE_URI: ${{ inputs.image_uri }}
+          IMAGE_DIGEST: ${{ inputs.image_digest }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, datetime
+          outcome = os.environ.get("PROV_OUTCOME", "")
+          bundle = os.environ.get("PROV_BUNDLE", "")
+          native_ok = (outcome == "success") and bool(bundle)
+          if native_ok:
+              level = "SLSA_BUILD_L3_ASPIRING"
+              non_falsifiable = True
+              method = "actions/attest-build-provenance (GitHub-isolated signer, Fulcio+Rekor)"
+              detail = ("Provenance podpisane przez izolowaną infrastrukturę GitHub poza "
+                        "kontrolą kroku budującego — niefalsyfikowalne (cel SLSA Build L3). "
+                        "Pełna certyfikacja L3 wymaga niezależnej weryfikacji buildera.")
+          else:
+              level = "SLSA_BUILD_L1"
+              non_falsifiable = False
+              method = "scripts/generate-provenance.sh (fallback generowany przez job — forgeable)"
+              detail = ("Atestacja natywna niedostępna (np. prywatne repo na koncie osobistym); "
+                        "użyto fallbacku skryptowego generowanego przez sam job, który NIE jest "
+                        "niefalsyfikowalny. Honest L1.")
+          doc = {
+              "schema": "cyberforge.slsa-provenance-level/v1",
+              "generated_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "generated_by": "sign-and-attest.yml (EP-11)",
+              "image_uri": os.environ.get("IMAGE_URI", ""),
+              "image_digest": os.environ.get("IMAGE_DIGEST", ""),
+              "native_attestation_outcome": outcome,
+              "native_attestation_bundle_present": bool(bundle),
+              "non_falsifiable": non_falsifiable,
+              "provenance_level": level,
+              "method": method,
+              "detail": detail,
+          }
+          with open("slsa-provenance-level.json", "w", encoding="utf-8") as fh:
+              json.dump(doc, fh, indent=2)
+          print(f"slsa-provenance-level: {level} (non_falsifiable={non_falsifiable})")
+          PY
+          {
+            echo "## SLSA Build Provenance Level (EP-11)"
+            echo ""
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| Poziom provenance | $(jq -r '.provenance_level' slsa-provenance-level.json) |"
+            echo "| Niefalsyfikowalne | $(jq -r '.non_falsifiable' slsa-provenance-level.json) |"
+            echo "| Metoda | $(jq -r '.method' slsa-provenance-level.json) |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Bundle signing proof
         if: always()
@@ -240,6 +316,16 @@ jobs:
         with:
           name: signing-proof
           path: signing-proof.txt
+
+      # EP-11 — zmierzony poziom SLSA provenance jako osobny artefakt, pobierany i
+      # pieczętowany przez Fazę 6 (evidence-pack.yml) do paczki dowodowej.
+      - name: Upload SLSA provenance level marker (EP-11)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: slsa-provenance-level
+          path: slsa-provenance-level.json
+          if-no-files-found: warn
 
       - name: Job Summary
         if: always()
